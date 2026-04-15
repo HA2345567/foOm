@@ -71,7 +71,7 @@ export function RecordingStudio() {
       <div className="flex-1 flex items-center justify-center p-6">
         <AnimatePresence mode="wait">
           {/* === IDLE STATE === */}
-          {state === "idle" && !result && (
+          {(state === "idle" || state === "requesting") && !result && (
             <motion.div
               key="idle"
               initial={{ opacity: 0, y: 20 }}
