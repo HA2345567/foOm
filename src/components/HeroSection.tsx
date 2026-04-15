@@ -16,7 +16,7 @@ export function HeroSection() {
           transition={{ duration: 0.5 }}
           className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full border border-border bg-surface mb-8"
         >
-          <span className="w-2 h-2 rounded-full bg-green-500 animate-pulse" />
+          <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
           <span className="text-caption text-muted-foreground">Now in public beta</span>
         </motion.div>
 
@@ -85,7 +85,7 @@ export function HeroSection() {
               <div className="flex flex-col items-center gap-4">
                 {/* Record button */}
                 <div className="w-16 h-16 rounded-full border-2 border-muted-foreground/30 flex items-center justify-center">
-                  <div className="w-10 h-10 rounded-full bg-red-500/80" />
+                  <div className="w-10 h-10 rounded-full bg-destructive/80" />
                 </div>
                 <span className="text-caption text-muted-foreground">Click to start recording</span>
               </div>
