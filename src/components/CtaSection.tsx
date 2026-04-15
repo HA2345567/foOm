@@ -1,3 +1,4 @@
+import { Link } from "@tanstack/react-router";
 import { motion } from "framer-motion";
 
 export function CtaSection() {
@@ -18,9 +19,9 @@ export function CtaSection() {
           ZoomCast makes it happen in one click.
         </p>
         <div className="mt-10">
-          <button className="px-10 py-4 rounded-lg bg-primary text-primary-foreground font-medium shadow-button hover:opacity-90 transition-opacity text-sm">
+          <Link to="/record" className="px-10 py-4 rounded-lg bg-primary text-primary-foreground font-medium shadow-button hover:opacity-90 transition-opacity text-sm">
             Start Recording — It's Free
-          </button>
+          </Link>
         </div>
         <p className="mt-4 text-xs text-muted-foreground">
           No account required. No downloads. Works in Chrome & Edge.

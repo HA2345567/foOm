@@ -1,3 +1,4 @@
+import { Link } from "@tanstack/react-router";
 import { motion } from "framer-motion";
 
 export function HeroSection() {
@@ -50,9 +51,12 @@ export function HeroSection() {
           transition={{ duration: 0.6, delay: 0.3 }}
           className="mt-10 flex flex-col sm:flex-row items-center justify-center gap-4"
         >
-          <button className="px-8 py-3.5 rounded-lg bg-primary text-primary-foreground font-medium shadow-button hover:opacity-90 transition-opacity text-sm">
+          <Link
+            to="/record"
+            className="px-8 py-3.5 rounded-lg bg-primary text-primary-foreground font-medium shadow-button hover:opacity-90 transition-opacity text-sm"
+          >
             Start Recording — Free
-          </button>
+          </Link>
           <a
             href="#how-it-works"
             className="px-8 py-3.5 rounded-lg border border-border bg-surface text-foreground font-medium hover:bg-accent transition-colors text-sm"
