@@ -90,9 +90,9 @@ export function Navbar() {
                   {link.label}
                 </a>
               ))}
-              <button className="mt-2 w-full px-4 py-3 rounded-lg bg-primary text-primary-foreground text-sm font-medium">
+              <Link to="/record" className="mt-2 block w-full px-4 py-3 rounded-lg bg-primary text-primary-foreground text-sm font-medium text-center" onClick={() => setMobileOpen(false)}>
                 Start Recording
-              </button>
+              </Link>
             </div>
           </motion.div>
         )}
