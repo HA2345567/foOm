@@ -1,26 +1,41 @@
 import { createFileRoute } from "@tanstack/react-router";
+import { Navbar } from "../components/Navbar";
+import { HeroSection } from "../components/HeroSection";
+import { FeaturesSection } from "../components/FeaturesSection";
+import { HowItWorks } from "../components/HowItWorks";
+import { PricingSection } from "../components/PricingSection";
+import { CtaSection } from "../components/CtaSection";
+import { Footer } from "../components/Footer";
 
 export const Route = createFileRoute("/")({
   component: Index,
+  head: () => ({
+    meta: [
+      { title: "ZoomCast — AI Screen Recorder That Makes Demos Look Pro" },
+      {
+        name: "description",
+        content:
+          "Record your screen in the browser. AI auto-zoom, silence removal, and subtitles make every demo look cinematic. No downloads required.",
+      },
+      { property: "og:title", content: "ZoomCast — AI Screen Recorder" },
+      {
+        property: "og:description",
+        content: "Record your screen. AI makes it look pro. No downloads, no editing.",
+      },
+    ],
+  }),
 });
 
-// IMPORTANT: Replace this placeholder. For sites with multiple pages (About, Services, Contact, etc.),
-// create separate route files (about.tsx, services.tsx, contact.tsx) — don't put all pages in this file.
-function PlaceholderIndex() {
+function Index() {
   return (
-    <div
-      className="flex min-h-screen items-center justify-center"
-      style={{ backgroundColor: "#fcfbf8" }}
-    >
-      <img
-        data-lovable-blank-page-placeholder="REMOVE_THIS"
-        src="/placeholder.svg"
-        alt="Your app will live here!"
-      />
+    <div className="min-h-screen bg-background text-foreground">
+      <Navbar />
+      <HeroSection />
+      <FeaturesSection />
+      <HowItWorks />
+      <PricingSection />
+      <CtaSection />
+      <Footer />
     </div>
   );
-}
-
-function Index() {
-  return <PlaceholderIndex />;
 }
