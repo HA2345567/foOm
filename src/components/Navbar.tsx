@@ -46,9 +46,12 @@ export function Navbar() {
           >
             Log in
           </a>
-          <button className="px-4 py-2 rounded-lg bg-primary text-primary-foreground text-sm font-medium shadow-button hover:opacity-90 transition-opacity">
+          <Link
+            to="/record"
+            className="px-4 py-2 rounded-lg bg-primary text-primary-foreground text-sm font-medium shadow-button hover:opacity-90 transition-opacity"
+          >
             Start Recording
-          </button>
+          </Link>
         </div>
 
         {/* Mobile hamburger */}
