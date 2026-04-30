@@ -257,7 +257,7 @@ export function RecordingStudio() {
               <div className="text-center mb-8">
                 <h2 className="text-display-section text-foreground">Recording complete</h2>
                 <p className="mt-2 text-body text-muted-foreground">
-                  {formatTime(r.result.duration)} · {(r.result.blob.size / 1024 / 1024).toFixed(1)} MB · {r.result.clicks.length} click{r.result.clicks.length === 1 ? "" : "s"} detected
+                  {formatTime(r.result.duration)} · {(r.result.blob.size / 1024 / 1024).toFixed(1)} MB · {r.result.clicks.length} click{r.result.clicks.length === 1 ? "" : "s"} · {r.result.scrolls.length} scroll{r.result.scrolls.length === 1 ? "" : "s"} · {r.result.pauses.length} pause{r.result.pauses.length === 1 ? "" : "s"} detected
                 </p>
               </div>
 
