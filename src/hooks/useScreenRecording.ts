@@ -116,9 +116,8 @@ export function useScreenRecording() {
       const constraints: DisplayMediaStreamOptions = {
         video: {
           frameRate: 30,
-          // @ts-expect-error - displaySurface is supported in Chromium
           displaySurface: displaySurfaceMap[sourceType],
-        },
+        } as MediaTrackConstraints,
         audio: true,
       };
       const screenStream =
