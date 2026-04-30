@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
 import { Link } from "@tanstack/react-router";
 import { motion, AnimatePresence } from "framer-motion";
 import { useScreenRecording, type SourceType } from "../hooks/useScreenRecording";
@@ -11,7 +11,7 @@ function formatTime(seconds: number) {
   return `${m}:${s}`;
 }
 
-const sources: { value: SourceType; label: string; desc: string; icon: JSX.Element }[] = [
+const sources: { value: SourceType; label: string; desc: string; icon: ReactNode }[] = [
   {
     value: "screen",
     label: "Entire Screen",
