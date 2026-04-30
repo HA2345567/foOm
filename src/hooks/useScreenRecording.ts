@@ -194,6 +194,8 @@ export function useScreenRecording() {
           width: dimsRef.current.w,
           height: dimsRef.current.h,
           clicks: clicksRef.current.slice(),
+          scrolls: scrollsRef.current.slice(),
+          pauses: pausesRef.current.slice(),
           mimeType,
         });
         setState("stopped");
