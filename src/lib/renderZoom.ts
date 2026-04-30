@@ -60,7 +60,11 @@ export async function renderAutoZoom(
   const keyframes = generateZoomKeyframes(
     recording.clicks,
     recording.duration,
-    { zoomScale: opts.zoomScale ?? 1.6 },
+    {
+      clickScale: opts.zoomScale ?? 1.7,
+      scrolls: recording.scrolls,
+      pauses: recording.pauses,
+    },
   );
 
   // 1) Decode source via <video> element
