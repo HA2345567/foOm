@@ -18,6 +18,19 @@ export interface ClickEvent {
   y: number;
 }
 
+export interface ScrollEvent {
+  t: number;
+  /** normalized scroll delta magnitude */
+  intensity: number;
+}
+
+export interface PauseEvent {
+  /** start time, seconds */
+  t: number;
+  /** duration of pause, seconds */
+  duration: number;
+}
+
 export interface RecordingResult {
   blob: Blob;
   url: string;
@@ -25,6 +38,8 @@ export interface RecordingResult {
   width: number;
   height: number;
   clicks: ClickEvent[];
+  scrolls: ScrollEvent[];
+  pauses: PauseEvent[];
   mimeType: string;
 }
 
@@ -52,6 +67,9 @@ export function useScreenRecording() {
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const startTimeRef = useRef(0);
   const clicksRef = useRef<ClickEvent[]>([]);
+  const scrollsRef = useRef<ScrollEvent[]>([]);
+  const pausesRef = useRef<PauseEvent[]>([]);
+  const lastActivityRef = useRef<number>(0);
   const dimsRef = useRef<{ w: number; h: number }>({ w: 1280, h: 720 });
   const mimeRef = useRef<string>("video/webm");
 
