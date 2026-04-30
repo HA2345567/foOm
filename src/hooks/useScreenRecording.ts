@@ -129,6 +129,8 @@ export function useScreenRecording() {
     setState("requesting");
     chunksRef.current = [];
     clicksRef.current = [];
+    scrollsRef.current = [];
+    pausesRef.current = [];
 
     try {
       const constraints: DisplayMediaStreamOptions = {
