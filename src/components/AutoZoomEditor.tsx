@@ -270,13 +270,34 @@ export function AutoZoomEditor({ recording, onDiscard }: Props) {
         </section>
 
         {/* Stats */}
-        <section className="p-3 rounded-xl bg-card border border-border space-y-1">
-          <p className="text-xs text-muted-foreground">Auto-detected events</p>
-          <div className="flex justify-between text-sm">
-            <span className="text-foreground">{recording.clicks.length} clicks</span>
-            <span className="text-foreground">{recording.scrolls.length} scrolls</span>
-            <span className="text-foreground">{recording.pauses.length} pauses</span>
+        <section className="p-3 rounded-xl bg-card border border-border space-y-2">
+          <div className="flex items-center justify-between">
+            <p className="text-xs text-muted-foreground">Zoom moments</p>
+            {isAuto && (
+              <span className="text-[10px] uppercase tracking-wider text-primary">AI-detected</span>
+            )}
+            {analyzing && (
+              <span className="text-[10px] uppercase tracking-wider text-muted-foreground animate-pulse">
+                Analyzing…
+              </span>
+            )}
           </div>
+          <div className="flex justify-between text-sm">
+            <span className="text-foreground tabular-nums">{effectiveClicks.length} zooms</span>
+            <span className="text-foreground tabular-nums">{recording.scrolls.length} scrolls</span>
+            <span className="text-foreground tabular-nums">{recording.pauses.length} pauses</span>
+          </div>
+          {analyzing && (
+            <p className="text-[11px] text-muted-foreground leading-snug">
+              No clicks were captured (browsers can't see clicks outside this tab).
+              Detecting motion in your video to auto-zoom on the busiest moments…
+            </p>
+          )}
+          {isAuto && !analyzing && (
+            <p className="text-[11px] text-muted-foreground leading-snug">
+              Auto-zoom focused on {effectiveClicks.length} interest points detected from screen motion.
+            </p>
+          )}
         </section>
 
         {/* Export */}
