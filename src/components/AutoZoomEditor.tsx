@@ -1,10 +1,11 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { motion } from "framer-motion";
-import type { RecordingResult } from "../hooks/useScreenRecording";
+import type { RecordingResult, ClickEvent } from "../hooks/useScreenRecording";
 import { generateZoomKeyframes, interpolateZoom } from "../lib/autoZoom";
 import { drawComposite } from "../lib/composite";
 import { BACKGROUNDS, DEFAULT_FRAME, type Background, type FrameStyle } from "../lib/backgrounds";
 import { renderAutoZoom, type RenderProgress, type RenderOutput } from "../lib/renderZoom";
+import { detectInterestPoints } from "../lib/detectInterest";
 
 interface Props {
   recording: RecordingResult;
@@ -27,14 +28,40 @@ export function AutoZoomEditor({ recording, onDiscard }: Props) {
   const [rendered, setRendered] = useState<RenderOutput | null>(null);
   const [renderError, setRenderError] = useState<string | null>(null);
 
+  // Auto-detected interest points (used when no real clicks were captured)
+  const [autoClicks, setAutoClicks] = useState<ClickEvent[] | null>(null);
+  const [analyzing, setAnalyzing] = useState(false);
+
+  // If no real clicks were captured, analyze the video for motion-based interest points
+  useEffect(() => {
+    if (recording.clicks.length > 0) return;
+    let cancelled = false;
+    setAnalyzing(true);
+    detectInterestPoints(recording.url, recording.duration)
+      .then((points) => {
+        if (!cancelled) setAutoClicks(points);
+      })
+      .catch((e) => console.warn("interest detection failed", e))
+      .finally(() => {
+        if (!cancelled) setAnalyzing(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [recording]);
+
+  const effectiveClicks = recording.clicks.length > 0 ? recording.clicks : (autoClicks ?? []);
+  const isAuto = recording.clicks.length === 0 && (autoClicks?.length ?? 0) > 0;
+
   const keyframes = useMemo(
     () =>
-      generateZoomKeyframes(recording.clicks, recording.duration, {
+      generateZoomKeyframes(effectiveClicks, recording.duration, {
         scrolls: recording.scrolls,
         pauses: recording.pauses,
       }),
-    [recording],
+    [effectiveClicks, recording],
   );
+
 
   // Live preview render loop — paints zoomed video onto canvas with chosen background
   useEffect(() => {
@@ -102,6 +129,7 @@ export function AutoZoomEditor({ recording, onDiscard }: Props) {
         format,
         background,
         frame,
+        clicksOverride: effectiveClicks,
         onProgress: (p) => setRenderState(p),
       });
       setRendered(out);
@@ -242,13 +270,34 @@ export function AutoZoomEditor({ recording, onDiscard }: Props) {
         </section>
 
         {/* Stats */}
-        <section className="p-3 rounded-xl bg-card border border-border space-y-1">
-          <p className="text-xs text-muted-foreground">Auto-detected events</p>
-          <div className="flex justify-between text-sm">
-            <span className="text-foreground">{recording.clicks.length} clicks</span>
-            <span className="text-foreground">{recording.scrolls.length} scrolls</span>
-            <span className="text-foreground">{recording.pauses.length} pauses</span>
+        <section className="p-3 rounded-xl bg-card border border-border space-y-2">
+          <div className="flex items-center justify-between">
+            <p className="text-xs text-muted-foreground">Zoom moments</p>
+            {isAuto && (
+              <span className="text-[10px] uppercase tracking-wider text-primary">AI-detected</span>
+            )}
+            {analyzing && (
+              <span className="text-[10px] uppercase tracking-wider text-muted-foreground animate-pulse">
+                Analyzing…
+              </span>
+            )}
           </div>
+          <div className="flex justify-between text-sm">
+            <span className="text-foreground tabular-nums">{effectiveClicks.length} zooms</span>
+            <span className="text-foreground tabular-nums">{recording.scrolls.length} scrolls</span>
+            <span className="text-foreground tabular-nums">{recording.pauses.length} pauses</span>
+          </div>
+          {analyzing && (
+            <p className="text-[11px] text-muted-foreground leading-snug">
+              No clicks were captured (browsers can't see clicks outside this tab).
+              Detecting motion in your video to auto-zoom on the busiest moments…
+            </p>
+          )}
+          {isAuto && !analyzing && (
+            <p className="text-[11px] text-muted-foreground leading-snug">
+              Auto-zoom focused on {effectiveClicks.length} interest points detected from screen motion.
+            </p>
+          )}
         </section>
 
         {/* Export */}

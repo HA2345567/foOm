@@ -42,6 +42,8 @@ export async function renderAutoZoom(
     zoomScale?: number;
     background: Background;
     frame: FrameStyle;
+    /** override the click events used for auto-zoom (e.g. detected interest points) */
+    clicksOverride?: RecordingResult["clicks"];
     onProgress?: (p: RenderProgress) => void;
   },
 ): Promise<RenderOutput> {
@@ -49,15 +51,12 @@ export async function renderAutoZoom(
   const format = opts.format ?? "mp4";
   const onProgress = opts.onProgress ?? (() => {});
 
-  const keyframes = generateZoomKeyframes(
-    recording.clicks,
-    recording.duration,
-    {
-      clickScale: opts.zoomScale ?? 1.7,
-      scrolls: recording.scrolls,
-      pauses: recording.pauses,
-    },
-  );
+  const clicks = opts.clicksOverride ?? recording.clicks;
+  const keyframes = generateZoomKeyframes(clicks, recording.duration, {
+    clickScale: opts.zoomScale ?? 1.7,
+    scrolls: recording.scrolls,
+    pauses: recording.pauses,
+  });
 
   onProgress({ stage: "decoding", percent: 0 });
   const video = document.createElement("video");
