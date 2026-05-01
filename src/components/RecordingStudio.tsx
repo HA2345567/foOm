@@ -1,9 +1,9 @@
-import { useState, type ReactNode } from "react";
+import { type ReactNode } from "react";
 import { Link } from "@tanstack/react-router";
 import { motion, AnimatePresence } from "framer-motion";
 import { useScreenRecording, type SourceType } from "../hooks/useScreenRecording";
 import { WebcamOverlay } from "./WebcamOverlay";
-import { renderAutoZoom, type RenderProgress, type RenderOutput } from "../lib/renderZoom";
+import { AutoZoomEditor } from "./AutoZoomEditor";
 
 function formatTime(seconds: number) {
   const m = Math.floor(seconds / 60).toString().padStart(2, "0");
