@@ -79,7 +79,7 @@ export function RecordingStudio() {
         </div>
       </header>
 
-      <div className="flex-1 flex items-center justify-center p-6">
+      <div className="flex-1 flex items-center justify-center p-6 max-w-[1400px] mx-auto w-full">
         <AnimatePresence mode="wait">
           {/* IDLE */}
           {(r.state === "idle" || r.state === "requesting") && !r.result && (
