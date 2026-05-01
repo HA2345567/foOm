@@ -1,10 +1,11 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { motion } from "framer-motion";
-import type { RecordingResult } from "../hooks/useScreenRecording";
+import type { RecordingResult, ClickEvent } from "../hooks/useScreenRecording";
 import { generateZoomKeyframes, interpolateZoom } from "../lib/autoZoom";
 import { drawComposite } from "../lib/composite";
 import { BACKGROUNDS, DEFAULT_FRAME, type Background, type FrameStyle } from "../lib/backgrounds";
 import { renderAutoZoom, type RenderProgress, type RenderOutput } from "../lib/renderZoom";
+import { detectInterestPoints } from "../lib/detectInterest";
 
 interface Props {
   recording: RecordingResult;
@@ -27,14 +28,40 @@ export function AutoZoomEditor({ recording, onDiscard }: Props) {
   const [rendered, setRendered] = useState<RenderOutput | null>(null);
   const [renderError, setRenderError] = useState<string | null>(null);
 
+  // Auto-detected interest points (used when no real clicks were captured)
+  const [autoClicks, setAutoClicks] = useState<ClickEvent[] | null>(null);
+  const [analyzing, setAnalyzing] = useState(false);
+
+  // If no real clicks were captured, analyze the video for motion-based interest points
+  useEffect(() => {
+    if (recording.clicks.length > 0) return;
+    let cancelled = false;
+    setAnalyzing(true);
+    detectInterestPoints(recording.url, recording.duration)
+      .then((points) => {
+        if (!cancelled) setAutoClicks(points);
+      })
+      .catch((e) => console.warn("interest detection failed", e))
+      .finally(() => {
+        if (!cancelled) setAnalyzing(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [recording]);
+
+  const effectiveClicks = recording.clicks.length > 0 ? recording.clicks : (autoClicks ?? []);
+  const isAuto = recording.clicks.length === 0 && (autoClicks?.length ?? 0) > 0;
+
   const keyframes = useMemo(
     () =>
-      generateZoomKeyframes(recording.clicks, recording.duration, {
+      generateZoomKeyframes(effectiveClicks, recording.duration, {
         scrolls: recording.scrolls,
         pauses: recording.pauses,
       }),
-    [recording],
+    [effectiveClicks, recording],
   );
+
 
   // Live preview render loop — paints zoomed video onto canvas with chosen background
   useEffect(() => {
