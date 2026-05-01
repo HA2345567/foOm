@@ -1,9 +1,9 @@
-import { useState, type ReactNode } from "react";
+import { type ReactNode } from "react";
 import { Link } from "@tanstack/react-router";
 import { motion, AnimatePresence } from "framer-motion";
 import { useScreenRecording, type SourceType } from "../hooks/useScreenRecording";
 import { WebcamOverlay } from "./WebcamOverlay";
-import { renderAutoZoom, type RenderProgress, type RenderOutput } from "../lib/renderZoom";
+import { AutoZoomEditor } from "./AutoZoomEditor";
 
 function formatTime(seconds: number) {
   const m = Math.floor(seconds / 60).toString().padStart(2, "0");
@@ -49,37 +49,6 @@ const sources: { value: SourceType; label: string; desc: string; icon: ReactNode
 
 export function RecordingStudio() {
   const r = useScreenRecording();
-  const [renderState, setRenderState] = useState<RenderProgress | null>(null);
-  const [rendered, setRendered] = useState<RenderOutput | null>(null);
-  const [renderError, setRenderError] = useState<string | null>(null);
-
-  const handleAutoZoomRender = async (format: "mp4" | "webm") => {
-    if (!r.result) return;
-    setRenderError(null);
-    setRendered(null);
-    try {
-      const out = await renderAutoZoom(r.result, {
-        format,
-        onProgress: (p) => setRenderState(p),
-      });
-      setRendered(out);
-    } catch (e) {
-      console.error(e);
-      setRenderError(e instanceof Error ? e.message : "Render failed");
-    } finally {
-      setRenderState(null);
-    }
-  };
-
-  const downloadRendered = () => {
-    if (!rendered) return;
-    const a = document.createElement("a");
-    a.href = rendered.url;
-    a.download = `zoomcast-zoomed-${Date.now()}.${rendered.format}`;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-  };
 
   return (
     <div className="min-h-screen bg-background flex flex-col">
@@ -110,7 +79,7 @@ export function RecordingStudio() {
         </div>
       </header>
 
-      <div className="flex-1 flex items-center justify-center p-6">
+      <div className="flex-1 flex items-center justify-center p-6 max-w-[1400px] mx-auto w-full">
         <AnimatePresence mode="wait">
           {/* IDLE */}
           {(r.state === "idle" || r.state === "requesting") && !r.result && (
@@ -251,77 +220,22 @@ export function RecordingStudio() {
             </motion.div>
           )}
 
-          {/* STOPPED / PREVIEW */}
+          {/* STOPPED — open the editor with live auto-zoom + background picker */}
           {r.state === "stopped" && r.result && (
-            <motion.div key="preview" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -20 }} className="w-full max-w-3xl">
-              <div className="text-center mb-8">
-                <h2 className="text-display-section text-foreground">Recording complete</h2>
+            <motion.div
+              key="editor"
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -20 }}
+              className="w-full"
+            >
+              <div className="text-center mb-6">
+                <h2 className="text-display-section text-foreground">Edit & Export</h2>
                 <p className="mt-2 text-body text-muted-foreground">
-                  {formatTime(r.result.duration)} · {(r.result.blob.size / 1024 / 1024).toFixed(1)} MB · {r.result.clicks.length} click{r.result.clicks.length === 1 ? "" : "s"} · {r.result.scrolls.length} scroll{r.result.scrolls.length === 1 ? "" : "s"} · {r.result.pauses.length} pause{r.result.pauses.length === 1 ? "" : "s"} detected
+                  {formatTime(r.result.duration)} · {(r.result.blob.size / 1024 / 1024).toFixed(1)} MB · auto-zoom is live in preview
                 </p>
               </div>
-
-              <div className="rounded-xl border border-border bg-card shadow-card overflow-hidden mb-6">
-                <video src={rendered?.url ?? r.result.url} controls className="w-full aspect-video bg-secondary" />
-              </div>
-
-              {/* Render progress */}
-              {renderState && (
-                <div className="mb-6 p-4 rounded-xl border border-border bg-card">
-                  <div className="flex items-center justify-between mb-2">
-                    <p className="text-sm font-medium text-foreground capitalize">{renderState.stage}…</p>
-                    <p className="text-sm text-muted-foreground tabular-nums">{renderState.percent}%</p>
-                  </div>
-                  <div className="h-1.5 rounded-full bg-muted overflow-hidden">
-                    <motion.div
-                      className="h-full bg-primary"
-                      animate={{ width: `${renderState.percent}%` }}
-                      transition={{ duration: 0.3 }}
-                    />
-                  </div>
-                  <p className="text-xs text-muted-foreground mt-2">Re-rendering with auto-zoom — this can take a few minutes.</p>
-                </div>
-              )}
-
-              {renderError && (
-                <div className="mb-6 p-3 rounded-lg bg-destructive/10 border border-destructive/20 text-sm text-destructive text-center">{renderError}</div>
-              )}
-
-              {/* Actions */}
-              <div className="grid sm:grid-cols-2 gap-3 mb-3">
-                <button
-                  onClick={() => handleAutoZoomRender("mp4")}
-                  disabled={!!renderState}
-                  className="px-6 py-3 rounded-xl bg-primary text-primary-foreground text-sm font-medium shadow-button hover:opacity-90 transition-opacity disabled:opacity-50 flex items-center justify-center gap-2"
-                >
-                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="3"/></svg>
-                  ✨ Auto-Zoom & Export MP4
-                </button>
-                <button
-                  onClick={() => handleAutoZoomRender("webm")}
-                  disabled={!!renderState}
-                  className="px-6 py-3 rounded-xl border border-border bg-card text-foreground text-sm font-medium hover:bg-accent transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
-                >
-                  ✨ Auto-Zoom & Export WebM
-                </button>
-              </div>
-
-              <div className="grid sm:grid-cols-2 gap-3">
-                {rendered ? (
-                  <button onClick={downloadRendered} className="px-6 py-3 rounded-xl bg-foreground text-background text-sm font-medium hover:opacity-90 transition-opacity flex items-center justify-center gap-2">
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" x2="12" y1="15" y2="3"/></svg>
-                    Download {rendered.format.toUpperCase()}
-                  </button>
-                ) : (
-                  <button onClick={r.downloadRecording} className="px-6 py-3 rounded-xl border border-border bg-card text-foreground text-sm font-medium hover:bg-accent transition-colors flex items-center justify-center gap-2">
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" x2="12" y1="15" y2="3"/></svg>
-                    Download Raw WebM
-                  </button>
-                )}
-                <button onClick={() => { setRendered(null); r.discardRecording(); }} className="px-6 py-3 rounded-xl border border-border bg-card text-foreground text-sm font-medium hover:bg-accent transition-colors">
-                  Record Again
-                </button>
-              </div>
+              <AutoZoomEditor recording={r.result} onDiscard={r.discardRecording} />
             </motion.div>
           )}
         </AnimatePresence>
