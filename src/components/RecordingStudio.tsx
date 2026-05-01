@@ -49,37 +49,6 @@ const sources: { value: SourceType; label: string; desc: string; icon: ReactNode
 
 export function RecordingStudio() {
   const r = useScreenRecording();
-  const [renderState, setRenderState] = useState<RenderProgress | null>(null);
-  const [rendered, setRendered] = useState<RenderOutput | null>(null);
-  const [renderError, setRenderError] = useState<string | null>(null);
-
-  const handleAutoZoomRender = async (format: "mp4" | "webm") => {
-    if (!r.result) return;
-    setRenderError(null);
-    setRendered(null);
-    try {
-      const out = await renderAutoZoom(r.result, {
-        format,
-        onProgress: (p) => setRenderState(p),
-      });
-      setRendered(out);
-    } catch (e) {
-      console.error(e);
-      setRenderError(e instanceof Error ? e.message : "Render failed");
-    } finally {
-      setRenderState(null);
-    }
-  };
-
-  const downloadRendered = () => {
-    if (!rendered) return;
-    const a = document.createElement("a");
-    a.href = rendered.url;
-    a.download = `zoomcast-zoomed-${Date.now()}.${rendered.format}`;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-  };
 
   return (
     <div className="min-h-screen bg-background flex flex-col">
