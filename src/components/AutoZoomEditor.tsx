@@ -129,6 +129,7 @@ export function AutoZoomEditor({ recording, onDiscard }: Props) {
         format,
         background,
         frame,
+        clicksOverride: effectiveClicks,
         onProgress: (p) => setRenderState(p),
       });
       setRendered(out);
