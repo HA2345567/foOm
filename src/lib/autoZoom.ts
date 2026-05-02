@@ -1,8 +1,4 @@
-import type {
-  ClickEvent,
-  ScrollEvent,
-  PauseEvent,
-} from "../hooks/useScreenRecording";
+import type { ClickEvent, ScrollEvent, PauseEvent } from "../hooks/useScreenRecording";
 
 export interface ZoomKeyframe {
   /** seconds */
@@ -259,10 +255,7 @@ function smoothstep5(x: number): number {
   return t * t * t * (t * (t * 6 - 15) + 10);
 }
 
-export function interpolateZoom(
-  keyframes: ZoomKeyframe[],
-  t: number,
-): ZoomKeyframe {
+export function interpolateZoom(keyframes: ZoomKeyframe[], t: number): ZoomKeyframe {
   if (t <= keyframes[0].t) return keyframes[0];
   // binary search for speed on long timelines
   let lo = 0;

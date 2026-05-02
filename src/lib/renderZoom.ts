@@ -1,9 +1,6 @@
 import { FFmpeg } from "@ffmpeg/ffmpeg";
 import { fetchFile, toBlobURL } from "@ffmpeg/util";
-import {
-  generateZoomKeyframes,
-  interpolateZoom,
-} from "./autoZoom";
+import { generateZoomKeyframes, interpolateZoom } from "./autoZoom";
 import type { RecordingResult } from "../hooks/useScreenRecording";
 import { drawComposite } from "./composite";
 import type { Background, FrameStyle } from "./backgrounds";
@@ -140,11 +137,44 @@ export async function renderAutoZoom(
   const outName = format === "mp4" ? "out.mp4" : "out.webm";
   const args =
     format === "mp4"
-      ? ["-i", "video.webm", "-i", "audio.webm", "-map", "0:v:0", "-map", "1:a:0?",
-         "-c:v", "libx264", "-preset", "ultrafast", "-crf", "22", "-pix_fmt", "yuv420p",
-         "-c:a", "aac", "-shortest", outName]
-      : ["-i", "video.webm", "-i", "audio.webm", "-map", "0:v:0", "-map", "1:a:0?",
-         "-c:v", "copy", "-c:a", "libopus", "-shortest", outName];
+      ? [
+          "-i",
+          "video.webm",
+          "-i",
+          "audio.webm",
+          "-map",
+          "0:v:0",
+          "-map",
+          "1:a:0?",
+          "-c:v",
+          "libx264",
+          "-preset",
+          "ultrafast",
+          "-crf",
+          "22",
+          "-pix_fmt",
+          "yuv420p",
+          "-c:a",
+          "aac",
+          "-shortest",
+          outName,
+        ]
+      : [
+          "-i",
+          "video.webm",
+          "-i",
+          "audio.webm",
+          "-map",
+          "0:v:0",
+          "-map",
+          "1:a:0?",
+          "-c:v",
+          "copy",
+          "-c:a",
+          "libopus",
+          "-shortest",
+          outName,
+        ];
 
   await ffmpeg.exec(args);
   const data = (await ffmpeg.readFile(outName)) as Uint8Array;
