@@ -206,16 +206,27 @@ export function generateZoomKeyframes(
     }
   }
 
-  // Smoothing pass (3-tap moving average) to kill any micro-jitter
-  // between segment boundaries — keeps motion silky.
+  // Smoothing pass (9-tap gaussian-like moving average) to remove fast
+  // acceleration spikes while preserving intentional focus changes.
   const smoothed: ZoomKeyframe[] = samples.map((s, i) => {
-    const a = samples[Math.max(0, i - 1)];
-    const b = samples[Math.min(samples.length - 1, i + 1)];
+    const weights = [1, 2, 3, 4, 5, 4, 3, 2, 1];
+    let total = 0;
+    let scale = 0;
+    let x = 0;
+    let y = 0;
+    for (let o = -4; o <= 4; o++) {
+      const weight = weights[o + 4];
+      const sample = samples[Math.max(0, Math.min(samples.length - 1, i + o))];
+      total += weight;
+      scale += sample.scale * weight;
+      x += sample.x * weight;
+      y += sample.y * weight;
+    }
     return {
       t: s.t,
-      scale: (a.scale + s.scale + b.scale) / 3,
-      x: (a.x + s.x + b.x) / 3,
-      y: (a.y + s.y + b.y) / 3,
+      scale: scale / total,
+      x: x / total,
+      y: y / total,
     };
   });
 
@@ -225,9 +236,9 @@ export function generateZoomKeyframes(
     const prev = keyframes[keyframes.length - 1];
     if (
       !prev ||
-      Math.abs(prev.scale - s.scale) > 0.003 ||
-      Math.abs(prev.x - s.x) > 0.003 ||
-      Math.abs(prev.y - s.y) > 0.003
+      Math.abs(prev.scale - s.scale) > 0.0015 ||
+      Math.abs(prev.x - s.x) > 0.0015 ||
+      Math.abs(prev.y - s.y) > 0.0015
     ) {
       keyframes.push(s);
     }
