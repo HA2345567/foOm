@@ -7,7 +7,7 @@ import type {
 export interface ZoomKeyframe {
   /** seconds */
   t: number;
-  /** scale factor (1 = no zoom, <1 would be wide but we clamp at 1) */
+  /** scale factor (1 = no zoom) */
   scale: number;
   /** focus point normalized 0..1 */
   x: number;
@@ -15,29 +15,34 @@ export interface ZoomKeyframe {
 }
 
 export interface ZoomConfig {
-  /** zoom-in scale on click (default 1.7) */
+  /** zoom-in scale on click — pros prefer subtle (default 1.5) */
   clickScale?: number;
-  /** soft zoom scale during long pauses (default 1.25) */
+  /** soft zoom scale during long pauses (default 1.2) */
   pauseScale?: number;
   /** scale during active scrolling — kept at 1 (wide) */
   scrollScale?: number;
-  /** seconds before click to start zoom */
+  /** seconds of ease-in BEFORE click lands — long for cinematic feel */
   preRoll?: number;
-  /** seconds to hold zoom after click */
+  /** seconds to hold zoom after click before easing back */
   hold?: number;
+  /** seconds for ease-out back to wide */
+  postRoll?: number;
   /** minimum pause duration (s) to trigger soft zoom */
   pauseThreshold?: number;
+  /** merge clicks within this many seconds of each other */
+  clickMergeWindow?: number;
+  /** merge clicks within this normalized distance */
+  clickMergeDistance?: number;
 }
 
 /**
  * Generate cinematic zoom keyframes from captured events.
  *
- * Behavior:
- *  - **Click** → snap-zoom in (preRoll s before click) to focus point, hold, ease out
- *  - **Scroll** → force wide (scale=1) for the duration of the scroll burst
- *  - **Pause** (idle ≥ threshold) → soft zoom (1.25x) toward last click area
- *
- * Conflicts: scroll always wins (wide) > click zoom > pause soft-zoom > default wide.
+ * Designed for professional output (Screen Studio / Tella style):
+ *  - Long, gentle ease-in/ease-out (no snap pops)
+ *  - Quintic smoothstep for buttery motion
+ *  - Aggressive merging of nearby clicks → one continuous zoom moment
+ *  - Smoothing pass kills micro-jitter between targets
  */
 export function generateZoomKeyframes(
   clicks: ClickEvent[],
@@ -47,63 +52,73 @@ export function generateZoomKeyframes(
     pauses?: PauseEvent[];
   } = {},
 ): ZoomKeyframe[] {
-  const clickScale = opts.clickScale ?? 1.7;
-  const pauseScale = opts.pauseScale ?? 1.25;
+  const clickScale = opts.clickScale ?? 1.5;
+  const pauseScale = opts.pauseScale ?? 1.2;
   const scrollScale = opts.scrollScale ?? 1.0;
-  const preRoll = opts.preRoll ?? 0.3;
-  const hold = opts.hold ?? 1.5;
+  const preRoll = opts.preRoll ?? 0.6;
+  const hold = opts.hold ?? 1.8;
+  const postRoll = opts.postRoll ?? 0.8;
   const pauseThreshold = opts.pauseThreshold ?? 2.5;
+  const mergeWindow = opts.clickMergeWindow ?? 2.5;
+  const mergeDist = opts.clickMergeDistance ?? 0.22;
   const scrolls = opts.scrolls ?? [];
   const pauses = opts.pauses ?? [];
 
   type Segment = {
-    start: number;
-    end: number;
+    /** start of ease-in */
+    inStart: number;
+    /** time scale reaches full */
+    inEnd: number;
+    /** time scale starts easing out */
+    outStart: number;
+    /** time fully back to wide */
+    outEnd: number;
     scale: number;
     x: number;
     y: number;
-    /** higher priority overrides lower when overlapping */
     priority: number;
-    /** 'snap' uses fast ease-in/out; 'soft' uses gentle ease */
-    style: "snap" | "soft" | "wide";
   };
 
   const segments: Segment[] = [];
 
-  // 1) Click groups → snap zoom moments
-  const groups: { start: number; end: number; x: number; y: number }[] = [];
+  // 1) Click groups → smooth zoom moments
+  const groups: { start: number; end: number; x: number; y: number; n: number }[] = [];
   for (const c of clicks) {
     const last = groups[groups.length - 1];
     if (
       last &&
-      c.t - last.end < hold &&
-      Math.hypot(c.x - last.x, c.y - last.y) < 0.18
+      c.t - last.end < mergeWindow &&
+      Math.hypot(c.x - last.x, c.y - last.y) < mergeDist
     ) {
       last.end = c.t;
-      // average focal point
-      last.x = (last.x + c.x) / 2;
-      last.y = (last.y + c.y) / 2;
+      // running average focal point
+      last.x = (last.x * last.n + c.x) / (last.n + 1);
+      last.y = (last.y * last.n + c.y) / (last.n + 1);
+      last.n += 1;
     } else {
-      groups.push({ start: c.t, end: c.t, x: c.x, y: c.y });
+      groups.push({ start: c.t, end: c.t, x: c.x, y: c.y, n: 1 });
     }
   }
   for (const g of groups) {
+    const inStart = Math.max(0, g.start - preRoll);
+    const inEnd = g.start;
+    const outStart = Math.min(duration, g.end + hold);
+    const outEnd = Math.min(duration, outStart + postRoll);
     segments.push({
-      start: Math.max(0, g.start - preRoll),
-      end: Math.min(duration, g.end + hold),
+      inStart,
+      inEnd,
+      outStart,
+      outEnd,
       scale: clickScale,
       x: g.x,
       y: g.y,
       priority: 2,
-      style: "snap",
     });
   }
 
-  // 2) Pauses (≥ threshold) with no overlapping scroll/click → soft zoom
-  // Soft zoom focuses on most recent click point, or screen center if none.
+  // 2) Pauses → soft zoom toward last click
   for (const p of pauses) {
     if (p.duration < pauseThreshold) continue;
-    // find most recent click before this pause
     let focus = { x: 0.5, y: 0.5 };
     for (let i = clicks.length - 1; i >= 0; i--) {
       if (clicks[i].t <= p.t) {
@@ -111,18 +126,24 @@ export function generateZoomKeyframes(
         break;
       }
     }
+    const inStart = p.t + 0.4;
+    const inEnd = inStart + 0.7;
+    const outStart = p.t + p.duration - 0.6;
+    const outEnd = p.t + p.duration;
+    if (inEnd >= outStart) continue;
     segments.push({
-      start: p.t + 0.4, // small delay so we don't fight a click's hold
-      end: p.t + p.duration - 0.2,
+      inStart,
+      inEnd,
+      outStart,
+      outEnd,
       scale: pauseScale,
       x: focus.x,
       y: focus.y,
       priority: 1,
-      style: "soft",
     });
   }
 
-  // 3) Scrolls → wide. Group consecutive scroll events within 0.6s.
+  // 3) Scrolls → gentle wide
   const scrollBursts: { start: number; end: number }[] = [];
   for (const s of scrolls) {
     const last = scrollBursts[scrollBursts.length - 1];
@@ -133,52 +154,85 @@ export function generateZoomKeyframes(
     }
   }
   for (const b of scrollBursts) {
+    const inStart = Math.max(0, b.start - 0.4);
+    const inEnd = inStart + 0.4;
+    const outStart = Math.min(duration, b.end + 0.6);
+    const outEnd = Math.min(duration, outStart + 0.4);
     segments.push({
-      start: Math.max(0, b.start - 0.2),
-      end: Math.min(duration, b.end + 0.8),
+      inStart,
+      inEnd,
+      outStart,
+      outEnd,
       scale: scrollScale,
       x: 0.5,
       y: 0.5,
-      priority: 3, // highest — scroll always wins
-      style: "wide",
+      priority: 3,
     });
   }
 
-  // Resolve into a flat keyframe timeline.
-  // Sample at 0.1s steps, picking highest-priority segment active at each tick,
-  // then collapse runs of equal targets into keyframes.
-  const STEP = 0.1;
+  // Sample at fine resolution. For each tick, pick highest-priority active
+  // segment and compute its eased value at that moment (pre-roll/hold/post-roll
+  // shape baked in here, so the global interpolator just lerps between samples).
+  const STEP = 0.05;
   const samples: ZoomKeyframe[] = [];
-  for (let t = 0; t <= duration; t += STEP) {
-    let chosen: Segment | null = null;
+  for (let t = 0; t <= duration + 1e-6; t += STEP) {
+    let chosen: { seg: Segment; weight: number } | null = null;
     for (const seg of segments) {
-      if (t >= seg.start && t <= seg.end) {
-        if (!chosen || seg.priority > chosen.priority) chosen = seg;
+      if (t < seg.inStart || t > seg.outEnd) continue;
+      let w = 0;
+      if (t < seg.inEnd) {
+        const r = (t - seg.inStart) / Math.max(1e-3, seg.inEnd - seg.inStart);
+        w = smoothstep5(r);
+      } else if (t < seg.outStart) {
+        w = 1;
+      } else {
+        const r = (t - seg.outStart) / Math.max(1e-3, seg.outEnd - seg.outStart);
+        w = 1 - smoothstep5(r);
+      }
+      if (!chosen || seg.priority > chosen.seg.priority) {
+        chosen = { seg, weight: w };
       }
     }
     if (chosen) {
-      samples.push({ t, scale: chosen.scale, x: chosen.x, y: chosen.y });
+      const { seg, weight } = chosen;
+      samples.push({
+        t,
+        scale: 1 + (seg.scale - 1) * weight,
+        x: 0.5 + (seg.x - 0.5) * weight,
+        y: 0.5 + (seg.y - 0.5) * weight,
+      });
     } else {
       samples.push({ t, scale: 1, x: 0.5, y: 0.5 });
     }
   }
 
-  // Compress: keep only points where target meaningfully changes
+  // Smoothing pass (3-tap moving average) to kill any micro-jitter
+  // between segment boundaries — keeps motion silky.
+  const smoothed: ZoomKeyframe[] = samples.map((s, i) => {
+    const a = samples[Math.max(0, i - 1)];
+    const b = samples[Math.min(samples.length - 1, i + 1)];
+    return {
+      t: s.t,
+      scale: (a.scale + s.scale + b.scale) / 3,
+      x: (a.x + s.x + b.x) / 3,
+      y: (a.y + s.y + b.y) / 3,
+    };
+  });
+
+  // Compress: drop near-duplicate samples to keep the keyframe array small.
   const keyframes: ZoomKeyframe[] = [];
-  for (let i = 0; i < samples.length; i++) {
-    const s = samples[i];
+  for (const s of smoothed) {
     const prev = keyframes[keyframes.length - 1];
     if (
       !prev ||
-      Math.abs(prev.scale - s.scale) > 0.01 ||
-      Math.abs(prev.x - s.x) > 0.01 ||
-      Math.abs(prev.y - s.y) > 0.01
+      Math.abs(prev.scale - s.scale) > 0.003 ||
+      Math.abs(prev.x - s.x) > 0.003 ||
+      Math.abs(prev.y - s.y) > 0.003
     ) {
       keyframes.push(s);
     }
   }
-  // Always anchor start and end at wide
-  if (keyframes[0].t > 0) {
+  if (keyframes.length === 0 || keyframes[0].t > 0) {
     keyframes.unshift({ t: 0, scale: 1, x: 0.5, y: 0.5 });
   }
   const lastKf = keyframes[keyframes.length - 1];
@@ -188,27 +242,35 @@ export function generateZoomKeyframes(
   return keyframes;
 }
 
+/** Quintic smoothstep — silkier than cubic, used by pro motion tools. */
+function smoothstep5(x: number): number {
+  const t = Math.max(0, Math.min(1, x));
+  return t * t * t * (t * (t * 6 - 15) + 10);
+}
+
 export function interpolateZoom(
   keyframes: ZoomKeyframe[],
   t: number,
 ): ZoomKeyframe {
   if (t <= keyframes[0].t) return keyframes[0];
-  for (let i = 1; i < keyframes.length; i++) {
-    const a = keyframes[i - 1];
-    const b = keyframes[i];
-    if (t <= b.t) {
-      const span = b.t - a.t || 1;
-      const raw = (t - a.t) / span;
-      // ease in-out cubic
-      const e =
-        raw < 0.5 ? 4 * raw * raw * raw : 1 - Math.pow(-2 * raw + 2, 3) / 2;
-      return {
-        t,
-        scale: a.scale + (b.scale - a.scale) * e,
-        x: a.x + (b.x - a.x) * e,
-        y: a.y + (b.y - a.y) * e,
-      };
-    }
+  // binary search for speed on long timelines
+  let lo = 0;
+  let hi = keyframes.length - 1;
+  while (lo < hi - 1) {
+    const mid = (lo + hi) >> 1;
+    if (keyframes[mid].t <= t) lo = mid;
+    else hi = mid;
   }
-  return keyframes[keyframes.length - 1];
+  const a = keyframes[lo];
+  const b = keyframes[hi];
+  if (t >= b.t) return b;
+  const span = b.t - a.t || 1;
+  const r = (t - a.t) / span;
+  // linear lerp here — easing is already baked into the dense sample grid
+  return {
+    t,
+    scale: a.scale + (b.scale - a.scale) * r,
+    x: a.x + (b.x - a.x) * r,
+    y: a.y + (b.y - a.y) * r,
+  };
 }
