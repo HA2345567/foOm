@@ -1,8 +1,4 @@
-import type {
-  ClickEvent,
-  ScrollEvent,
-  PauseEvent,
-} from "../hooks/useScreenRecording";
+import type { ClickEvent, ScrollEvent, PauseEvent } from "../hooks/useScreenRecording";
 
 export interface ZoomKeyframe {
   /** seconds */
@@ -52,15 +48,15 @@ export function generateZoomKeyframes(
     pauses?: PauseEvent[];
   } = {},
 ): ZoomKeyframe[] {
-  const clickScale = opts.clickScale ?? 1.5;
-  const pauseScale = opts.pauseScale ?? 1.2;
+  const clickScale = opts.clickScale ?? 1.42;
+  const pauseScale = opts.pauseScale ?? 1.14;
   const scrollScale = opts.scrollScale ?? 1.0;
-  const preRoll = opts.preRoll ?? 0.6;
-  const hold = opts.hold ?? 1.8;
-  const postRoll = opts.postRoll ?? 0.8;
+  const preRoll = opts.preRoll ?? 1.25;
+  const hold = opts.hold ?? 2.25;
+  const postRoll = opts.postRoll ?? 1.45;
   const pauseThreshold = opts.pauseThreshold ?? 2.5;
-  const mergeWindow = opts.clickMergeWindow ?? 2.5;
-  const mergeDist = opts.clickMergeDistance ?? 0.22;
+  const mergeWindow = opts.clickMergeWindow ?? 3.2;
+  const mergeDist = opts.clickMergeDistance ?? 0.3;
   const scrolls = opts.scrolls ?? [];
   const pauses = opts.pauses ?? [];
 
@@ -126,9 +122,9 @@ export function generateZoomKeyframes(
         break;
       }
     }
-    const inStart = p.t + 0.4;
-    const inEnd = inStart + 0.7;
-    const outStart = p.t + p.duration - 0.6;
+    const inStart = p.t + 0.6;
+    const inEnd = inStart + 1.15;
+    const outStart = p.t + p.duration - 1.1;
     const outEnd = p.t + p.duration;
     if (inEnd >= outStart) continue;
     segments.push({
@@ -154,10 +150,10 @@ export function generateZoomKeyframes(
     }
   }
   for (const b of scrollBursts) {
-    const inStart = Math.max(0, b.start - 0.4);
-    const inEnd = inStart + 0.4;
-    const outStart = Math.min(duration, b.end + 0.6);
-    const outEnd = Math.min(duration, outStart + 0.4);
+    const inStart = Math.max(0, b.start - 0.8);
+    const inEnd = inStart + 0.9;
+    const outStart = Math.min(duration, b.end + 1.0);
+    const outEnd = Math.min(duration, outStart + 0.9);
     segments.push({
       inStart,
       inEnd,
@@ -173,7 +169,7 @@ export function generateZoomKeyframes(
   // Sample at fine resolution. For each tick, pick highest-priority active
   // segment and compute its eased value at that moment (pre-roll/hold/post-roll
   // shape baked in here, so the global interpolator just lerps between samples).
-  const STEP = 0.05;
+  const STEP = 1 / 60;
   const samples: ZoomKeyframe[] = [];
   for (let t = 0; t <= duration + 1e-6; t += STEP) {
     let chosen: { seg: Segment; weight: number } | null = null;
@@ -206,16 +202,27 @@ export function generateZoomKeyframes(
     }
   }
 
-  // Smoothing pass (3-tap moving average) to kill any micro-jitter
-  // between segment boundaries — keeps motion silky.
+  // Smoothing pass (9-tap gaussian-like moving average) to remove fast
+  // acceleration spikes while preserving intentional focus changes.
   const smoothed: ZoomKeyframe[] = samples.map((s, i) => {
-    const a = samples[Math.max(0, i - 1)];
-    const b = samples[Math.min(samples.length - 1, i + 1)];
+    const weights = [1, 2, 3, 4, 5, 4, 3, 2, 1];
+    let total = 0;
+    let scale = 0;
+    let x = 0;
+    let y = 0;
+    for (let o = -4; o <= 4; o++) {
+      const weight = weights[o + 4];
+      const sample = samples[Math.max(0, Math.min(samples.length - 1, i + o))];
+      total += weight;
+      scale += sample.scale * weight;
+      x += sample.x * weight;
+      y += sample.y * weight;
+    }
     return {
       t: s.t,
-      scale: (a.scale + s.scale + b.scale) / 3,
-      x: (a.x + s.x + b.x) / 3,
-      y: (a.y + s.y + b.y) / 3,
+      scale: scale / total,
+      x: x / total,
+      y: y / total,
     };
   });
 
@@ -225,9 +232,9 @@ export function generateZoomKeyframes(
     const prev = keyframes[keyframes.length - 1];
     if (
       !prev ||
-      Math.abs(prev.scale - s.scale) > 0.003 ||
-      Math.abs(prev.x - s.x) > 0.003 ||
-      Math.abs(prev.y - s.y) > 0.003
+      Math.abs(prev.scale - s.scale) > 0.0015 ||
+      Math.abs(prev.x - s.x) > 0.0015 ||
+      Math.abs(prev.y - s.y) > 0.0015
     ) {
       keyframes.push(s);
     }
@@ -248,10 +255,7 @@ function smoothstep5(x: number): number {
   return t * t * t * (t * (t * 6 - 15) + 10);
 }
 
-export function interpolateZoom(
-  keyframes: ZoomKeyframe[],
-  t: number,
-): ZoomKeyframe {
+export function interpolateZoom(keyframes: ZoomKeyframe[], t: number): ZoomKeyframe {
   if (t <= keyframes[0].t) return keyframes[0];
   // binary search for speed on long timelines
   let lo = 0;
