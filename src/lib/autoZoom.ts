@@ -52,15 +52,15 @@ export function generateZoomKeyframes(
     pauses?: PauseEvent[];
   } = {},
 ): ZoomKeyframe[] {
-  const clickScale = opts.clickScale ?? 1.5;
-  const pauseScale = opts.pauseScale ?? 1.2;
+  const clickScale = opts.clickScale ?? 1.42;
+  const pauseScale = opts.pauseScale ?? 1.14;
   const scrollScale = opts.scrollScale ?? 1.0;
-  const preRoll = opts.preRoll ?? 0.6;
-  const hold = opts.hold ?? 1.8;
-  const postRoll = opts.postRoll ?? 0.8;
+  const preRoll = opts.preRoll ?? 1.25;
+  const hold = opts.hold ?? 2.25;
+  const postRoll = opts.postRoll ?? 1.45;
   const pauseThreshold = opts.pauseThreshold ?? 2.5;
-  const mergeWindow = opts.clickMergeWindow ?? 2.5;
-  const mergeDist = opts.clickMergeDistance ?? 0.22;
+  const mergeWindow = opts.clickMergeWindow ?? 3.2;
+  const mergeDist = opts.clickMergeDistance ?? 0.3;
   const scrolls = opts.scrolls ?? [];
   const pauses = opts.pauses ?? [];
 
@@ -126,9 +126,9 @@ export function generateZoomKeyframes(
         break;
       }
     }
-    const inStart = p.t + 0.4;
-    const inEnd = inStart + 0.7;
-    const outStart = p.t + p.duration - 0.6;
+    const inStart = p.t + 0.6;
+    const inEnd = inStart + 1.15;
+    const outStart = p.t + p.duration - 1.1;
     const outEnd = p.t + p.duration;
     if (inEnd >= outStart) continue;
     segments.push({
@@ -154,10 +154,10 @@ export function generateZoomKeyframes(
     }
   }
   for (const b of scrollBursts) {
-    const inStart = Math.max(0, b.start - 0.4);
-    const inEnd = inStart + 0.4;
-    const outStart = Math.min(duration, b.end + 0.6);
-    const outEnd = Math.min(duration, outStart + 0.4);
+    const inStart = Math.max(0, b.start - 0.8);
+    const inEnd = inStart + 0.9;
+    const outStart = Math.min(duration, b.end + 1.0);
+    const outEnd = Math.min(duration, outStart + 0.9);
     segments.push({
       inStart,
       inEnd,
@@ -173,7 +173,7 @@ export function generateZoomKeyframes(
   // Sample at fine resolution. For each tick, pick highest-priority active
   // segment and compute its eased value at that moment (pre-roll/hold/post-roll
   // shape baked in here, so the global interpolator just lerps between samples).
-  const STEP = 0.05;
+  const STEP = 1 / 60;
   const samples: ZoomKeyframe[] = [];
   for (let t = 0; t <= duration + 1e-6; t += STEP) {
     let chosen: { seg: Segment; weight: number } | null = null;
