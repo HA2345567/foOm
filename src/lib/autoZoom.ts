@@ -156,11 +156,11 @@ export interface TypeBurstEvent {
 interface SpringParams { k: number; c: number; m: number }
 
 const FEEL_PRESETS: Record<NonNullable<ZoomConfig["feel"]>, SpringParams> = {
-  //             stiffness   damping   mass
-  glass: { k: 18,  c: 8.49,  m: 1.0 },  // 2√(18·1)  ≈ 8.49  → critical
-  silk:  { k: 38,  c: 12.33, m: 1.0 },  // 2√(38·1)  ≈ 12.33 → critical
-  snap:  { k: 80,  c: 17.89, m: 1.0 },  // 2√(80·1)  ≈ 17.89 → critical
-  custom:{ k: 38,  c: 12.33, m: 1.0 },  // replaced by user values below
+  //             stiffness   damping        mass
+  glass: { k: 7,   c: 5.29,  m: 1.0 },  // 2√(7·1)   ≈ 5.29  → critical, very slow cinematic
+  silk:  { k: 14,  c: 7.48,  m: 1.0 },  // 2√(14·1)  ≈ 7.48  → critical, slow & luxurious
+  snap:  { k: 38,  c: 12.33, m: 1.0 },  // 2√(38·1)  ≈ 12.33 → critical, responsive
+  custom:{ k: 14,  c: 7.48,  m: 1.0 },  // replaced by user values below
 };
 
 // ─────────────────────────────────────────────────────────────────────────────
