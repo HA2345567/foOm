@@ -65,15 +65,15 @@ export type ZoomTriggerKind =
 export interface ZoomConfig {
   /**
    * Motion feel preset — controls spring stiffness + damping globally.
-   * "glass"    → extremely slow, cinematic, almost floating
-   * "silk"     → slow, luxurious — ideal for product demos  (DEFAULT)
+   * "glass"    → ultra-slow, cinematic, almost floating
+   * "silk"     → deliberately slow, luxurious — ideal for product demos  (DEFAULT)
    * "snap"     → faster response, still smooth — good for dev tools
    * "custom"   → set springStiffness / springDamping / springMass yourself
    */
   feel?: "glass" | "silk" | "snap" | "custom";
 
   // ── Spring physics (only used when feel = "custom") ───────────────────────
-  /** Spring stiffness k — higher = faster response (default 38 for silk) */
+  /** Spring stiffness k — higher = faster response (default 4 for silk) */
   springStiffness?: number;
   /** Spring damping c — set to 2*sqrt(k*m) for critical damping */
   springDamping?: number;
@@ -96,7 +96,7 @@ export interface ZoomConfig {
   scrollOutScale?: number;
 
   // ── Timing ────────────────────────────────────────────────────────────────
-  /** Seconds to hold at full zoom AFTER a click group ends (default 1.8) */
+  /** Seconds to hold at full zoom AFTER a click group ends (default 2.8) */
   hold?: number;
   /** Extra hold added per additional click in a merged group (default 0.25) */
   holdPerClick?: number;
@@ -157,10 +157,10 @@ interface SpringParams { k: number; c: number; m: number }
 
 const FEEL_PRESETS: Record<NonNullable<ZoomConfig["feel"]>, SpringParams> = {
   //             stiffness   damping        mass
-  glass: { k: 7,   c: 5.29,  m: 1.0 },  // 2√(7·1)   ≈ 5.29  → critical, very slow cinematic
-  silk:  { k: 14,  c: 7.48,  m: 1.0 },  // 2√(14·1)  ≈ 7.48  → critical, slow & luxurious
-  snap:  { k: 38,  c: 12.33, m: 1.0 },  // 2√(38·1)  ≈ 12.33 → critical, responsive
-  custom:{ k: 14,  c: 7.48,  m: 1.0 },  // replaced by user values below
+  glass: { k: 2.25, c: 3.0, m: 1.0 },  // 2√(2.25·1) = 3.0 → ultra-slow cinematic
+  silk:  { k: 4.0,  c: 4.0, m: 1.0 },  // 2√(4·1)    = 4.0 → slow professional default
+  snap:  { k: 9.0,  c: 6.0, m: 1.0 },  // 2√(9·1)    = 6.0 → responsive but still smooth
+  custom:{ k: 4.0,  c: 4.0, m: 1.0 },  // replaced by user values below
 };
 
 // ─────────────────────────────────────────────────────────────────────────────
