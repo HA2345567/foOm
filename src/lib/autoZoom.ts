@@ -30,6 +30,20 @@
  *   • Zoom-out feels like the lens breathing back naturally.
  *   • Overlapping triggers blend seamlessly — spring velocity carries through.
  *   • Works at 30fps, 60fps, or 120fps render targets identically.
+ *
+ * FEEL PRESETS (v2 — Makhan Edition)
+ * ───────────────────────────────────
+ *   All presets have been re-tuned for a dramatically slower, heavier feel.
+ *   The key levers: lower stiffness (k) + higher mass (m) = more inertia.
+ *
+ *   "glass"  → k=0.6,  m=1.8 — glacial, almost floating, cinematic drift
+ *   "silk"   → k=1.1,  m=1.5 — makhan smooth, the new default
+ *   "snap"   → k=3.5,  m=1.0 — still smooth, just less slow
+ *   "custom" → set springStiffness / springDamping / springMass yourself
+ *
+ *   Critical damping condition: c = 2·√(k·m)
+ *   All presets are tuned to be at or very near critical damping so the
+ *   spring settles without oscillating or overshooting.
  */
 
 import type {
@@ -65,27 +79,27 @@ export type ZoomTriggerKind =
 export interface ZoomConfig {
   /**
    * Motion feel preset — controls spring stiffness + damping globally.
-   * "glass"    → ultra-slow, cinematic, almost floating
-   * "silk"     → deliberately slow, luxurious — ideal for product demos  (DEFAULT)
-   * "snap"     → faster response, still smooth — good for dev tools
+   * "glass"    → glacial, near-floating cinematic drift
+   * "silk"     → makhan smooth, slow and luxurious  (DEFAULT)
+   * "snap"     → smoother but noticeably quicker — good for dev tools
    * "custom"   → set springStiffness / springDamping / springMass yourself
    */
   feel?: "glass" | "silk" | "snap" | "custom";
 
   // ── Spring physics (only used when feel = "custom") ───────────────────────
-  /** Spring stiffness k — higher = faster response (default 4 for silk) */
+  /** Spring stiffness k — lower = slower response (default 1.1 for silk) */
   springStiffness?: number;
   /** Spring damping c — set to 2*sqrt(k*m) for critical damping */
   springDamping?: number;
-  /** Spring mass m — higher = more inertia / momentum (default 1) */
+  /** Spring mass m — higher = more inertia / momentum (default 1.5) */
   springMass?: number;
 
   // ── Zoom-in scales ────────────────────────────────────────────────────────
-  /** Target scale on click (default 1.55) */
+  /** Target scale on click (default 1.32) */
   clickScale?: number;
-  /** Target scale during type burst (default 1.35) */
+  /** Target scale during type burst (default 1.14) */
   typeScale?: number;
-  /** Target scale during pause (default 1.2) */
+  /** Target scale during pause (default 1.08) */
   pauseScale?: number;
 
   // ── Zoom-out ──────────────────────────────────────────────────────────────
@@ -96,9 +110,9 @@ export interface ZoomConfig {
   scrollOutScale?: number;
 
   // ── Timing ────────────────────────────────────────────────────────────────
-  /** Seconds to hold at full zoom AFTER a click group ends (default 2.8) */
+  /** Seconds to hold at full zoom AFTER a click group ends (default 3.5) */
   hold?: number;
-  /** Extra hold added per additional click in a merged group (default 0.25) */
+  /** Extra hold added per additional click in a merged group (default 0.6) */
   holdPerClick?: number;
   /** Min pause duration (s) before soft zoom triggers (default 2.0) */
   pauseThreshold?: number;
@@ -150,37 +164,29 @@ export interface TypeBurstEvent {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Spring physics feel presets
+// Spring physics feel presets  (v2 — Makhan Edition)
 // ─────────────────────────────────────────────────────────────────────────────
 
 interface SpringParams { k: number; c: number; m: number }
 
 const FEEL_PRESETS: Record<NonNullable<ZoomConfig["feel"]>, SpringParams> = {
-  //             stiffness   damping        mass
-  glass: { k: 2.25, c: 3.0, m: 1.0 },  // 2√(2.25·1) = 3.0 → ultra-slow cinematic
-  silk:  { k: 4.0,  c: 4.0, m: 1.0 },  // 2√(4·1)    = 4.0 → slow professional default
-  snap:  { k: 9.0,  c: 6.0, m: 1.0 },  // 2√(9·1)    = 6.0 → responsive but still smooth
-  custom:{ k: 4.0,  c: 4.0, m: 1.0 },  // replaced by user values below
+  glass:  { k: 0.6,  c: 2.08, m: 1.8 },
+  silk:   { k: 1.1,  c: 2.57, m: 1.5 },
+  snap:   { k: 3.5,  c: 3.74, m: 1.0 },
+  custom: { k: 1.1,  c: 2.57, m: 1.5 },
 };
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Internal: ZoomIntent — what the engine "wants" the camera to do at time t
+// Internal: ZoomIntent
 // ─────────────────────────────────────────────────────────────────────────────
 
 interface ZoomIntent {
-  /** Start of this intent window */
   start: number;
-  /** End of this intent window */
   end: number;
-  /** Target scale */
   scale: number;
-  /** Target focal X */
   x: number;
-  /** Target focal Y */
   y: number;
-  /** Priority — higher wins when intents overlap */
   priority: number;
-  /** Trigger label */
   trigger: ZoomTriggerKind;
 }
 
@@ -196,9 +202,8 @@ function clamp01(v: number): number {
   return clamp(v, 0, 1);
 }
 
-/** At scale S, the viewport covers 1/S of the canvas. Clamp focal so no black. */
 function clampFocal(coord: number, scale: number): number {
-  if (scale <= 1) return 0.5; // at scale=1 (full-wide) center is always fine
+  if (scale <= 1) return 0.5;
   const half = 0.5 / scale;
   return clamp(coord, half, 1 - half);
 }
@@ -208,7 +213,6 @@ function isBlackedOut(t: number, ranges: TimeRange[]): boolean {
   return false;
 }
 
-/** Merge a sorted {t} array into contiguous bursts separated by gapThreshold */
 function mergeBursts(
   events: { t: number }[],
   gapThreshold: number,
@@ -223,7 +227,7 @@ function mergeBursts(
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Ramer-Douglas-Peucker simplification (3D: scale, x, y)
+// RDP simplification
 // ─────────────────────────────────────────────────────────────────────────────
 
 function rdpPerpendicularDist(
@@ -283,7 +287,7 @@ function simplify(points: ZoomKeyframe[], epsilon: number): ZoomKeyframe[] {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Critically-damped spring — the core of butter smoothness
+// Critically-damped spring
 // ─────────────────────────────────────────────────────────────────────────────
 
 interface SpringState {
@@ -370,14 +374,15 @@ function resolveConfig(opts: ZoomConfig): ResolvedConfig {
     c: clamp(opts.springDamping   ?? baseSpring.c, 0.1, 200),
     m: clamp(opts.springMass      ?? baseSpring.m, 0.1, 10),
   };
+
   return {
     spring,
-    clickScale:           clamp(opts.clickScale       ?? 1.42, 1, 4),
-    typeScale:            clamp(opts.typeScale         ?? 1.22, 1, 3),
-    pauseScale:           clamp(opts.pauseScale        ?? 1.12, 1, 2),
+    clickScale:           clamp(opts.clickScale       ?? 1.32, 1, 4),
+    typeScale:            clamp(opts.typeScale         ?? 1.14, 1, 3),
+    pauseScale:           clamp(opts.pauseScale        ?? 1.08, 1, 2),
     scrollOutScale:       clamp(opts.scrollOutScale    ?? 1.0,  0.5, 1.5),
-    hold:                 clamp(opts.hold              ?? 2.8,  0, 15),
-    holdPerClick:         clamp(opts.holdPerClick      ?? 0.45, 0, 3),
+    hold:                 clamp(opts.hold              ?? 3.5,  0, 15),
+    holdPerClick:         clamp(opts.holdPerClick      ?? 0.6,  0, 3),
     pauseThreshold:       clamp(opts.pauseThreshold    ?? 2.0,  0.5, 30),
     scrollBurstThreshold: clamp(opts.scrollBurstThreshold ?? 0.25, 0, 5),
     clickMergeWindow:     clamp(opts.clickMergeWindow  ?? 2.8,  0, 10),
@@ -408,14 +413,12 @@ function resolveTarget(
   blackoutRanges: TimeRange[],
 ): ZoomTarget {
   if (isBlackedOut(t, blackoutRanges)) return NEUTRAL;
-
   let best: ZoomIntent | null = null;
   for (const intent of intents) {
     if (t < intent.start || t > intent.end) continue;
     if (!best || intent.priority > best.priority) best = intent;
   }
   if (!best) return NEUTRAL;
-
   const safeX = clampFocal(best.x, best.scale);
   const safeY = clampFocal(best.y, best.scale);
   return { scale: best.scale, x: safeX, y: safeY, trigger: best.trigger };
@@ -450,15 +453,12 @@ export function generateZoomKeyframes(
   const sortedClicks = [...clicks]
     .filter((c) => inRange(c.t) && isFinite(c.x) && isFinite(c.y))
     .sort((a, b) => a.t - b.t);
-
   const sortedScrolls = [...scrolls]
     .filter((s) => inRange(s.t))
     .sort((a, b) => a.t - b.t);
-
   const sortedPauses = [...pauses]
     .filter((p) => inRange(p.t) && isFinite(p.duration) && p.duration > 0)
     .sort((a, b) => a.t - b.t);
-
   const sortedBursts = [...typeBursts]
     .filter((tb) => inRange(tb.t) && isFinite(tb.duration) && tb.duration > 0)
     .sort((a, b) => a.t - b.t);
@@ -468,7 +468,6 @@ export function generateZoomKeyframes(
   // 1a. Click groups
   type CGroup = { start: number; end: number; x: number; y: number; n: number };
   const groups: CGroup[] = [];
-
   for (const c of sortedClicks) {
     const cx = clamp01(c.x);
     const cy = clamp01(c.y);
@@ -486,7 +485,6 @@ export function generateZoomKeyframes(
       groups.push({ start: c.t, end: c.t, x: cx, y: cy, n: 1 });
     }
   }
-
   for (const g of groups) {
     const hold = cfg.hold + (g.n - 1) * cfg.holdPerClick;
     intents.push({
@@ -503,7 +501,6 @@ export function generateZoomKeyframes(
   // 1b. Type bursts
   for (const tb of sortedBursts) {
     if (tb.duration < 0.4) continue;
-
     let fx = 0.5, fy = 0.5;
     for (let i = sortedClicks.length - 1; i >= 0; i--) {
       if (sortedClicks[i].t <= tb.t) {
@@ -527,7 +524,6 @@ export function generateZoomKeyframes(
   for (const p of sortedPauses) {
     if (p.duration < cfg.pauseThreshold) continue;
     if (!inRange(p.t)) continue;
-
     let fx = 0.5, fy = 0.5;
     for (let i = sortedClicks.length - 1; i >= 0; i--) {
       if (sortedClicks[i].t <= p.t) {
@@ -587,13 +583,12 @@ export function generateZoomKeyframes(
   const nSteps   = Math.ceil(duration / simStep) + 2;
   const rawSamples: ZoomKeyframe[] = [];
   rawSamples.length = nSteps;
-
   let sampleCount = 0;
+
   let lastTrigger: ZoomTriggerKind | undefined;
 
   for (let step = 0; ; step++) {
     const t = Math.min(step * simStep, duration);
-
     const target = resolveTarget(t, intents, blackoutRanges);
     if (target.trigger !== undefined) lastTrigger = target.trigger;
 
@@ -649,7 +644,6 @@ export function interpolateZoom(
   if (keyframes.length === 0)  return { t, scale: 1, x: 0.5, y: 0.5 };
   if (keyframes.length === 1)  return keyframes[0];
   if (t <= keyframes[0].t)     return keyframes[0];
-
   const last = keyframes[keyframes.length - 1];
   if (t >= last.t) return last;
 
@@ -658,12 +652,10 @@ export function interpolateZoom(
     const mid = (lo + hi) >> 1;
     if (keyframes[mid].t <= t) lo = mid; else hi = mid;
   }
-
   const a = keyframes[lo];
   const b = keyframes[hi];
   const span = b.t - a.t;
   if (span < 1e-9) return a;
-
   const r = (t - a.t) / span;
   return {
     t,
@@ -728,7 +720,6 @@ export function toFFmpegZoomPan(
     const f0 = Math.round(a.t * fps);
     const f1 = Math.round(b.t * fps);
     if (f1 <= f0) continue;
-
     const span = f1 - f0;
     const zA = a.scale.toFixed(6);
     const zB = b.scale.toFixed(6);
@@ -737,7 +728,6 @@ export function toFFmpegZoomPan(
     const yA = (a.y * height * (1 - a.scale)).toFixed(4);
     const yB = (b.y * height * (1 - b.scale)).toFixed(4);
     const u  = `(on-${f0})/${span}`;
-
     zParts.push(`if(between(on,${f0},${f1}),(${zA})+(${zB}-${zA})*${u},0)`);
     xParts.push(`if(between(on,${f0},${f1}),(${xA})+(${xB}-${xA})*${u},0)`);
     yParts.push(`if(between(on,${f0},${f1}),(${yA})+(${yB}-${yA})*${u},0)`);
