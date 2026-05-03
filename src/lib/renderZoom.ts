@@ -31,6 +31,19 @@ export interface RenderOutput {
   format: "mp4" | "webm";
 }
 
+/**
+ * Deterministic frame-by-frame renderer.
+ *
+ * For each output frame we:
+ *   1. Seek the source <video> to the exact frame timestamp and await `seeked`
+ *   2. Draw composite (background + zoomed video) onto an offscreen canvas
+ *   3. Encode that canvas as JPEG and feed it to FFmpeg as an image sequence
+ *
+ * FFmpeg then assembles the JPEGs at the requested fps and muxes the original
+ * recording audio. This guarantees the spring-physics zoom curve is sampled
+ * at uniform intervals — no MediaRecorder real-time drift, no duplicated /
+ * dropped frames, perfectly smooth motion.
+ */
 export async function renderAutoZoom(
   recording: RecordingResult,
   opts: {
@@ -39,7 +52,6 @@ export async function renderAutoZoom(
     zoomScale?: number;
     background: Background;
     frame: FrameStyle;
-    /** override the click events used for auto-zoom (e.g. detected interest points) */
     clicksOverride?: RecordingResult["clicks"];
     onProgress?: (p: RenderProgress) => void;
   },
@@ -50,63 +62,81 @@ export async function renderAutoZoom(
 
   const clicks = opts.clicksOverride ?? recording.clicks;
   const keyframes = generateZoomKeyframes(clicks, recording.duration, {
-    clickScale: opts.zoomScale ?? 1.42,
+    clickScale: opts.zoomScale ?? 1.55,
+    feel: "silk",
     scrolls: recording.scrolls,
     pauses: recording.pauses,
   });
 
-  onProgress({ stage: "decoding", percent: 0 });
+  onProgress({ stage: "loading", percent: 2 });
+  const ffmpeg = await getFFmpeg();
+
+  onProgress({ stage: "decoding", percent: 5 });
   const video = document.createElement("video");
   video.src = recording.url;
   video.muted = true;
   video.playsInline = true;
+  video.preload = "auto";
   await new Promise<void>((resolve, reject) => {
     video.onloadedmetadata = () => resolve();
     video.onerror = () => reject(new Error("video decode failed"));
   });
+  // Some browsers need a play()/pause() cycle before currentTime seeks reliably
+  try {
+    await video.play();
+    video.pause();
+  } catch {
+    /* ignore */
+  }
 
   const srcW = recording.width || video.videoWidth;
   const srcH = recording.height || video.videoHeight;
-  const outW = srcW;
-  const outH = srcH;
+  // Cap output at 1080p-ish for reasonable encode time / memory
+  const maxDim = 1280;
+  const scale = Math.min(1, maxDim / Math.max(srcW, srcH));
+  const outW = Math.round(srcW * scale / 2) * 2;
+  const outH = Math.round(srcH * scale / 2) * 2;
 
   const canvas = document.createElement("canvas");
   canvas.width = outW;
   canvas.height = outH;
-  const ctx = canvas.getContext("2d")!;
+  const ctx = canvas.getContext("2d", { alpha: false })!;
 
-  const canvasStream = canvas.captureStream(fps);
-  const recorderMime = MediaRecorder.isTypeSupported("video/webm;codecs=vp9")
-    ? "video/webm;codecs=vp9"
-    : "video/webm";
-  const chunks: Blob[] = [];
-  const recorder = new MediaRecorder(canvasStream, {
-    mimeType: recorderMime,
-    videoBitsPerSecond: 6_000_000,
-  });
-  recorder.ondataavailable = (e) => {
-    if (e.data.size > 0) chunks.push(e.data);
-  };
-  const recordingDone = new Promise<Blob>((resolve) => {
-    recorder.onstop = () => resolve(new Blob(chunks, { type: recorderMime }));
-  });
+  const totalFrames = Math.max(1, Math.ceil(recording.duration * fps));
 
-  recorder.start();
-  await video.play().catch(() => {});
-  video.pause();
-  video.currentTime = 0;
-
-  const totalFrames = Math.ceil(recording.duration * fps);
-  for (let i = 0; i < totalFrames; i++) {
-    const t = i / fps;
-    await new Promise<void>((resolve) => {
+  // Helper: seek to exact time, wait for the seeked event
+  const seekTo = (t: number) =>
+    new Promise<void>((resolve) => {
       const onSeek = () => {
         video.removeEventListener("seeked", onSeek);
         resolve();
       };
       video.addEventListener("seeked", onSeek);
-      video.currentTime = Math.min(t, recording.duration - 0.001);
+      video.currentTime = Math.min(t, Math.max(0, recording.duration - 1e-3));
     });
+
+  // Helper: canvas → JPEG Uint8Array
+  const canvasToJpeg = (quality = 0.92): Promise<Uint8Array> =>
+    new Promise((resolve, reject) => {
+      canvas.toBlob(
+        (blob) => {
+          if (!blob) return reject(new Error("toBlob failed"));
+          const reader = new FileReader();
+          reader.onloadend = () => {
+            const buf = reader.result as ArrayBuffer;
+            resolve(new Uint8Array(buf));
+          };
+          reader.onerror = () => reject(reader.error);
+          reader.readAsArrayBuffer(blob);
+        },
+        "image/jpeg",
+        quality,
+      );
+    });
+
+  for (let i = 0; i < totalFrames; i++) {
+    const t = i / fps;
+    await seekTo(t);
     const kf = interpolateZoom(keyframes, t);
     drawComposite(ctx, video, kf, {
       background: opts.background,
@@ -116,62 +146,50 @@ export async function renderAutoZoom(
       outW,
       outH,
     });
-    await new Promise((r) => setTimeout(r, 1000 / fps));
-    if (i % 10 === 0) {
+    const jpeg = await canvasToJpeg(0.92);
+    const name = `f${i.toString().padStart(6, "0")}.jpg`;
+    await ffmpeg.writeFile(name, jpeg);
+
+    if (i % 3 === 0 || i === totalFrames - 1) {
       onProgress({
         stage: "compositing",
-        percent: Math.round((i / totalFrames) * 70),
+        percent: 5 + Math.round((i / totalFrames) * 75),
       });
     }
   }
 
-  recorder.stop();
-  const zoomedWebm = await recordingDone;
-
-  onProgress({ stage: "loading", percent: 75 });
-  const ffmpeg = await getFFmpeg();
-  await ffmpeg.writeFile("video.webm", await fetchFile(zoomedWebm));
+  onProgress({ stage: "encoding", percent: 82 });
   await ffmpeg.writeFile("audio.webm", await fetchFile(recording.blob));
-  onProgress({ stage: "encoding", percent: 85 });
 
   const outName = format === "mp4" ? "out.mp4" : "out.webm";
   const args =
     format === "mp4"
       ? [
-          "-i",
-          "video.webm",
-          "-i",
-          "audio.webm",
-          "-map",
-          "0:v:0",
-          "-map",
-          "1:a:0?",
-          "-c:v",
-          "libx264",
-          "-preset",
-          "ultrafast",
-          "-crf",
-          "22",
-          "-pix_fmt",
-          "yuv420p",
-          "-c:a",
-          "aac",
+          "-framerate", String(fps),
+          "-i", "f%06d.jpg",
+          "-i", "audio.webm",
+          "-map", "0:v:0",
+          "-map", "1:a:0?",
+          "-c:v", "libx264",
+          "-preset", "veryfast",
+          "-crf", "20",
+          "-pix_fmt", "yuv420p",
+          "-movflags", "+faststart",
+          "-c:a", "aac",
+          "-b:a", "160k",
           "-shortest",
           outName,
         ]
       : [
-          "-i",
-          "video.webm",
-          "-i",
-          "audio.webm",
-          "-map",
-          "0:v:0",
-          "-map",
-          "1:a:0?",
-          "-c:v",
-          "copy",
-          "-c:a",
-          "libopus",
+          "-framerate", String(fps),
+          "-i", "f%06d.jpg",
+          "-i", "audio.webm",
+          "-map", "0:v:0",
+          "-map", "1:a:0?",
+          "-c:v", "libvpx-vp9",
+          "-b:v", "0",
+          "-crf", "32",
+          "-c:a", "libopus",
           "-shortest",
           outName,
         ];
@@ -183,6 +201,23 @@ export async function renderAutoZoom(
   const blob = new Blob([copy.buffer], {
     type: format === "mp4" ? "video/mp4" : "video/webm",
   });
+
+  // Cleanup frame files to free WASM memory for next export
+  for (let i = 0; i < totalFrames; i++) {
+    const name = `f${i.toString().padStart(6, "0")}.jpg`;
+    try {
+      await ffmpeg.deleteFile(name);
+    } catch {
+      /* ignore */
+    }
+  }
+  try {
+    await ffmpeg.deleteFile("audio.webm");
+    await ffmpeg.deleteFile(outName);
+  } catch {
+    /* ignore */
+  }
+
   onProgress({ stage: "done", percent: 100 });
   return { blob, url: URL.createObjectURL(blob), format };
 }
