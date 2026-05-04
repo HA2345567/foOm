@@ -174,12 +174,22 @@ interface SpringParams { k: number; c: number; m: number }
 //   glass → omega=2.0  → ~2.0s settle, very slow cinematic drift
 //   silk  → omega=3.0  → ~1.3s settle, smooth professional default
 //   snap  → omega=5.0  → ~0.8s settle, snappy but still smooth
+// Scale spring → controls zoom-in / zoom-out push.
+// Position spring → softer, longer settle so the camera GLIDES between focal
+// points instead of snapping. This is the single biggest factor in making
+// the motion feel like a real camera operator vs. a CSS transform.
 const FEEL_PRESETS: Record<NonNullable<ZoomConfig["feel"]>, SpringParams> = {
-  glass:  { k: 4.0,  c: 4.0,  m: 1.0 },
-  silk:   { k: 9.0,  c: 6.0,  m: 1.0 },
-  snap:   { k: 25.0, c: 10.0, m: 1.0 },
-  custom: { k: 9.0,  c: 6.0,  m: 1.0 },
+  glass:  { k: 3.2,  c: 3.6,  m: 1.0 },
+  silk:   { k: 7.0,  c: 5.3,  m: 1.0 },
+  snap:   { k: 18.0, c: 8.5,  m: 1.0 },
+  custom: { k: 7.0,  c: 5.3,  m: 1.0 },
 };
+
+// Position springs are intentionally softer than the scale spring (≈55-60%
+// stiffness, slightly under-damped) so panning across the frame reads as a
+// smooth dolly rather than a hard cut to the new target.
+const POSITION_SPRING_RATIO = 0.55;
+const POSITION_DAMPING_RATIO = 0.92; // slight under-damp = organic settle
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Internal: ZoomIntent
