@@ -1,4 +1,5 @@
 import { useState, useRef, useCallback, useEffect } from "react";
+import { saveRecording, loadRecording, clearRecording } from "../lib/db";
 
 export type RecordingState =
   | "idle"
@@ -70,8 +71,21 @@ export function useScreenRecording() {
   const scrollsRef = useRef<ScrollEvent[]>([]);
   const pausesRef = useRef<PauseEvent[]>([]);
   const lastActivityRef = useRef<number>(0);
+  const pauseStartTimeRef = useRef<number | null>(null);
   const dimsRef = useRef<{ w: number; h: number }>({ w: 1280, h: 720 });
   const mimeRef = useRef<string>("video/webm");
+
+  useEffect(() => {
+    const restore = async () => {
+      const saved = await loadRecording();
+      if (saved && saved.blob) {
+        const url = URL.createObjectURL(saved.blob);
+        setResult({ ...saved, url });
+        setState("stopped");
+      }
+    };
+    restore();
+  }, []);
 
   const cleanup = useCallback(() => {
     screenStreamRef.current?.getTracks().forEach((t) => t.stop());
@@ -123,6 +137,17 @@ export function useScreenRecording() {
     window.addEventListener("pointerdown", handler, true);
     return () => window.removeEventListener("pointerdown", handler, true);
   }, [state, recordClick]);
+
+  useEffect(() => {
+    if (state !== "recording") return;
+    const handler = (e: WheelEvent) => {
+      const t = (Date.now() - startTimeRef.current) / 1000;
+      const intensity = Math.min(1, Math.abs(e.deltaY) / 500);
+      scrollsRef.current.push({ t, intensity });
+    };
+    window.addEventListener("wheel", handler, { passive: true });
+    return () => window.removeEventListener("wheel", handler);
+  }, [state]);
 
   const beginCapture = useCallback(async () => {
     setError(null);
@@ -189,7 +214,7 @@ export function useScreenRecording() {
         const blob = new Blob(chunksRef.current, { type: mimeType });
         const url = URL.createObjectURL(blob);
         const duration = (Date.now() - startTimeRef.current) / 1000;
-        setResult({
+        const recordingResult: RecordingResult = {
           blob,
           url,
           duration,
@@ -199,7 +224,9 @@ export function useScreenRecording() {
           scrolls: scrollsRef.current.slice(),
           pauses: pausesRef.current.slice(),
           mimeType,
-        });
+        };
+        setResult(recordingResult);
+        saveRecording(recordingResult);
         setState("stopped");
         cleanup();
       };
@@ -240,6 +267,7 @@ export function useScreenRecording() {
     if (r?.state === "recording") {
       r.pause();
       setState("paused");
+      pauseStartTimeRef.current = Date.now();
       if (timerRef.current) clearInterval(timerRef.current);
     }
   }, []);
@@ -247,6 +275,12 @@ export function useScreenRecording() {
   const resumeRecording = useCallback(() => {
     const r = mediaRecorderRef.current;
     if (r?.state === "paused") {
+      if (pauseStartTimeRef.current) {
+        const pauseT = (pauseStartTimeRef.current - startTimeRef.current) / 1000;
+        const duration = (Date.now() - pauseStartTimeRef.current) / 1000;
+        pausesRef.current.push({ t: pauseT, duration });
+        pauseStartTimeRef.current = null;
+      }
       r.resume();
       setState("recording");
       const base = Date.now() - elapsed * 1000;
@@ -264,6 +298,7 @@ export function useScreenRecording() {
   const discardRecording = useCallback(() => {
     if (result?.url) URL.revokeObjectURL(result.url);
     setResult(null);
+    clearRecording();
     setState("idle");
     setElapsed(0);
     setError(null);

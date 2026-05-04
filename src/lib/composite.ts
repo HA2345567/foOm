@@ -1,9 +1,11 @@
 import type { ZoomKeyframe } from "./autoZoom";
-import type { Background, FrameStyle } from "./backgrounds";
+import type { Background, FrameStyle, Subtitle } from "./backgrounds";
 
 export interface CompositeOptions {
   background: Background;
   frame: FrameStyle;
+  subtitles?: Subtitle[];
+  currentTime?: number;
   /** source video natural size */
   srcW: number;
   srcH: number;
@@ -11,6 +13,7 @@ export interface CompositeOptions {
   outW: number;
   outH: number;
 }
+
 
 /**
  * Draw one frame: background fill + zoomed/cropped video inset with rounded
@@ -59,7 +62,52 @@ export function drawComposite(
   ctx.clip();
   ctx.drawImage(video, sx, sy, sw, sh, targetX, targetY, targetW, targetH);
   ctx.restore();
+
+  // 5) Subtitles
+  if (opts.subtitles && opts.currentTime !== undefined) {
+    const sub = opts.subtitles.find(
+      (s) => opts.currentTime! >= s.start && opts.currentTime! <= s.end,
+    );
+    if (sub) {
+      ctx.save();
+      const fontSize = Math.round(outH * 0.042);
+      ctx.font = `600 ${fontSize}px Inter, system-ui, sans-serif`;
+      const paddingH = fontSize * 0.8;
+      const paddingV = fontSize * 0.4;
+      const textW = ctx.measureText(sub.text).width;
+      
+      const subX = outW / 2;
+      const subY = targetY + targetH - fontSize * 1.5;
+
+      // Pill background
+      ctx.fillStyle = "rgba(0,0,0,0.8)";
+      ctx.beginPath();
+      const bx = subX - textW / 2 - paddingH;
+      const by = subY - fontSize;
+      const bw = textW + paddingH * 2;
+      const bh = fontSize + paddingV * 2;
+      const br = bh / 2;
+      ctx.moveTo(bx + br, by);
+      ctx.lineTo(bx + bw - br, by);
+      ctx.quadraticCurveTo(bx + bw, by, bx + bw, by + br);
+      ctx.lineTo(bx + bw, by + bh - br);
+      ctx.quadraticCurveTo(bx + bw, by + bh, bx + bw - br, by + bh);
+      ctx.lineTo(bx + br, by + bh);
+      ctx.quadraticCurveTo(bx, by + bh, bx, by + bh - br);
+      ctx.lineTo(bx, by + br);
+      ctx.quadraticCurveTo(bx, by, bx + br, by);
+      ctx.fill();
+
+      // Text
+      ctx.textAlign = "center";
+      ctx.textBaseline = "middle";
+      ctx.fillStyle = "#fff";
+      ctx.fillText(sub.text, subX, subY - fontSize / 2 + paddingV);
+      ctx.restore();
+    }
+  }
 }
+
 
 function roundedRectPath(
   ctx: CanvasRenderingContext2D,
