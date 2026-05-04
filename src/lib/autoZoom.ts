@@ -487,7 +487,10 @@ export function generateZoomKeyframes(
   for (const g of groups) {
     const hold = cfg.hold + (g.n - 1) * cfg.holdPerClick;
     intents.push({
-      start:    Math.max(0, g.start - 0.05),
+      // Pre-roll: start the push slightly before the click so the camera is
+      // already moving when the user's action lands — this is the single
+      // biggest "professional" tell vs. reactive zoom.
+      start:    Math.max(0, g.start - 0.18),
       end:      Math.min(duration, g.end + hold),
       scale:    cfg.clickScale,
       x:        clamp01(g.x),
