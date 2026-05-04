@@ -174,12 +174,22 @@ interface SpringParams { k: number; c: number; m: number }
 //   glass → omega=2.0  → ~2.0s settle, very slow cinematic drift
 //   silk  → omega=3.0  → ~1.3s settle, smooth professional default
 //   snap  → omega=5.0  → ~0.8s settle, snappy but still smooth
+// Scale spring → controls zoom-in / zoom-out push.
+// Position spring → softer, longer settle so the camera GLIDES between focal
+// points instead of snapping. This is the single biggest factor in making
+// the motion feel like a real camera operator vs. a CSS transform.
 const FEEL_PRESETS: Record<NonNullable<ZoomConfig["feel"]>, SpringParams> = {
-  glass:  { k: 4.0,  c: 4.0,  m: 1.0 },
-  silk:   { k: 9.0,  c: 6.0,  m: 1.0 },
-  snap:   { k: 25.0, c: 10.0, m: 1.0 },
-  custom: { k: 9.0,  c: 6.0,  m: 1.0 },
+  glass:  { k: 3.2,  c: 3.6,  m: 1.0 },
+  silk:   { k: 7.0,  c: 5.3,  m: 1.0 },
+  snap:   { k: 18.0, c: 8.5,  m: 1.0 },
+  custom: { k: 7.0,  c: 5.3,  m: 1.0 },
 };
+
+// Position springs are intentionally softer than the scale spring (≈55-60%
+// stiffness, slightly under-damped) so panning across the frame reads as a
+// smooth dolly rather than a hard cut to the new target.
+const POSITION_SPRING_RATIO = 0.55;
+const POSITION_DAMPING_RATIO = 0.92; // slight under-damp = organic settle
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Internal: ZoomIntent
@@ -366,18 +376,18 @@ function resolveConfig(opts: ZoomConfig): ResolvedConfig {
 
   return {
     spring,
-    clickScale:           clamp(opts.clickScale       ?? 1.35, 1, 4),
-    typeScale:            clamp(opts.typeScale         ?? 1.18, 1, 3),
-    pauseScale:           clamp(opts.pauseScale        ?? 1.10, 1, 2),
+    clickScale:           clamp(opts.clickScale       ?? 1.32, 1, 4),
+    typeScale:            clamp(opts.typeScale         ?? 1.16, 1, 3),
+    pauseScale:           clamp(opts.pauseScale        ?? 1.09, 1, 2),
     scrollOutScale:       clamp(opts.scrollOutScale    ?? 1.0,  0.5, 1.5),
-    hold:                 clamp(opts.hold              ?? 2.2,  0, 15),
-    holdPerClick:         clamp(opts.holdPerClick      ?? 0.5,  0, 3),
+    hold:                 clamp(opts.hold              ?? 2.4,  0, 15),
+    holdPerClick:         clamp(opts.holdPerClick      ?? 0.55, 0, 3),
     pauseThreshold:       clamp(opts.pauseThreshold    ?? 2.0,  0.5, 30),
     scrollBurstThreshold: clamp(opts.scrollBurstThreshold ?? 0.25, 0, 5),
-    clickMergeWindow:     clamp(opts.clickMergeWindow  ?? 2.2,  0, 10),
-    clickMergeDistance:   clamp(opts.clickMergeDistance ?? 0.18, 0, 1),
+    clickMergeWindow:     clamp(opts.clickMergeWindow  ?? 2.4,  0, 10),
+    clickMergeDistance:   clamp(opts.clickMergeDistance ?? 0.20, 0, 1),
     simStep:              clamp(opts.simStep           ?? 1 / 120, 1 / 240, 1 / 30),
-    rdpEpsilon:           clamp(opts.rdpEpsilon        ?? 0.0008, 0, 0.1),
+    rdpEpsilon:           clamp(opts.rdpEpsilon        ?? 0.0004, 0, 0.1),
     forcedZooms:    opts.forcedZooms    ?? [],
     blackoutRanges: opts.blackoutRanges ?? [],
   };
@@ -477,7 +487,10 @@ export function generateZoomKeyframes(
   for (const g of groups) {
     const hold = cfg.hold + (g.n - 1) * cfg.holdPerClick;
     intents.push({
-      start:    Math.max(0, g.start - 0.05),
+      // Pre-roll: start the push slightly before the click so the camera is
+      // already moving when the user's action lands — this is the single
+      // biggest "professional" tell vs. reactive zoom.
+      start:    Math.max(0, g.start - 0.18),
       end:      Math.min(duration, g.end + hold),
       scale:    cfg.clickScale,
       x:        clamp01(g.x),
@@ -562,7 +575,12 @@ export function generateZoomKeyframes(
   }
 
   // STEP 2 — Spring simulation
+  // Two coupled springs: a "tight" one for scale (zoom in/out feels snappy
+  // and intentional) and a "soft" one for position (panning between focal
+  // points reads as a smooth dolly, never a hard jump).
   const { k, c, m } = spring;
+  const kPos = k * POSITION_SPRING_RATIO;
+  const cPos = 2 * Math.sqrt(kPos * m) * POSITION_DAMPING_RATIO;
   const { simStep, rdpEpsilon, blackoutRanges } = cfg;
 
   const scaleSpring: SpringState = { p: 1.0, v: 0 };
@@ -584,9 +602,9 @@ export function generateZoomKeyframes(
     const liveSafeX = clampFocal(target.x, scaleSpring.p);
     const liveSafeY = clampFocal(target.y, scaleSpring.p);
 
-    const nextScale = springStep(scaleSpring, target.scale, k, c, m, simStep);
-    const nextX     = springStep(xSpring,     liveSafeX,   k, c, m, simStep);
-    const nextY     = springStep(ySpring,      liveSafeY,   k, c, m, simStep);
+    const nextScale = springStep(scaleSpring, target.scale, k,    c,    m, simStep);
+    const nextX     = springStep(xSpring,     liveSafeX,    kPos, cPos, m, simStep);
+    const nextY     = springStep(ySpring,     liveSafeY,    kPos, cPos, m, simStep);
 
     scaleSpring.p = nextScale.p; scaleSpring.v = nextScale.v;
     xSpring.p     = nextX.p;     xSpring.v     = nextX.v;
