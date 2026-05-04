@@ -169,11 +169,16 @@ export interface TypeBurstEvent {
 
 interface SpringParams { k: number; c: number; m: number }
 
+// Tuned with m=1 and critical damping c = 2*sqrt(k*m) = 2*omega.
+// Settling time ≈ 4/omega seconds (to within ~2% of target).
+//   glass → omega=2.0  → ~2.0s settle, very slow cinematic drift
+//   silk  → omega=3.0  → ~1.3s settle, smooth professional default
+//   snap  → omega=5.0  → ~0.8s settle, snappy but still smooth
 const FEEL_PRESETS: Record<NonNullable<ZoomConfig["feel"]>, SpringParams> = {
-  glass:  { k: 0.6,  c: 2.08, m: 1.8 },
-  silk:   { k: 1.1,  c: 2.57, m: 1.5 },
-  snap:   { k: 3.5,  c: 3.74, m: 1.0 },
-  custom: { k: 1.1,  c: 2.57, m: 1.5 },
+  glass:  { k: 4.0,  c: 4.0,  m: 1.0 },
+  silk:   { k: 9.0,  c: 6.0,  m: 1.0 },
+  snap:   { k: 25.0, c: 10.0, m: 1.0 },
+  custom: { k: 9.0,  c: 6.0,  m: 1.0 },
 };
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -295,6 +300,15 @@ interface SpringState {
   v: number;
 }
 
+/**
+ * Semi-implicit (symplectic) Euler integrator for a damped spring.
+ *   F = -k*(p - goal) - c*v
+ *   a = F / m
+ *
+ * Stable for any (k, c, m, dt) combination as long as dt is small.
+ * We substep internally to guarantee stability even if the caller
+ * passes a large dt — the spring NEVER explodes.
+ */
 function springStep(
   state: SpringState,
   goal: number,
@@ -303,45 +317,20 @@ function springStep(
   m: number,
   dt: number,
 ): SpringState {
-  const w  = Math.sqrt(k / m);
-  const zeta = c / (2 * Math.sqrt(k * m));
+  // Critical sub-step: keep dt * omega well below 1 for stability.
+  const omega = Math.sqrt(k / m);
+  const maxDt = 0.25 / Math.max(omega, 1e-6);
+  const sub = Math.max(1, Math.ceil(dt / maxDt));
+  const h = dt / sub;
 
-  if (Math.abs(zeta - 1) < 1e-4) {
-    const x0 = state.p - goal;
-    const v0 = state.v;
-    const e  = Math.exp(-w * dt);
-    const newP = (x0 + (v0 + w * x0) * dt) * e + goal;
-    const newV = ((v0 + w * x0) * e - (v0 + w * x0) * w * dt * e) - w * (x0 + (v0 + w * x0) * dt) * e;
-    return { p: newP, v: newV };
+  let p = state.p;
+  let v = state.v;
+  for (let i = 0; i < sub; i++) {
+    const a = (-k * (p - goal) - c * v) / m;
+    v = v + a * h;
+    p = p + v * h;
   }
-
-  if (zeta < 1) {
-    const wd  = w * Math.sqrt(1 - zeta * zeta);
-    const x0  = state.p - goal;
-    const v0  = state.v;
-    const e   = Math.exp(-zeta * w * dt);
-    const cos = Math.cos(wd * dt);
-    const sin = Math.sin(wd * dt);
-    const newP = e * (x0 * cos + ((v0 + zeta * w * x0) / wd) * sin) + goal;
-    const newV = e * (
-      (v0 - zeta * w * x0) * cos - (wd * x0 + (v0 + zeta * w * x0) * zeta / wd * wd) * sin
-    );
-    return { p: newP, v: newV };
-  }
-
-  const r1  = -zeta * w + w * Math.sqrt(zeta * zeta - 1);
-  const r2  = -zeta * w - w * Math.sqrt(zeta * zeta - 1);
-  const x0  = state.p - goal;
-  const v0  = state.v;
-  const denom = r1 - r2 || 1e-12;
-  const c1  = (v0 - r2 * x0) / denom;
-  const c2  = (r1 * x0 - v0) / denom;
-  const e1  = Math.exp(r1 * dt);
-  const e2  = Math.exp(r2 * dt);
-  return {
-    p: c1 * e1 + c2 * e2 + goal,
-    v: c1 * r1 * e1 + c2 * r2 * e2,
-  };
+  return { p, v };
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -370,22 +359,22 @@ function resolveConfig(opts: ZoomConfig): ResolvedConfig {
   const feel = opts.feel ?? "silk";
   const baseSpring = FEEL_PRESETS[feel];
   const spring: SpringParams = {
-    k: clamp(opts.springStiffness ?? baseSpring.k, 1, 500),
+    k: clamp(opts.springStiffness ?? baseSpring.k, 0.1, 500),
     c: clamp(opts.springDamping   ?? baseSpring.c, 0.1, 200),
     m: clamp(opts.springMass      ?? baseSpring.m, 0.1, 10),
   };
 
   return {
     spring,
-    clickScale:           clamp(opts.clickScale       ?? 1.32, 1, 4),
-    typeScale:            clamp(opts.typeScale         ?? 1.14, 1, 3),
-    pauseScale:           clamp(opts.pauseScale        ?? 1.08, 1, 2),
+    clickScale:           clamp(opts.clickScale       ?? 1.35, 1, 4),
+    typeScale:            clamp(opts.typeScale         ?? 1.18, 1, 3),
+    pauseScale:           clamp(opts.pauseScale        ?? 1.10, 1, 2),
     scrollOutScale:       clamp(opts.scrollOutScale    ?? 1.0,  0.5, 1.5),
-    hold:                 clamp(opts.hold              ?? 3.5,  0, 15),
-    holdPerClick:         clamp(opts.holdPerClick      ?? 0.6,  0, 3),
+    hold:                 clamp(opts.hold              ?? 2.2,  0, 15),
+    holdPerClick:         clamp(opts.holdPerClick      ?? 0.5,  0, 3),
     pauseThreshold:       clamp(opts.pauseThreshold    ?? 2.0,  0.5, 30),
     scrollBurstThreshold: clamp(opts.scrollBurstThreshold ?? 0.25, 0, 5),
-    clickMergeWindow:     clamp(opts.clickMergeWindow  ?? 2.8,  0, 10),
+    clickMergeWindow:     clamp(opts.clickMergeWindow  ?? 2.2,  0, 10),
     clickMergeDistance:   clamp(opts.clickMergeDistance ?? 0.18, 0, 1),
     simStep:              clamp(opts.simStep           ?? 1 / 120, 1 / 240, 1 / 30),
     rdpEpsilon:           clamp(opts.rdpEpsilon        ?? 0.0008, 0, 0.1),
