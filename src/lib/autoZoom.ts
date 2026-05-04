@@ -169,11 +169,16 @@ export interface TypeBurstEvent {
 
 interface SpringParams { k: number; c: number; m: number }
 
+// Tuned with m=1 and critical damping c = 2*sqrt(k*m) = 2*omega.
+// Settling time ≈ 4/omega seconds (to within ~2% of target).
+//   glass → omega=2.0  → ~2.0s settle, very slow cinematic drift
+//   silk  → omega=3.0  → ~1.3s settle, smooth professional default
+//   snap  → omega=5.0  → ~0.8s settle, snappy but still smooth
 const FEEL_PRESETS: Record<NonNullable<ZoomConfig["feel"]>, SpringParams> = {
-  glass:  { k: 0.6,  c: 2.08, m: 1.8 },
-  silk:   { k: 1.1,  c: 2.57, m: 1.5 },
-  snap:   { k: 3.5,  c: 3.74, m: 1.0 },
-  custom: { k: 1.1,  c: 2.57, m: 1.5 },
+  glass:  { k: 4.0,  c: 4.0,  m: 1.0 },
+  silk:   { k: 9.0,  c: 6.0,  m: 1.0 },
+  snap:   { k: 25.0, c: 10.0, m: 1.0 },
+  custom: { k: 9.0,  c: 6.0,  m: 1.0 },
 };
 
 // ─────────────────────────────────────────────────────────────────────────────
