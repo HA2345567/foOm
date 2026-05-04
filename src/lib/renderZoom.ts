@@ -62,7 +62,7 @@ export async function renderAutoZoom(
 
   const clicks = opts.clicksOverride ?? recording.clicks;
   const keyframes = generateZoomKeyframes(clicks, recording.duration, {
-    clickScale: opts.zoomScale ?? 1.42,
+    clickScale: opts.zoomScale ?? 1.35,
     feel: "silk",
     scrolls: recording.scrolls,
     pauses: recording.pauses,
