@@ -575,7 +575,12 @@ export function generateZoomKeyframes(
   }
 
   // STEP 2 — Spring simulation
+  // Two coupled springs: a "tight" one for scale (zoom in/out feels snappy
+  // and intentional) and a "soft" one for position (panning between focal
+  // points reads as a smooth dolly, never a hard jump).
   const { k, c, m } = spring;
+  const kPos = k * POSITION_SPRING_RATIO;
+  const cPos = 2 * Math.sqrt(kPos * m) * POSITION_DAMPING_RATIO;
   const { simStep, rdpEpsilon, blackoutRanges } = cfg;
 
   const scaleSpring: SpringState = { p: 1.0, v: 0 };
@@ -597,9 +602,9 @@ export function generateZoomKeyframes(
     const liveSafeX = clampFocal(target.x, scaleSpring.p);
     const liveSafeY = clampFocal(target.y, scaleSpring.p);
 
-    const nextScale = springStep(scaleSpring, target.scale, k, c, m, simStep);
-    const nextX     = springStep(xSpring,     liveSafeX,   k, c, m, simStep);
-    const nextY     = springStep(ySpring,      liveSafeY,   k, c, m, simStep);
+    const nextScale = springStep(scaleSpring, target.scale, k,    c,    m, simStep);
+    const nextX     = springStep(xSpring,     liveSafeX,    kPos, cPos, m, simStep);
+    const nextY     = springStep(ySpring,     liveSafeY,    kPos, cPos, m, simStep);
 
     scaleSpring.p = nextScale.p; scaleSpring.v = nextScale.v;
     xSpring.p     = nextX.p;     xSpring.v     = nextX.v;
