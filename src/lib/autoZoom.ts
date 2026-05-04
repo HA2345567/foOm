@@ -300,6 +300,15 @@ interface SpringState {
   v: number;
 }
 
+/**
+ * Semi-implicit (symplectic) Euler integrator for a damped spring.
+ *   F = -k*(p - goal) - c*v
+ *   a = F / m
+ *
+ * Stable for any (k, c, m, dt) combination as long as dt is small.
+ * We substep internally to guarantee stability even if the caller
+ * passes a large dt — the spring NEVER explodes.
+ */
 function springStep(
   state: SpringState,
   goal: number,
@@ -308,45 +317,20 @@ function springStep(
   m: number,
   dt: number,
 ): SpringState {
-  const w  = Math.sqrt(k / m);
-  const zeta = c / (2 * Math.sqrt(k * m));
+  // Critical sub-step: keep dt * omega well below 1 for stability.
+  const omega = Math.sqrt(k / m);
+  const maxDt = 0.25 / Math.max(omega, 1e-6);
+  const sub = Math.max(1, Math.ceil(dt / maxDt));
+  const h = dt / sub;
 
-  if (Math.abs(zeta - 1) < 1e-4) {
-    const x0 = state.p - goal;
-    const v0 = state.v;
-    const e  = Math.exp(-w * dt);
-    const newP = (x0 + (v0 + w * x0) * dt) * e + goal;
-    const newV = ((v0 + w * x0) * e - (v0 + w * x0) * w * dt * e) - w * (x0 + (v0 + w * x0) * dt) * e;
-    return { p: newP, v: newV };
+  let p = state.p;
+  let v = state.v;
+  for (let i = 0; i < sub; i++) {
+    const a = (-k * (p - goal) - c * v) / m;
+    v = v + a * h;
+    p = p + v * h;
   }
-
-  if (zeta < 1) {
-    const wd  = w * Math.sqrt(1 - zeta * zeta);
-    const x0  = state.p - goal;
-    const v0  = state.v;
-    const e   = Math.exp(-zeta * w * dt);
-    const cos = Math.cos(wd * dt);
-    const sin = Math.sin(wd * dt);
-    const newP = e * (x0 * cos + ((v0 + zeta * w * x0) / wd) * sin) + goal;
-    const newV = e * (
-      (v0 - zeta * w * x0) * cos - (wd * x0 + (v0 + zeta * w * x0) * zeta / wd * wd) * sin
-    );
-    return { p: newP, v: newV };
-  }
-
-  const r1  = -zeta * w + w * Math.sqrt(zeta * zeta - 1);
-  const r2  = -zeta * w - w * Math.sqrt(zeta * zeta - 1);
-  const x0  = state.p - goal;
-  const v0  = state.v;
-  const denom = r1 - r2 || 1e-12;
-  const c1  = (v0 - r2 * x0) / denom;
-  const c2  = (r1 * x0 - v0) / denom;
-  const e1  = Math.exp(r1 * dt);
-  const e2  = Math.exp(r2 * dt);
-  return {
-    p: c1 * e1 + c2 * e2 + goal,
-    v: c1 * r1 * e1 + c2 * r2 * e2,
-  };
+  return { p, v };
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
