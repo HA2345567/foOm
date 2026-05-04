@@ -359,22 +359,22 @@ function resolveConfig(opts: ZoomConfig): ResolvedConfig {
   const feel = opts.feel ?? "silk";
   const baseSpring = FEEL_PRESETS[feel];
   const spring: SpringParams = {
-    k: clamp(opts.springStiffness ?? baseSpring.k, 1, 500),
+    k: clamp(opts.springStiffness ?? baseSpring.k, 0.1, 500),
     c: clamp(opts.springDamping   ?? baseSpring.c, 0.1, 200),
     m: clamp(opts.springMass      ?? baseSpring.m, 0.1, 10),
   };
 
   return {
     spring,
-    clickScale:           clamp(opts.clickScale       ?? 1.32, 1, 4),
-    typeScale:            clamp(opts.typeScale         ?? 1.14, 1, 3),
-    pauseScale:           clamp(opts.pauseScale        ?? 1.08, 1, 2),
+    clickScale:           clamp(opts.clickScale       ?? 1.35, 1, 4),
+    typeScale:            clamp(opts.typeScale         ?? 1.18, 1, 3),
+    pauseScale:           clamp(opts.pauseScale        ?? 1.10, 1, 2),
     scrollOutScale:       clamp(opts.scrollOutScale    ?? 1.0,  0.5, 1.5),
-    hold:                 clamp(opts.hold              ?? 3.5,  0, 15),
-    holdPerClick:         clamp(opts.holdPerClick      ?? 0.6,  0, 3),
+    hold:                 clamp(opts.hold              ?? 2.2,  0, 15),
+    holdPerClick:         clamp(opts.holdPerClick      ?? 0.5,  0, 3),
     pauseThreshold:       clamp(opts.pauseThreshold    ?? 2.0,  0.5, 30),
     scrollBurstThreshold: clamp(opts.scrollBurstThreshold ?? 0.25, 0, 5),
-    clickMergeWindow:     clamp(opts.clickMergeWindow  ?? 2.8,  0, 10),
+    clickMergeWindow:     clamp(opts.clickMergeWindow  ?? 2.2,  0, 10),
     clickMergeDistance:   clamp(opts.clickMergeDistance ?? 0.18, 0, 1),
     simStep:              clamp(opts.simStep           ?? 1 / 120, 1 / 240, 1 / 30),
     rdpEpsilon:           clamp(opts.rdpEpsilon        ?? 0.0008, 0, 0.1),
