@@ -269,11 +269,9 @@ export function RecordingStudio() {
   );
 }
 
-import { useEffect as _useEffect, useRef as _useRef } from "react";
-
 function WebcamPreview({ stream }: { stream: MediaStream }) {
-  const ref = _useRef<HTMLVideoElement>(null);
-  _useEffect(() => {
+  const ref = useRef<HTMLVideoElement>(null);
+  useEffect(() => {
     if (ref.current) ref.current.srcObject = stream;
   }, [stream]);
   return (
