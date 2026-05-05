@@ -175,62 +175,115 @@ export function useScreenRecording() {
 
   const beginCapture = useCallback(async () => {
     setError(null);
-    setState("requesting");
     chunksRef.current = [];
     clicksRef.current = [];
     scrollsRef.current = [];
     pausesRef.current = [];
 
+    // Pre-flight checks
+    if (typeof navigator === "undefined" || !navigator.mediaDevices?.getDisplayMedia) {
+      setError("Screen capture isn't supported in this browser. Try the latest Chrome, Edge, or Firefox.");
+      return;
+    }
+    if (typeof MediaRecorder === "undefined") {
+      setError("Your browser doesn't support MediaRecorder.");
+      return;
+    }
+
+    setState("requesting");
+
+    let screenStream: MediaStream | null = null;
+    let audioCtx: AudioContext | null = null;
+
     try {
+      // 1) Acquire display stream — MUST be inside the user gesture, so do it first
       const constraints: DisplayMediaStreamOptions = {
         video: {
-          frameRate: 30,
+          frameRate: { ideal: 30, max: 60 },
           displaySurface: displaySurfaceMap[sourceType],
         } as MediaTrackConstraints,
         audio: true,
       };
-      const screenStream =
-        await navigator.mediaDevices.getDisplayMedia(constraints);
+      screenStream = await navigator.mediaDevices.getDisplayMedia(constraints);
       screenStreamRef.current = screenStream;
 
       const videoTrack = screenStream.getVideoTracks()[0];
+      if (!videoTrack) throw new Error("No video track returned from screen capture");
       const settings = videoTrack.getSettings();
       dimsRef.current = {
         w: settings.width ?? 1280,
         h: settings.height ?? 720,
       };
 
-      const tracks: MediaStreamTrack[] = [videoTrack];
-      const screenAudioTracks = screenStream.getAudioTracks();
-      if (screenAudioTracks.length > 0) tracks.push(...screenAudioTracks);
-
+      // 2) Reuse existing mic stream if user already enabled it; otherwise acquire fresh
+      let micTrack: MediaStreamTrack | null = null;
       if (micEnabled) {
         try {
-          const ms =
+          const liveMic =
             micStream && micStream.getAudioTracks().some((t) => t.readyState === "live")
               ? micStream
-              : await navigator.mediaDevices.getUserMedia({ audio: true });
-          micStreamRef.current = ms;
-          if (ms !== micStream) setMicStream(ms);
-          tracks.push(...ms.getAudioTracks());
-        } catch {
-          console.warn("Mic denied");
+              : await navigator.mediaDevices.getUserMedia({
+                  audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true },
+                });
+          micStreamRef.current = liveMic;
+          if (liveMic !== micStream) setMicStream(liveMic);
+          micTrack = liveMic.getAudioTracks()[0] ?? null;
+        } catch (e) {
+          console.warn("Mic acquisition failed:", e);
+        }
+      }
+
+      // 3) Mix system audio + mic into a single track via Web Audio (max compat across browsers)
+      const screenAudioTracks = screenStream.getAudioTracks();
+      const tracks: MediaStreamTrack[] = [videoTrack];
+
+      if (screenAudioTracks.length > 0 || micTrack) {
+        try {
+          const AudioCtx =
+            window.AudioContext ||
+            (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
+          audioCtx = new AudioCtx();
+          const dest = audioCtx.createMediaStreamDestination();
+          if (screenAudioTracks.length > 0) {
+            const sysSrc = audioCtx.createMediaStreamSource(new MediaStream(screenAudioTracks));
+            const sysGain = audioCtx.createGain();
+            sysGain.gain.value = 0.9;
+            sysSrc.connect(sysGain).connect(dest);
+          }
+          if (micTrack) {
+            const micSrc = audioCtx.createMediaStreamSource(new MediaStream([micTrack]));
+            const micGain = audioCtx.createGain();
+            micGain.gain.value = 1.0;
+            micSrc.connect(micGain).connect(dest);
+          }
+          tracks.push(...dest.stream.getAudioTracks());
+        } catch (e) {
+          console.warn("Audio mixing failed, falling back to raw tracks:", e);
+          if (screenAudioTracks.length > 0) tracks.push(...screenAudioTracks);
+          if (micTrack) tracks.push(micTrack);
         }
       }
 
       const combined = new MediaStream(tracks);
-      const mimeType = MediaRecorder.isTypeSupported(
+
+      // 4) Choose a supported mime type (try several, in order of quality)
+      const candidates = [
         "video/webm;codecs=vp9,opus",
-      )
-        ? "video/webm;codecs=vp9,opus"
-        : MediaRecorder.isTypeSupported("video/webm;codecs=vp8,opus")
-          ? "video/webm;codecs=vp8,opus"
-          : "video/webm";
+        "video/webm;codecs=vp8,opus",
+        "video/webm;codecs=h264,opus",
+        "video/webm",
+        "video/mp4",
+      ];
+      const mimeType = candidates.find((m) => MediaRecorder.isTypeSupported(m)) ?? "";
+      if (!mimeType) {
+        throw new Error("No supported video MIME type found for MediaRecorder");
+      }
       mimeRef.current = mimeType;
 
       const recorder = new MediaRecorder(combined, {
         mimeType,
-        videoBitsPerSecond: 3_000_000,
+        videoBitsPerSecond: 5_000_000,
+        audioBitsPerSecond: 128_000,
       });
 
       recorder.ondataavailable = (e) => {
@@ -257,6 +310,15 @@ export function useScreenRecording() {
         cleanup();
       };
 
+      recorder.onerror = (ev: Event) => {
+        const e = ev as Event & { error?: DOMException };
+        console.error("MediaRecorder error:", e.error);
+        setError(`Recording error: ${e.error?.message ?? "unknown"}`);
+        try {
+          if (recorder.state !== "inactive") recorder.stop();
+        } catch {/* noop */}
+      };
+
       videoTrack.addEventListener("ended", () => {
         if (recorder.state !== "inactive") recorder.stop();
       });
@@ -271,6 +333,11 @@ export function useScreenRecording() {
       }
       setCountdown(0);
 
+      // Verify the source is still alive after countdown (user may have stopped sharing)
+      if (videoTrack.readyState !== "live") {
+        throw new Error("Screen capture ended before recording could start");
+      }
+
       recorder.start(1000);
       startTimeRef.current = Date.now();
       setState("recording");
@@ -278,10 +345,25 @@ export function useScreenRecording() {
         setElapsed(Math.floor((Date.now() - startTimeRef.current) / 1000));
       }, 1000);
     } catch (err) {
+      console.error("beginCapture failed:", err);
+      // Clean up the streams we acquired before failing
+      try {
+        screenStream?.getTracks().forEach((t) => t.stop());
+      } catch {/* noop */}
+      try {
+        await audioCtx?.close();
+      } catch {/* noop */}
       cleanup();
       setState("idle");
-      if (err instanceof DOMException && err.name === "NotAllowedError") {
-        setError("Screen sharing was cancelled");
+      if (err instanceof DOMException) {
+        if (err.name === "NotAllowedError") setError("Screen sharing was cancelled or blocked.");
+        else if (err.name === "NotFoundError") setError("No capture source available.");
+        else if (err.name === "NotReadableError") setError("Capture source is in use by another app.");
+        else if (err.name === "AbortError") setError("Capture was aborted before it began.");
+        else if (err.name === "OverconstrainedError") setError("Requested capture settings aren't supported.");
+        else setError(`Failed to start recording: ${err.message || err.name}`);
+      } else if (err instanceof Error) {
+        setError(`Failed to start recording: ${err.message}`);
       } else {
         setError("Failed to start recording");
       }
