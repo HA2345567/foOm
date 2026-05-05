@@ -227,6 +227,11 @@ export function RecordingStudio() {
                     <span className="font-display text-2xl font-bold text-foreground tabular-nums">{formatTime(r.elapsed)}</span>
                   </div>
                   <p className="text-caption text-muted-foreground">{r.state === "recording" ? "Recording your screen…" : "Paused"}</p>
+                  {r.micEnabled && r.micStream && r.state === "recording" && (
+                    <div className="mt-3 flex justify-center">
+                      <MicMeter stream={r.micStream} bars={24} />
+                    </div>
+                  )}
                 </div>
                 {r.webcamStream && <WebcamOverlay stream={r.webcamStream} />}
               </div>
