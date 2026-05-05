@@ -115,7 +115,7 @@ export function RecordingStudio() {
               {/* Toggles */}
               <div className="space-y-3 mb-8">
                 <button
-                  onClick={() => r.setMicEnabled(!r.micEnabled)}
+                  onClick={r.toggleMic}
                   className={`w-full flex items-center gap-4 p-4 rounded-xl border transition-colors ${r.micEnabled ? "border-foreground/20 bg-card" : "border-border bg-card/50"}`}
                 >
                   <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${r.micEnabled ? "bg-primary text-primary-foreground" : "bg-surface text-muted-foreground"}`}>
@@ -127,8 +127,11 @@ export function RecordingStudio() {
                   </div>
                   <div className="text-left flex-1">
                     <p className="text-sm font-medium text-foreground">Microphone</p>
-                    <p className="text-xs text-muted-foreground">{r.micEnabled ? "Your voice will be recorded" : "Screen audio only"}</p>
+                    <p className="text-xs text-muted-foreground">{r.micEnabled ? "Live — speak to test" : "Screen audio only"}</p>
                   </div>
+                  {r.micEnabled && r.micStream && (
+                    <MicMeter stream={r.micStream} className="mr-2" />
+                  )}
                   <div className={`w-10 h-6 rounded-full p-0.5 transition-colors ${r.micEnabled ? "bg-primary" : "bg-muted"}`}>
                     <div className={`w-5 h-5 rounded-full bg-foreground transition-transform ${r.micEnabled ? "translate-x-4" : "translate-x-0"}`} />
                   </div>
