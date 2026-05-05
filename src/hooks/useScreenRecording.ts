@@ -310,6 +310,15 @@ export function useScreenRecording() {
         cleanup();
       };
 
+      recorder.onerror = (ev: Event) => {
+        const e = ev as Event & { error?: DOMException };
+        console.error("MediaRecorder error:", e.error);
+        setError(`Recording error: ${e.error?.message ?? "unknown"}`);
+        try {
+          if (recorder.state !== "inactive") recorder.stop();
+        } catch {/* noop */}
+      };
+
       videoTrack.addEventListener("ended", () => {
         if (recorder.state !== "inactive") recorder.stop();
       });
@@ -324,6 +333,11 @@ export function useScreenRecording() {
       }
       setCountdown(0);
 
+      // Verify the source is still alive after countdown (user may have stopped sharing)
+      if (videoTrack.readyState !== "live") {
+        throw new Error("Screen capture ended before recording could start");
+      }
+
       recorder.start(1000);
       startTimeRef.current = Date.now();
       setState("recording");
@@ -331,10 +345,25 @@ export function useScreenRecording() {
         setElapsed(Math.floor((Date.now() - startTimeRef.current) / 1000));
       }, 1000);
     } catch (err) {
+      console.error("beginCapture failed:", err);
+      // Clean up the streams we acquired before failing
+      try {
+        screenStream?.getTracks().forEach((t) => t.stop());
+      } catch {/* noop */}
+      try {
+        await audioCtx?.close();
+      } catch {/* noop */}
       cleanup();
       setState("idle");
-      if (err instanceof DOMException && err.name === "NotAllowedError") {
-        setError("Screen sharing was cancelled");
+      if (err instanceof DOMException) {
+        if (err.name === "NotAllowedError") setError("Screen sharing was cancelled or blocked.");
+        else if (err.name === "NotFoundError") setError("No capture source available.");
+        else if (err.name === "NotReadableError") setError("Capture source is in use by another app.");
+        else if (err.name === "AbortError") setError("Capture was aborted before it began.");
+        else if (err.name === "OverconstrainedError") setError("Requested capture settings aren't supported.");
+        else setError(`Failed to start recording: ${err.message || err.name}`);
+      } else if (err instanceof Error) {
+        setError(`Failed to start recording: ${err.message}`);
       } else {
         setError("Failed to start recording");
       }
