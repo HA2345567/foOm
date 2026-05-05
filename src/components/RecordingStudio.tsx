@@ -157,6 +157,27 @@ export function RecordingStudio() {
                 </button>
               </div>
 
+              {(r.webcamStream || r.micStream) && (
+                <div className="mb-6 p-4 rounded-xl border border-border bg-card flex items-center gap-4">
+                  {r.webcamStream && <WebcamPreview stream={r.webcamStream} />}
+                  <div className="flex-1 min-w-0">
+                    <p className="text-xs uppercase tracking-wider text-muted-foreground mb-1">Live preview</p>
+                    <p className="text-sm text-foreground">
+                      {r.webcamStream && r.micStream
+                        ? "Camera and mic are active. You're ready to record."
+                        : r.webcamStream
+                          ? "Camera is active. Position yourself in the frame."
+                          : "Mic is active. Speak to test the input level."}
+                    </p>
+                    {r.micStream && (
+                      <div className="mt-2">
+                        <MicMeter stream={r.micStream} bars={20} />
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+
               {r.error && (
                 <div className="mb-6 p-3 rounded-lg bg-destructive/10 border border-destructive/20 text-sm text-destructive text-center">{r.error}</div>
               )}
