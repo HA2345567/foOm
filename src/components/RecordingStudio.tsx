@@ -268,3 +268,23 @@ export function RecordingStudio() {
     </div>
   );
 }
+
+import { useEffect as _useEffect, useRef as _useRef } from "react";
+
+function WebcamPreview({ stream }: { stream: MediaStream }) {
+  const ref = _useRef<HTMLVideoElement>(null);
+  _useEffect(() => {
+    if (ref.current) ref.current.srcObject = stream;
+  }, [stream]);
+  return (
+    <div className="w-16 h-16 rounded-full overflow-hidden border-2 border-primary shadow-card-hover shrink-0">
+      <video
+        ref={ref}
+        autoPlay
+        playsInline
+        muted
+        className="w-full h-full object-cover scale-x-[-1]"
+      />
+    </div>
+  );
+}
