@@ -158,11 +158,13 @@ export function useScreenRecording() {
 
       if (micEnabled) {
         try {
-          const micStream = await navigator.mediaDevices.getUserMedia({
-            audio: true,
-          });
-          micStreamRef.current = micStream;
-          tracks.push(...micStream.getAudioTracks());
+          const ms =
+            micStream && micStream.getAudioTracks().some((t) => t.readyState === "live")
+              ? micStream
+              : await navigator.mediaDevices.getUserMedia({ audio: true });
+          micStreamRef.current = ms;
+          if (ms !== micStream) setMicStream(ms);
+          tracks.push(...ms.getAudioTracks());
         } catch {
           console.warn("Mic denied");
         }
