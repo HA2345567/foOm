@@ -103,6 +103,29 @@ export function useScreenRecording() {
     }
   }, [webcamStream]);
 
+  const setMicEnabled = useCallback(
+    async (next: boolean) => {
+      if (next === micEnabled) return;
+      if (!next) {
+        micStream?.getTracks().forEach((t) => t.stop());
+        setMicStream(null);
+        setMicEnabledState(false);
+        return;
+      }
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        setMicStream(stream);
+        setMicEnabledState(true);
+      } catch {
+        setError("Microphone access denied");
+        setMicEnabledState(false);
+      }
+    },
+    [micEnabled, micStream],
+  );
+
+  const toggleMic = useCallback(() => setMicEnabled(!micEnabled), [micEnabled, setMicEnabled]);
+
   // Global click listener tied to OS cursor isn't possible in the browser;
   // we approximate by listening to pointerdown on the page during recording.
   // For full-screen captures these clicks won't fire, so we expose `recordClick`
