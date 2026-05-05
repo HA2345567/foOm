@@ -55,7 +55,8 @@ export function useScreenRecording() {
   const [result, setResult] = useState<RecordingResult | null>(null);
   const [elapsed, setElapsed] = useState(0);
   const [countdown, setCountdown] = useState(0);
-  const [micEnabled, setMicEnabled] = useState(true);
+  const [micEnabled, setMicEnabledState] = useState(false);
+  const [micStream, setMicStream] = useState<MediaStream | null>(null);
   const [webcamEnabled, setWebcamEnabled] = useState(false);
   const [webcamStream, setWebcamStream] = useState<MediaStream | null>(null);
   const [sourceType, setSourceType] = useState<SourceType>("screen");
@@ -115,6 +116,29 @@ export function useScreenRecording() {
       }
     }
   }, [webcamStream]);
+
+  const setMicEnabled = useCallback(
+    async (next: boolean) => {
+      if (next === micEnabled) return;
+      if (!next) {
+        micStream?.getTracks().forEach((t) => t.stop());
+        setMicStream(null);
+        setMicEnabledState(false);
+        return;
+      }
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        setMicStream(stream);
+        setMicEnabledState(true);
+      } catch {
+        setError("Microphone access denied");
+        setMicEnabledState(false);
+      }
+    },
+    [micEnabled, micStream],
+  );
+
+  const toggleMic = useCallback(() => setMicEnabled(!micEnabled), [micEnabled, setMicEnabled]);
 
   // Global click listener tied to OS cursor isn't possible in the browser;
   // we approximate by listening to pointerdown on the page during recording.
@@ -182,11 +206,13 @@ export function useScreenRecording() {
 
       if (micEnabled) {
         try {
-          const micStream = await navigator.mediaDevices.getUserMedia({
-            audio: true,
-          });
-          micStreamRef.current = micStream;
-          tracks.push(...micStream.getAudioTracks());
+          const ms =
+            micStream && micStream.getAudioTracks().some((t) => t.readyState === "live")
+              ? micStream
+              : await navigator.mediaDevices.getUserMedia({ audio: true });
+          micStreamRef.current = ms;
+          if (ms !== micStream) setMicStream(ms);
+          tracks.push(...ms.getAudioTracks());
         } catch {
           console.warn("Mic denied");
         }
@@ -318,8 +344,9 @@ export function useScreenRecording() {
     return () => {
       cleanup();
       webcamStream?.getTracks().forEach((t) => t.stop());
+      micStream?.getTracks().forEach((t) => t.stop());
     };
-  }, [cleanup, webcamStream]);
+  }, [cleanup, webcamStream, micStream]);
 
   return {
     state,
@@ -329,6 +356,8 @@ export function useScreenRecording() {
     error,
     micEnabled,
     setMicEnabled,
+    toggleMic,
+    micStream,
     webcamEnabled,
     webcamStream,
     toggleWebcam,

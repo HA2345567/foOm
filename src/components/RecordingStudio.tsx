@@ -1,8 +1,9 @@
-import { type ReactNode } from "react";
+import { type ReactNode, useEffect, useRef } from "react";
 import { Link } from "@tanstack/react-router";
 import { motion, AnimatePresence } from "framer-motion";
 import { useScreenRecording, type SourceType } from "../hooks/useScreenRecording";
 import { WebcamOverlay } from "./WebcamOverlay";
+import { MicMeter } from "./MicMeter";
 import { AutoZoomEditor } from "./AutoZoomEditor";
 
 function formatTime(seconds: number) {
@@ -114,7 +115,7 @@ export function RecordingStudio() {
               {/* Toggles */}
               <div className="space-y-3 mb-8">
                 <button
-                  onClick={() => r.setMicEnabled(!r.micEnabled)}
+                  onClick={r.toggleMic}
                   className={`w-full flex items-center gap-4 p-4 rounded-xl border transition-colors ${r.micEnabled ? "border-foreground/20 bg-card" : "border-border bg-card/50"}`}
                 >
                   <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${r.micEnabled ? "bg-primary text-primary-foreground" : "bg-surface text-muted-foreground"}`}>
@@ -126,8 +127,11 @@ export function RecordingStudio() {
                   </div>
                   <div className="text-left flex-1">
                     <p className="text-sm font-medium text-foreground">Microphone</p>
-                    <p className="text-xs text-muted-foreground">{r.micEnabled ? "Your voice will be recorded" : "Screen audio only"}</p>
+                    <p className="text-xs text-muted-foreground">{r.micEnabled ? "Live — speak to test" : "Screen audio only"}</p>
                   </div>
+                  {r.micEnabled && r.micStream && (
+                    <MicMeter stream={r.micStream} className="mr-2" />
+                  )}
                   <div className={`w-10 h-6 rounded-full p-0.5 transition-colors ${r.micEnabled ? "bg-primary" : "bg-muted"}`}>
                     <div className={`w-5 h-5 rounded-full bg-foreground transition-transform ${r.micEnabled ? "translate-x-4" : "translate-x-0"}`} />
                   </div>
@@ -152,6 +156,27 @@ export function RecordingStudio() {
                   </div>
                 </button>
               </div>
+
+              {(r.webcamStream || r.micStream) && (
+                <div className="mb-6 p-4 rounded-xl border border-border bg-card flex items-center gap-4">
+                  {r.webcamStream && <WebcamPreview stream={r.webcamStream} />}
+                  <div className="flex-1 min-w-0">
+                    <p className="text-xs uppercase tracking-wider text-muted-foreground mb-1">Live preview</p>
+                    <p className="text-sm text-foreground">
+                      {r.webcamStream && r.micStream
+                        ? "Camera and mic are active. You're ready to record."
+                        : r.webcamStream
+                          ? "Camera is active. Position yourself in the frame."
+                          : "Mic is active. Speak to test the input level."}
+                    </p>
+                    {r.micStream && (
+                      <div className="mt-2">
+                        <MicMeter stream={r.micStream} bars={20} />
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
 
               {r.error && (
                 <div className="mb-6 p-3 rounded-lg bg-destructive/10 border border-destructive/20 text-sm text-destructive text-center">{r.error}</div>
@@ -183,6 +208,12 @@ export function RecordingStudio() {
                 {r.countdown || "Go!"}
               </motion.div>
               <p className="text-muted-foreground mt-4">Recording starts in…</p>
+              {(r.webcamStream || r.micStream) && (
+                <div className="mt-8 flex items-center justify-center gap-4">
+                  {r.webcamStream && <WebcamPreview stream={r.webcamStream} />}
+                  {r.micStream && <MicMeter stream={r.micStream} bars={20} />}
+                </div>
+              )}
             </motion.div>
           )}
 
@@ -196,6 +227,11 @@ export function RecordingStudio() {
                     <span className="font-display text-2xl font-bold text-foreground tabular-nums">{formatTime(r.elapsed)}</span>
                   </div>
                   <p className="text-caption text-muted-foreground">{r.state === "recording" ? "Recording your screen…" : "Paused"}</p>
+                  {r.micEnabled && r.micStream && r.state === "recording" && (
+                    <div className="mt-3 flex justify-center">
+                      <MicMeter stream={r.micStream} bars={24} />
+                    </div>
+                  )}
                 </div>
                 {r.webcamStream && <WebcamOverlay stream={r.webcamStream} />}
               </div>
@@ -240,6 +276,24 @@ export function RecordingStudio() {
           )}
         </AnimatePresence>
       </div>
+    </div>
+  );
+}
+
+function WebcamPreview({ stream }: { stream: MediaStream }) {
+  const ref = useRef<HTMLVideoElement>(null);
+  useEffect(() => {
+    if (ref.current) ref.current.srcObject = stream;
+  }, [stream]);
+  return (
+    <div className="w-16 h-16 rounded-full overflow-hidden border-2 border-primary shadow-card-hover shrink-0">
+      <video
+        ref={ref}
+        autoPlay
+        playsInline
+        muted
+        className="w-full h-full object-cover scale-x-[-1]"
+      />
     </div>
   );
 }
