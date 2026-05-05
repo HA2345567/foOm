@@ -54,7 +54,8 @@ export function useScreenRecording() {
   const [result, setResult] = useState<RecordingResult | null>(null);
   const [elapsed, setElapsed] = useState(0);
   const [countdown, setCountdown] = useState(0);
-  const [micEnabled, setMicEnabled] = useState(true);
+  const [micEnabled, setMicEnabledState] = useState(false);
+  const [micStream, setMicStream] = useState<MediaStream | null>(null);
   const [webcamEnabled, setWebcamEnabled] = useState(false);
   const [webcamStream, setWebcamStream] = useState<MediaStream | null>(null);
   const [sourceType, setSourceType] = useState<SourceType>("screen");
