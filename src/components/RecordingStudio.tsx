@@ -208,6 +208,12 @@ export function RecordingStudio() {
                 {r.countdown || "Go!"}
               </motion.div>
               <p className="text-muted-foreground mt-4">Recording starts in…</p>
+              {(r.webcamStream || r.micStream) && (
+                <div className="mt-8 flex items-center justify-center gap-4">
+                  {r.webcamStream && <WebcamPreview stream={r.webcamStream} />}
+                  {r.micStream && <MicMeter stream={r.micStream} bars={20} />}
+                </div>
+              )}
             </motion.div>
           )}
 
