@@ -3,6 +3,7 @@ import { Link } from "@tanstack/react-router";
 import { motion, AnimatePresence } from "framer-motion";
 import { useScreenRecording, type SourceType } from "../hooks/useScreenRecording";
 import { WebcamOverlay } from "./WebcamOverlay";
+import { MicMeter } from "./MicMeter";
 import { AutoZoomEditor } from "./AutoZoomEditor";
 
 function formatTime(seconds: number) {
