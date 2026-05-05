@@ -309,8 +309,9 @@ export function useScreenRecording() {
     return () => {
       cleanup();
       webcamStream?.getTracks().forEach((t) => t.stop());
+      micStream?.getTracks().forEach((t) => t.stop());
     };
-  }, [cleanup, webcamStream]);
+  }, [cleanup, webcamStream, micStream]);
 
   return {
     state,
@@ -320,6 +321,8 @@ export function useScreenRecording() {
     error,
     micEnabled,
     setMicEnabled,
+    toggleMic,
+    micStream,
     webcamEnabled,
     webcamStream,
     toggleWebcam,
