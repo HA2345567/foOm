@@ -6,7 +6,7 @@ import { drawComposite } from "../lib/composite";
 import { GoogleGenerativeAI } from "@google/generative-ai";
 import { transcribeAudioAI, detectInterestAI } from "../lib/gemini";
 import { detectInterestPoints } from "../lib/detectInterest";
-import { renderAutoZoom, type RenderProgress, type RenderOutput } from "../lib/renderZoom";
+import { renderAutoZoom, type RenderProgress, type RenderOutput, type RenderFormat } from "../lib/renderZoom";
 import {
   BACKGROUNDS,
   RAYCAST_BG_IDS,
@@ -55,6 +55,10 @@ export function AutoZoomEditor({ recording, onDiscard }: Props) {
     if (saved) return parseInt(saved) as any;
     return 720;
   });
+  const [format, setFormat] = useState<RenderFormat>(() => {
+    const saved = localStorage.getItem("zoomly_format");
+    return (saved === "webm" ? "webm" : "mp4") as RenderFormat;
+  });
 
   useEffect(() => {
     localStorage.setItem("zoomly_background", background.id);
@@ -67,6 +71,10 @@ export function AutoZoomEditor({ recording, onDiscard }: Props) {
   useEffect(() => {
     localStorage.setItem("zoomly_quality", quality.toString());
   }, [quality]);
+
+  useEffect(() => {
+    localStorage.setItem("zoomly_format", format);
+  }, [format]);
 
   // AI Subtitles
   const [subtitles, setSubtitles] = useState<Subtitle[] | null>(null);
@@ -195,7 +203,7 @@ export function AutoZoomEditor({ recording, onDiscard }: Props) {
     setRendered(null);
     try {
       const out = await renderAutoZoom(recording, {
-        format: "webm",
+        format,
         quality,
         background,
         frame,
