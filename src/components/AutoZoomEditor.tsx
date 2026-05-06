@@ -6,9 +6,10 @@ import { drawComposite } from "../lib/composite";
 import { GoogleGenerativeAI } from "@google/generative-ai";
 import { transcribeAudioAI, detectInterestAI } from "../lib/gemini";
 import { detectInterestPoints } from "../lib/detectInterest";
-import { renderAutoZoom, type RenderProgress, type RenderOutput } from "../lib/renderZoom";
+import { renderAutoZoom, type RenderProgress, type RenderOutput, type RenderFormat } from "../lib/renderZoom";
 import {
   BACKGROUNDS,
+  RAYCAST_BG_IDS,
   DEFAULT_FRAME,
   type Background,
   type FrameStyle,
@@ -54,6 +55,10 @@ export function AutoZoomEditor({ recording, onDiscard }: Props) {
     if (saved) return parseInt(saved) as any;
     return 720;
   });
+  const [format, setFormat] = useState<RenderFormat>(() => {
+    const saved = localStorage.getItem("zoomly_format");
+    return (saved === "webm" ? "webm" : "mp4") as RenderFormat;
+  });
 
   useEffect(() => {
     localStorage.setItem("zoomly_background", background.id);
@@ -66,6 +71,10 @@ export function AutoZoomEditor({ recording, onDiscard }: Props) {
   useEffect(() => {
     localStorage.setItem("zoomly_quality", quality.toString());
   }, [quality]);
+
+  useEffect(() => {
+    localStorage.setItem("zoomly_format", format);
+  }, [format]);
 
   // AI Subtitles
   const [subtitles, setSubtitles] = useState<Subtitle[] | null>(null);
@@ -194,7 +203,7 @@ export function AutoZoomEditor({ recording, onDiscard }: Props) {
     setRendered(null);
     try {
       const out = await renderAutoZoom(recording, {
-        format: "webm",
+        format,
         quality,
         background,
         frame,
@@ -287,6 +296,18 @@ export function AutoZoomEditor({ recording, onDiscard }: Props) {
         <div className="pt-6 border-t border-border space-y-6">
           <section className="space-y-4">
             <div>
+              <div className="flex items-center justify-between mb-2.5">
+                <h3 className="text-[10px] uppercase tracking-widest text-muted-foreground/60">Raycast Wallpapers</h3>
+                <span className="text-[9px] uppercase tracking-widest text-primary/80 font-bold">Pro</span>
+              </div>
+              <div className="grid grid-cols-6 sm:grid-cols-8 md:grid-cols-10 lg:grid-cols-12 gap-1.5">
+                {BACKGROUNDS.filter(bg => RAYCAST_BG_IDS.includes(bg.id)).map((bg) => (
+                  <BackgroundButton key={bg.id} bg={bg} active={background.id === bg.id} onClick={() => setBackground(bg)} />
+                ))}
+              </div>
+            </div>
+
+            <div>
               <h3 className="text-[10px] uppercase tracking-widest text-muted-foreground/60 mb-2.5">Professional Scenes</h3>
               <div className="grid grid-cols-6 sm:grid-cols-8 md:grid-cols-10 lg:grid-cols-12 gap-1.5">
                 {BACKGROUNDS.filter(bg => bg.id.startsWith('pro_')).map((bg) => (
@@ -316,7 +337,7 @@ export function AutoZoomEditor({ recording, onDiscard }: Props) {
             <div>
               <h3 className="text-[10px] uppercase tracking-widest text-muted-foreground/60 mb-2.5">Creative</h3>
               <div className="grid grid-cols-6 sm:grid-cols-8 md:grid-cols-10 lg:grid-cols-12 gap-1.5">
-                {BACKGROUNDS.filter(bg => !bg.id.startsWith('pro_') && !["crimson", "ember", "gold", "neon_lime", "sapphire", "arctic", "violet", "amethyst", "rose", "magenta", "teal", "emerald", "copper", "infrared", "slate", "studio", "warm_white", "white", "black", "obsidian", "midnight", "carbon", "deep_space"].includes(bg.id)).map((bg) => (
+                {BACKGROUNDS.filter(bg => !bg.id.startsWith('pro_') && !RAYCAST_BG_IDS.includes(bg.id) && !["crimson", "ember", "gold", "neon_lime", "sapphire", "arctic", "violet", "amethyst", "rose", "magenta", "teal", "emerald", "copper", "infrared", "slate", "studio", "warm_white", "white", "black", "obsidian", "midnight", "carbon", "deep_space"].includes(bg.id)).map((bg) => (
                   <BackgroundButton key={bg.id} bg={bg} active={background.id === bg.id} onClick={() => setBackground(bg)} />
                 ))}
               </div>
@@ -449,6 +470,27 @@ export function AutoZoomEditor({ recording, onDiscard }: Props) {
 
         {/* Export / Download Options */}
         <section className="space-y-4">
+          <div className="space-y-2">
+            <p className="text-[10px] uppercase tracking-wider text-muted-foreground/70 font-bold ml-1">Format</p>
+            <div className="grid grid-cols-2 gap-1.5 p-1 rounded-xl bg-card border border-border shadow-inner">
+              {(["mp4", "webm"] as RenderFormat[]).map((f) => (
+                <button
+                  key={f}
+                  onClick={() => setFormat(f)}
+                  className={`py-1.5 rounded-lg text-[10px] font-bold uppercase tracking-wider transition-all ${
+                    format === f
+                      ? "bg-foreground text-background shadow-sm"
+                      : "text-muted-foreground hover:text-foreground hover:bg-muted/50"
+                  }`}
+                >
+                  {f}
+                </button>
+              ))}
+            </div>
+            <p className="text-[10px] text-muted-foreground/70 ml-1">
+              {format === "mp4" ? "H.264 + AAC — universal playback." : "VP9 + Opus — smaller file, modern browsers."}
+            </p>
+          </div>
           <div className="space-y-2">
             <p className="text-[10px] uppercase tracking-wider text-muted-foreground/70 font-bold ml-1">Quality</p>
             <div className="grid grid-cols-4 gap-1.5 p-1 rounded-xl bg-card border border-border shadow-inner">

@@ -631,6 +631,155 @@ export const BACKGROUNDS: Background[] = [
     url: "/bg/boardroom.png",
     paint: (ctx, w, h) => image(ctx, w, h, "/bg/boardroom.png"),
   },
+
+  // ── RAYCAST WALLPAPERS ─────────────────────────────────────────────────────
+  // Premium multi-blob mesh gradients inspired by raycast.com/wallpapers.
+  // Smooth, saturated, blended via "screen" composite for that signature glow.
+
+  {
+    id: "ray_pulse",
+    name: "Pulse",
+    css: "linear-gradient(135deg, #ff0080 0%, #7928ca 50%, #2563eb 100%)",
+    paint: (ctx, w, h) =>
+      meshGradient(ctx, w, h, "#0a0014", [
+        { cx: 0.18, cy: 0.78, r: 0.55, color: "rgba(255,0,128,0.85)" },
+        { cx: 0.55, cy: 0.50, r: 0.50, color: "rgba(121,40,202,0.80)" },
+        { cx: 0.88, cy: 0.22, r: 0.50, color: "rgba(37,99,235,0.80)" },
+        { cx: 0.50, cy: 0.05, r: 0.30, color: "rgba(255,90,180,0.35)" },
+      ], 6),
+  },
+  {
+    id: "ray_glass",
+    name: "Glass",
+    css: "linear-gradient(135deg, #06b6d4 0%, #3b82f6 50%, #8b5cf6 100%)",
+    paint: (ctx, w, h) =>
+      meshGradient(ctx, w, h, "#03060f", [
+        { cx: 0.22, cy: 0.75, r: 0.55, color: "rgba(6,182,212,0.85)" },
+        { cx: 0.55, cy: 0.42, r: 0.50, color: "rgba(59,130,246,0.85)" },
+        { cx: 0.85, cy: 0.18, r: 0.50, color: "rgba(139,92,246,0.80)" },
+        { cx: 0.10, cy: 0.20, r: 0.30, color: "rgba(34,211,238,0.30)" },
+      ], 6),
+  },
+  {
+    id: "ray_sunset",
+    name: "Sunset",
+    css: "linear-gradient(135deg, #fbbf24 0%, #f97316 45%, #db2777 100%)",
+    paint: (ctx, w, h) =>
+      meshGradient(ctx, w, h, "#1a0010", [
+        { cx: 0.18, cy: 0.78, r: 0.55, color: "rgba(251,191,36,0.80)" },
+        { cx: 0.50, cy: 0.55, r: 0.50, color: "rgba(249,115,22,0.85)" },
+        { cx: 0.82, cy: 0.25, r: 0.50, color: "rgba(219,39,119,0.85)" },
+        { cx: 0.40, cy: 0.10, r: 0.28, color: "rgba(255,200,80,0.30)" },
+      ], 6),
+  },
+  {
+    id: "ray_mint",
+    name: "Mint",
+    css: "linear-gradient(135deg, #6ee7b7 0%, #22d3ee 50%, #6366f1 100%)",
+    paint: (ctx, w, h) =>
+      meshGradient(ctx, w, h, "#03100c", [
+        { cx: 0.20, cy: 0.78, r: 0.55, color: "rgba(110,231,183,0.80)" },
+        { cx: 0.55, cy: 0.45, r: 0.50, color: "rgba(34,211,238,0.80)" },
+        { cx: 0.85, cy: 0.20, r: 0.55, color: "rgba(99,102,241,0.85)" },
+      ], 6),
+  },
+  {
+    id: "ray_blossom",
+    name: "Blossom",
+    css: "linear-gradient(135deg, #fda4af 0%, #f472b6 50%, #a855f7 100%)",
+    paint: (ctx, w, h) =>
+      meshGradient(ctx, w, h, "#15041a", [
+        { cx: 0.22, cy: 0.78, r: 0.55, color: "rgba(253,164,175,0.80)" },
+        { cx: 0.55, cy: 0.45, r: 0.50, color: "rgba(244,114,182,0.85)" },
+        { cx: 0.85, cy: 0.18, r: 0.50, color: "rgba(168,85,247,0.85)" },
+      ], 6),
+  },
+  {
+    id: "ray_ocean",
+    name: "Ocean",
+    css: "linear-gradient(135deg, #1e3a8a 0%, #0ea5e9 50%, #06b6d4 100%)",
+    paint: (ctx, w, h) =>
+      meshGradient(ctx, w, h, "#020617", [
+        { cx: 0.20, cy: 0.78, r: 0.60, color: "rgba(30,58,138,0.85)" },
+        { cx: 0.55, cy: 0.45, r: 0.50, color: "rgba(14,165,233,0.80)" },
+        { cx: 0.85, cy: 0.20, r: 0.50, color: "rgba(6,182,212,0.75)" },
+        { cx: 0.10, cy: 0.10, r: 0.25, color: "rgba(96,165,250,0.30)" },
+      ], 7),
+  },
+  {
+    id: "ray_lava",
+    name: "Lava",
+    css: "linear-gradient(135deg, #7c2d12 0%, #dc2626 45%, #f59e0b 100%)",
+    paint: (ctx, w, h) =>
+      meshGradient(ctx, w, h, "#150403", [
+        { cx: 0.18, cy: 0.78, r: 0.55, color: "rgba(124,45,18,0.90)" },
+        { cx: 0.52, cy: 0.50, r: 0.50, color: "rgba(220,38,38,0.85)" },
+        { cx: 0.85, cy: 0.22, r: 0.50, color: "rgba(245,158,11,0.80)" },
+      ], 7),
+  },
+  {
+    id: "ray_aurora2",
+    name: "Polaris",
+    css: "linear-gradient(135deg, #064e3b 0%, #0891b2 45%, #6366f1 100%)",
+    paint: (ctx, w, h) =>
+      meshGradient(ctx, w, h, "#020a10", [
+        { cx: 0.18, cy: 0.80, r: 0.55, color: "rgba(6,78,59,0.90)" },
+        { cx: 0.50, cy: 0.50, r: 0.50, color: "rgba(8,145,178,0.85)" },
+        { cx: 0.85, cy: 0.18, r: 0.55, color: "rgba(99,102,241,0.85)" },
+        { cx: 0.30, cy: 0.10, r: 0.25, color: "rgba(52,211,153,0.30)" },
+      ], 7),
+  },
+  {
+    id: "ray_candy",
+    name: "Candy",
+    css: "linear-gradient(135deg, #f0abfc 0%, #818cf8 50%, #22d3ee 100%)",
+    paint: (ctx, w, h) =>
+      meshGradient(ctx, w, h, "#0a0418", [
+        { cx: 0.20, cy: 0.78, r: 0.55, color: "rgba(240,171,252,0.85)" },
+        { cx: 0.55, cy: 0.45, r: 0.50, color: "rgba(129,140,248,0.85)" },
+        { cx: 0.85, cy: 0.18, r: 0.50, color: "rgba(34,211,238,0.85)" },
+      ], 6),
+  },
+  {
+    id: "ray_void",
+    name: "Void",
+    css: "linear-gradient(135deg, #18181b 0%, #3f3f46 50%, #71717a 100%)",
+    paint: (ctx, w, h) =>
+      meshGradient(ctx, w, h, "#050507", [
+        { cx: 0.20, cy: 0.80, r: 0.55, color: "rgba(63,63,70,0.95)" },
+        { cx: 0.55, cy: 0.45, r: 0.50, color: "rgba(113,113,122,0.55)" },
+        { cx: 0.85, cy: 0.20, r: 0.50, color: "rgba(161,161,170,0.30)" },
+      ], 8),
+  },
+  {
+    id: "ray_solar",
+    name: "Solar",
+    css: "linear-gradient(135deg, #facc15 0%, #f97316 50%, #b91c1c 100%)",
+    paint: (ctx, w, h) =>
+      meshGradient(ctx, w, h, "#15030a", [
+        { cx: 0.22, cy: 0.78, r: 0.55, color: "rgba(250,204,21,0.85)" },
+        { cx: 0.55, cy: 0.45, r: 0.50, color: "rgba(249,115,22,0.85)" },
+        { cx: 0.85, cy: 0.20, r: 0.50, color: "rgba(185,28,28,0.85)" },
+      ], 7),
+  },
+  {
+    id: "ray_iris",
+    name: "Iris",
+    css: "linear-gradient(135deg, #4f46e5 0%, #ec4899 50%, #f59e0b 100%)",
+    paint: (ctx, w, h) =>
+      meshGradient(ctx, w, h, "#0a0418", [
+        { cx: 0.18, cy: 0.78, r: 0.55, color: "rgba(79,70,229,0.85)" },
+        { cx: 0.52, cy: 0.45, r: 0.50, color: "rgba(236,72,153,0.85)" },
+        { cx: 0.85, cy: 0.20, r: 0.50, color: "rgba(245,158,11,0.80)" },
+      ], 6),
+  },
+];
+
+/** IDs of Raycast-style mesh wallpapers, used by the editor for grouping. */
+export const RAYCAST_BG_IDS = [
+  "ray_pulse", "ray_glass", "ray_sunset", "ray_mint", "ray_blossom",
+  "ray_ocean", "ray_lava", "ray_aurora2", "ray_candy", "ray_void",
+  "ray_solar", "ray_iris",
 ];
 
 
