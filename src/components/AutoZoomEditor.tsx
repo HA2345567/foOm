@@ -471,6 +471,27 @@ export function AutoZoomEditor({ recording, onDiscard }: Props) {
         {/* Export / Download Options */}
         <section className="space-y-4">
           <div className="space-y-2">
+            <p className="text-[10px] uppercase tracking-wider text-muted-foreground/70 font-bold ml-1">Format</p>
+            <div className="grid grid-cols-2 gap-1.5 p-1 rounded-xl bg-card border border-border shadow-inner">
+              {(["mp4", "webm"] as RenderFormat[]).map((f) => (
+                <button
+                  key={f}
+                  onClick={() => setFormat(f)}
+                  className={`py-1.5 rounded-lg text-[10px] font-bold uppercase tracking-wider transition-all ${
+                    format === f
+                      ? "bg-foreground text-background shadow-sm"
+                      : "text-muted-foreground hover:text-foreground hover:bg-muted/50"
+                  }`}
+                >
+                  {f}
+                </button>
+              ))}
+            </div>
+            <p className="text-[10px] text-muted-foreground/70 ml-1">
+              {format === "mp4" ? "H.264 + AAC — universal playback." : "VP9 + Opus — smaller file, modern browsers."}
+            </p>
+          </div>
+          <div className="space-y-2">
             <p className="text-[10px] uppercase tracking-wider text-muted-foreground/70 font-bold ml-1">Quality</p>
             <div className="grid grid-cols-4 gap-1.5 p-1 rounded-xl bg-card border border-border shadow-inner">
               {[360, 480, 720, 1080].map((q) => (
