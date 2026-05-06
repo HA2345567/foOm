@@ -9,6 +9,7 @@ import { detectInterestPoints } from "../lib/detectInterest";
 import { renderAutoZoom, type RenderProgress, type RenderOutput } from "../lib/renderZoom";
 import {
   BACKGROUNDS,
+  RAYCAST_BG_IDS,
   DEFAULT_FRAME,
   type Background,
   type FrameStyle,
@@ -287,6 +288,18 @@ export function AutoZoomEditor({ recording, onDiscard }: Props) {
         <div className="pt-6 border-t border-border space-y-6">
           <section className="space-y-4">
             <div>
+              <div className="flex items-center justify-between mb-2.5">
+                <h3 className="text-[10px] uppercase tracking-widest text-muted-foreground/60">Raycast Wallpapers</h3>
+                <span className="text-[9px] uppercase tracking-widest text-primary/80 font-bold">Pro</span>
+              </div>
+              <div className="grid grid-cols-6 sm:grid-cols-8 md:grid-cols-10 lg:grid-cols-12 gap-1.5">
+                {BACKGROUNDS.filter(bg => RAYCAST_BG_IDS.includes(bg.id)).map((bg) => (
+                  <BackgroundButton key={bg.id} bg={bg} active={background.id === bg.id} onClick={() => setBackground(bg)} />
+                ))}
+              </div>
+            </div>
+
+            <div>
               <h3 className="text-[10px] uppercase tracking-widest text-muted-foreground/60 mb-2.5">Professional Scenes</h3>
               <div className="grid grid-cols-6 sm:grid-cols-8 md:grid-cols-10 lg:grid-cols-12 gap-1.5">
                 {BACKGROUNDS.filter(bg => bg.id.startsWith('pro_')).map((bg) => (
@@ -316,7 +329,7 @@ export function AutoZoomEditor({ recording, onDiscard }: Props) {
             <div>
               <h3 className="text-[10px] uppercase tracking-widest text-muted-foreground/60 mb-2.5">Creative</h3>
               <div className="grid grid-cols-6 sm:grid-cols-8 md:grid-cols-10 lg:grid-cols-12 gap-1.5">
-                {BACKGROUNDS.filter(bg => !bg.id.startsWith('pro_') && !["crimson", "ember", "gold", "neon_lime", "sapphire", "arctic", "violet", "amethyst", "rose", "magenta", "teal", "emerald", "copper", "infrared", "slate", "studio", "warm_white", "white", "black", "obsidian", "midnight", "carbon", "deep_space"].includes(bg.id)).map((bg) => (
+                {BACKGROUNDS.filter(bg => !bg.id.startsWith('pro_') && !RAYCAST_BG_IDS.includes(bg.id) && !["crimson", "ember", "gold", "neon_lime", "sapphire", "arctic", "violet", "amethyst", "rose", "magenta", "teal", "emerald", "copper", "infrared", "slate", "studio", "warm_white", "white", "black", "obsidian", "midnight", "carbon", "deep_space"].includes(bg.id)).map((bg) => (
                   <BackgroundButton key={bg.id} bg={bg} active={background.id === bg.id} onClick={() => setBackground(bg)} />
                 ))}
               </div>
