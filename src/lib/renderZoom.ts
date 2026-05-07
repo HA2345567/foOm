@@ -2,57 +2,52 @@ import type { RecordingResult } from "../hooks/useScreenRecording";
 import { generateZoomKeyframes, interpolateZoom } from "./autoZoom";
 import { drawComposite } from "./composite";
 import {
-  BACKGROUNDS,
   _imgCache,
   type Background,
   type FrameStyle,
   type Subtitle,
 } from "./backgrounds";
-import * as Muxer from "webm-muxer";
+import * as WebMMuxer from "webm-muxer";
+import * as MP4Muxer from "mp4-muxer";
 
 export interface RenderProgress {
   stage: "preparing" | "rendering" | "encoding" | "done";
   percent: number;
 }
 
+export type RenderFormat = "mp4" | "webm";
+
 export interface RenderOutput {
   blob: Blob;
   url: string;
-  format: "webm";
+  format: RenderFormat;
 }
 
-const QUALITY_PRESETS: Record<
-  360 | 480 | 720 | 1080,
-  { targetH: number; videoBps: number }
-> = {
+const QUALITY_PRESETS: Record<360 | 480 | 720 | 1080, { targetH: number; videoBps: number }> = {
   360: { targetH: 360, videoBps: 1_200_000 },
   480: { targetH: 480, videoBps: 2_500_000 },
   720: { targetH: 720, videoBps: 5_000_000 },
   1080: { targetH: 1080, videoBps: 10_000_000 },
 };
 
-/** Target output frame rate */
 const OUTPUT_FPS = 30;
-/** Keyframe interval in seconds */
 const KEYFRAME_INTERVAL_S = 2;
+const AUDIO_BPS = 128_000;
 
 export async function renderAutoZoom(
   recording: RecordingResult,
   opts: {
-    format?: "mp4" | "webm";
+    format?: RenderFormat;
     quality?: 360 | 480 | 720 | 1080;
     background: Background;
     frame: FrameStyle;
     subtitles?: Subtitle[];
     clicksOverride?: RecordingResult["clicks"];
-    cameraX?: number;
-    cameraY?: number;
-    cameraSize?: number;
-    cameraShape?: "circle" | "square" | "rounded";
     onProgress?: (p: RenderProgress) => void;
   },
 ): Promise<RenderOutput> {
   const onProgress = opts.onProgress ?? (() => {});
+  const format: RenderFormat = opts.format ?? "mp4";
   onProgress({ stage: "preparing", percent: 0 });
 
   const qualityKey = (opts.quality ?? 720) as 360 | 480 | 720 | 1080;
@@ -81,6 +76,19 @@ export async function renderAutoZoom(
     pauses: recording.pauses,
   });
 
+  // ── Decode audio once up front ────────────────────────────────────────────
+  let audioBuffer: AudioBuffer | null = null;
+  try {
+    const arrBuf = await recording.blob.arrayBuffer();
+    const AC = window.AudioContext ||
+      (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
+    const tmpCtx = new AC();
+    audioBuffer = await tmpCtx.decodeAudioData(arrBuf.slice(0));
+    await tmpCtx.close();
+  } catch (e) {
+    console.warn("Audio decode failed, exporting video-only:", e);
+  }
+
   // ── Load video ────────────────────────────────────────────────────────────
   const video = document.createElement("video");
   video.src = recording.url;
@@ -88,7 +96,6 @@ export async function renderAutoZoom(
   video.playsInline = true;
   video.crossOrigin = "anonymous";
   video.preload = "auto";
-  // Playback speed 1x — requestVideoFrameCallback captures every decoded frame
   video.playbackRate = 1.0;
 
   await new Promise<void>((resolve, reject) => {
@@ -96,140 +103,153 @@ export async function renderAutoZoom(
     video.onerror = () => reject(new Error("Video failed to load"));
     video.load();
   });
-
-  // Ensure enough data is buffered before we start
   await new Promise<void>((resolve) => {
     if (video.readyState >= 4) return resolve();
     const onReady = () => { video.removeEventListener("canplaythrough", onReady); resolve(); };
     video.addEventListener("canplaythrough", onReady);
-    setTimeout(resolve, 3000); // fallback for blob URLs
+    setTimeout(resolve, 3000);
   });
 
-  // ── Load Camera if exists ─────────────────────────────────────────────────
-  let camVideo: HTMLVideoElement | null = null;
-  if (recording.cameraUrl) {
-    camVideo = document.createElement("video");
-    camVideo.src = recording.cameraUrl;
-    camVideo.muted = true;
-    camVideo.playsInline = true;
-    camVideo.crossOrigin = "anonymous";
-    camVideo.preload = "auto";
-    await new Promise<void>((resolve) => {
-      camVideo!.onloadedmetadata = () => resolve();
-      camVideo!.onerror = () => resolve(); // continue without cam if fails
-      camVideo!.load();
-    });
-  }
-
-  const srcW = video.videoWidth || recording.width || 1280;
-  const srcH = video.videoHeight || recording.height || 720;
+  const srcW = recording.width || video.videoWidth || 1280;
+  const srcH = recording.height || video.videoHeight || 720;
   const srcAspect = srcW / srcH;
 
   const outH = Math.min(preset.targetH, srcH * 2);
-  const outW = Math.round(outH * srcAspect) & ~1; // must be even
+  // Both encoders prefer even dims; H.264 in particular requires it.
+  const outW = Math.round(outH * srcAspect) & ~1;
+  const outHEven = outH & ~1;
 
-  // ── OffscreenCanvas ───────────────────────────────────────────────────────
-  const canvas = new OffscreenCanvas(outW, outH);
+  const canvas = new OffscreenCanvas(outW, outHEven);
   const ctx = canvas.getContext("2d", { alpha: false }) as OffscreenCanvasRenderingContext2D;
   ctx.imageSmoothingEnabled = true;
   ctx.imageSmoothingQuality = "high";
 
-  // ── Muxer (WebM with Audio) ────────────────────────────────────────────────
-  const muxerTarget = new Muxer.ArrayBufferTarget();
-  
-  const hasAudio = recording.blob.type.includes('audio') || (recording.mimeType && recording.mimeType.includes('opus'));
+  // ── Set up muxer + encoders for chosen format ─────────────────────────────
+  const sampleRate = audioBuffer?.sampleRate ?? 48000;
+  const channelCount = Math.min(2, audioBuffer?.numberOfChannels ?? 2);
 
-  const muxer = new Muxer.Muxer({
-    target: muxerTarget,
-    video: {
-      codec: "V_VP9",
-      width: outW,
-      height: outH,
-    },
-    audio: hasAudio ? {
-      codec: 'A_OPUS',
-      numberOfChannels: 2,
-      sampleRate: 48000
-    } : undefined,
-    firstTimestampBehavior: "offset",
-  });
+  let mp4Muxer: MP4Muxer.Muxer<MP4Muxer.ArrayBufferTarget> | null = null;
+  let webmMuxer: WebMMuxer.Muxer<WebMMuxer.ArrayBufferTarget> | null = null;
+  let mp4Target: MP4Muxer.ArrayBufferTarget | null = null;
+  let webmTarget: WebMMuxer.ArrayBufferTarget | null = null;
 
-  // ── VideoEncoder ──────────────────────────────────────────────────────────
+  let videoCodec: string;
+  let audioCodec: string;
+
+  if (format === "mp4") {
+    mp4Target = new MP4Muxer.ArrayBufferTarget();
+    mp4Muxer = new MP4Muxer.Muxer({
+      target: mp4Target,
+      fastStart: "in-memory",
+      firstTimestampBehavior: "offset",
+      video: { codec: "avc", width: outW, height: outHEven },
+      audio: audioBuffer ? { codec: "aac", numberOfChannels: channelCount, sampleRate } : undefined,
+    });
+    videoCodec = "avc1.640028"; // H.264 High @ Level 4.0
+    audioCodec = "mp4a.40.2";   // AAC LC
+  } else {
+    webmTarget = new WebMMuxer.ArrayBufferTarget();
+    webmMuxer = new WebMMuxer.Muxer({
+      target: webmTarget,
+      firstTimestampBehavior: "offset",
+      video: { codec: "V_VP9", width: outW, height: outHEven },
+      audio: audioBuffer ? { codec: "A_OPUS", numberOfChannels: channelCount, sampleRate } : undefined,
+    });
+    videoCodec = "vp09.00.10.08";
+    audioCodec = "opus";
+  }
+
+  // Verify codec support, fall back gracefully
+  const videoSupport = await VideoEncoder.isConfigSupported({
+    codec: videoCodec, width: outW, height: outHEven, bitrate: preset.videoBps, framerate: OUTPUT_FPS,
+  }).catch(() => null);
+  if (!videoSupport?.supported) {
+    if (format === "mp4") {
+      // Try baseline H.264
+      videoCodec = "avc1.42E01F";
+      const fallback = await VideoEncoder.isConfigSupported({
+        codec: videoCodec, width: outW, height: outHEven, bitrate: preset.videoBps, framerate: OUTPUT_FPS,
+      }).catch(() => null);
+      if (!fallback?.supported) throw new Error("Browser doesn't support H.264 encoding for MP4 export. Try WebM instead.");
+    } else {
+      throw new Error("Browser doesn't support VP9 encoding for WebM export.");
+    }
+  }
+
+  // ── Video encoder ─────────────────────────────────────────────────────────
   let videoError: Error | null = null;
   const videoEncoder = new VideoEncoder({
-    output: (chunk, meta) => muxer.addVideoChunk(chunk, meta),
+    output: (chunk, meta) => {
+      if (mp4Muxer) mp4Muxer.addVideoChunk(chunk, meta);
+      if (webmMuxer) webmMuxer.addVideoChunk(chunk, meta);
+    },
     error: (e) => { videoError = e; console.error("VideoEncoder error:", e); },
   });
   videoEncoder.configure({
-    codec: "vp09.00.10.08",
+    codec: videoCodec,
     width: outW,
-    height: outH,
+    height: outHEven,
     bitrate: preset.videoBps,
     framerate: OUTPUT_FPS,
+    ...(format === "mp4" ? { avc: { format: "avc" } as AvcEncoderConfig } : {}),
   });
 
-  // ── AudioEncoder ──────────────────────────────────────────────────────────
+  // ── Audio encoder ─────────────────────────────────────────────────────────
   let audioEncoder: AudioEncoder | null = null;
-  if (hasAudio) {
-    audioEncoder = new AudioEncoder({
-      output: (chunk, meta) => muxer.addAudioChunk(chunk, meta),
-      error: (e) => console.error("AudioEncoder error:", e),
-    });
-    audioEncoder.configure({
-      codec: 'opus',
-      numberOfChannels: 2,
-      sampleRate: 48000,
-      bitrate: 128000,
-    });
-  }
-
-  // ── Audio Capture Setup ───────────────────────────────────────────────────
-  let audioReader: ReadableStreamDefaultReader<AudioData> | null = null;
-  if (hasAudio) {
+  if (audioBuffer && typeof AudioEncoder !== "undefined") {
     try {
-      const stream = (video as any).captureStream ? (video as any).captureStream() : (video as any).mozCaptureStream();
-      const track = stream.getAudioTracks()[0];
-      if (track) {
-        const processor = new (window as any).MediaStreamTrackProcessor({ track });
-        audioReader = processor.readable.getReader();
-      }
+      audioEncoder = new AudioEncoder({
+        output: (chunk, meta) => {
+          if (mp4Muxer) mp4Muxer.addAudioChunk(chunk, meta);
+          if (webmMuxer) webmMuxer.addAudioChunk(chunk, meta);
+        },
+        error: (e) => console.error("AudioEncoder error:", e),
+      });
+      audioEncoder.configure({
+        codec: audioCodec,
+        sampleRate,
+        numberOfChannels: channelCount,
+        bitrate: AUDIO_BPS,
+      });
     } catch (e) {
-      console.warn("Audio capture setup failed", e);
+      console.warn("Audio encoder setup failed, video-only export:", e);
+      audioEncoder = null;
     }
   }
 
-  // ── Real-time capture via requestVideoFrameCallback ───────────────────────
-  // This is far faster than seek-per-frame: the browser decodes frames
-  // sequentially as the video plays, and we capture each one as it arrives.
-  // Total render time ≈ video duration (1× speed), not 10–20× slower.
+  // Encode audio in chunks of ~50ms
+  if (audioEncoder && audioBuffer) {
+    const totalFrames = audioBuffer.length;
+    const chunkFrames = Math.max(1, Math.floor(sampleRate * 0.05)); // 50ms
+    const interleaved = new Float32Array(chunkFrames * channelCount);
+    let frameOffset = 0;
+    while (frameOffset < totalFrames) {
+      const frames = Math.min(chunkFrames, totalFrames - frameOffset);
+      const slice = new Float32Array(frames * channelCount);
+      for (let ch = 0; ch < channelCount; ch++) {
+        const channelData = audioBuffer.getChannelData(ch);
+        for (let i = 0; i < frames; i++) {
+          slice[i * channelCount + ch] = channelData[frameOffset + i];
+        }
+      }
+      const ad = new AudioData({
+        format: "f32",
+        sampleRate,
+        numberOfFrames: frames,
+        numberOfChannels: channelCount,
+        timestamp: Math.round((frameOffset / sampleRate) * 1_000_000),
+        data: slice,
+      });
+      audioEncoder.encode(ad);
+      ad.close();
+      frameOffset += frames;
+    }
+  }
+
+  // ── Render frames via requestVideoFrameCallback ───────────────────────────
   let frameIndex = 0;
   let lastReportedPct = -1;
-
   onProgress({ stage: "rendering", percent: 0 });
-  
-  // Audio loop
-  let audioDone = false;
-  const audioLoop = async () => {
-    if (!audioReader || !audioEncoder) {
-      audioDone = true;
-      return;
-    }
-    try {
-      while (true) {
-        const { value, done } = await audioReader.read();
-        if (done) break;
-        if (audioEncoder.state === 'configured') {
-          audioEncoder.encode(value);
-        }
-        value.close();
-      }
-    } catch (e) {
-      console.warn("Audio loop error", e);
-    }
-    audioDone = true;
-  };
-
-  const audioPromise = audioLoop();
 
   await new Promise<void>((resolve, reject) => {
     const onFrame = (_now: DOMHighResTimeStamp, metadata: VideoFrameCallbackMetadata) => {
@@ -239,11 +259,7 @@ export async function renderAutoZoom(
       const timestampUs = Math.round(t * 1_000_000);
       const frameDurationUs = Math.round((1 / OUTPUT_FPS) * 1_000_000);
 
-      // Draw composite (background + zoomed video + subtitles)
       const kf = interpolateZoom(keyframes, t);
-      // Sync camera if active
-      if (camVideo) camVideo.currentTime = t;
-
       drawComposite(ctx as unknown as CanvasRenderingContext2D, video, kf, {
         background: opts.background,
         frame: opts.frame,
@@ -252,15 +268,9 @@ export async function renderAutoZoom(
         srcW,
         srcH,
         outW,
-        outH,
-        camera: camVideo || undefined,
-        cameraX: opts.cameraX,
-        cameraY: opts.cameraY,
-        cameraSize: opts.cameraSize,
-        cameraShape: opts.cameraShape,
+        outH: outHEven,
       });
 
-      // Encode this frame
       const outFrame = new VideoFrame(canvas, {
         timestamp: timestampUs,
         duration: frameDurationUs,
@@ -272,48 +282,48 @@ export async function renderAutoZoom(
       outFrame.close();
       frameIndex++;
 
-      // Progress
       const pct = Math.min(99, Math.round((t / recording.duration) * 100));
       if (pct !== lastReportedPct) {
         lastReportedPct = pct;
         onProgress({ stage: "rendering", percent: pct });
       }
 
-      // Schedule next frame capture
-      if (t < recording.duration - 0.1) {
+      if (t < recording.duration - 0.05) {
         video.requestVideoFrameCallback(onFrame);
       } else {
         resolve();
       }
     };
 
-    // Kick off the callback chain and start playback
     video.requestVideoFrameCallback(onFrame);
     video.play().catch(reject);
-
-    // Safety net: resolve when video naturally ends
     video.addEventListener("ended", () => resolve(), { once: true });
-
-    // Timeout guard: max duration + 10s buffer
     setTimeout(() => resolve(), (recording.duration + 10) * 1000);
   });
 
   video.pause();
-  if (audioReader) await audioReader.cancel();
-  await audioPromise;
 
-  // ── Flush encoder & finalize mux ──────────────────────────────────────────
   onProgress({ stage: "encoding", percent: 100 });
-
   if (videoEncoder.state === "configured") await videoEncoder.flush();
   if (audioEncoder && audioEncoder.state === "configured") await audioEncoder.flush();
 
-  muxer.finalize();
-  const blob = new Blob([muxerTarget.buffer], { type: "video/webm" });
+  let blob: Blob;
+  if (mp4Muxer && mp4Target) {
+    mp4Muxer.finalize();
+    blob = new Blob([mp4Target.buffer], { type: "video/mp4" });
+  } else if (webmMuxer && webmTarget) {
+    webmMuxer.finalize();
+    blob = new Blob([webmTarget.buffer], { type: "video/webm" });
+  } else {
+    throw new Error("Muxer not initialized");
+  }
 
   return {
     blob,
     url: URL.createObjectURL(blob),
-    format: "webm",
+    format,
   };
 }
+
+// Minor type shim for AVC config
+type AvcEncoderConfig = { format: "avc" | "annexb" };

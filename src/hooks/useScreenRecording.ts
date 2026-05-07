@@ -60,7 +60,8 @@ export function useScreenRecording() {
   const [result, setResult] = useState<RecordingResult | null>(null);
   const [elapsed, setElapsed] = useState(0);
   const [countdown, setCountdown] = useState(0);
-  const [micEnabled, setMicEnabled] = useState(true);
+  const [micEnabled, setMicEnabledState] = useState(false);
+  const [micStream, setMicStream] = useState<MediaStream | null>(null);
   const [webcamEnabled, setWebcamEnabled] = useState(false);
   const [webcamStream, setWebcamStream] = useState<MediaStream | null>(null);
   const [cameraShape, setCameraShape] = useState<CameraShape>("circle");
@@ -138,10 +139,29 @@ export function useScreenRecording() {
     }
   }, [webcamStream, micEnabled]);
 
-  // Global click listener tied to OS cursor isn't possible in the browser;
-  // we approximate by listening to pointerdown on the page during recording.
-  // For full-screen captures these clicks won't fire, so we expose `recordClick`
-  // for the recording UI to call when a click is detected via the screen stream.
+  const setMicEnabled = useCallback(
+    async (next: boolean) => {
+      if (next === micEnabled) return;
+      if (!next) {
+        micStream?.getTracks().forEach((t) => t.stop());
+        setMicStream(null);
+        setMicEnabledState(false);
+        return;
+      }
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        setMicStream(stream);
+        setMicEnabledState(true);
+      } catch {
+        setError("Microphone access denied");
+        setMicEnabledState(false);
+      }
+    },
+    [micEnabled, micStream],
+  );
+
+  const toggleMic = useCallback(() => setMicEnabled(!micEnabled), [micEnabled, setMicEnabled]);
+
   const recordClick = useCallback((xNorm: number, yNorm: number) => {
     if (!startTimeRef.current) return;
     const t = (Date.now() - startTimeRef.current) / 1000;
@@ -151,7 +171,6 @@ export function useScreenRecording() {
   useEffect(() => {
     if (state !== "recording") return;
     const handler = (e: PointerEvent) => {
-      // Map viewport click to normalized (best-effort for tab capture)
       const x = e.clientX / window.innerWidth;
       const y = e.clientY / window.innerHeight;
       recordClick(Math.max(0, Math.min(1, x)), Math.max(0, Math.min(1, y)));
@@ -172,7 +191,6 @@ export function useScreenRecording() {
   }, [state]);
 
   const beginCapture = useCallback(async () => {
-    // 1. Trigger PiP immediately to use the user gesture
     if (webcamEnabled && webcamVideoRef.current && !document.pictureInPictureElement) {
       try {
         await webcamVideoRef.current.requestPictureInPicture();
@@ -182,128 +200,111 @@ export function useScreenRecording() {
     }
 
     setError(null);
-    setState("requesting");
     chunksRef.current = [];
     camChunksRef.current = [];
     clicksRef.current = [];
     scrollsRef.current = [];
     pausesRef.current = [];
 
+    if (typeof navigator === "undefined" || !navigator.mediaDevices?.getDisplayMedia) {
+      setError("Screen capture isn't supported in this browser.");
+      return;
+    }
+    if (typeof MediaRecorder === "undefined") {
+      setError("Your browser doesn't support MediaRecorder.");
+      return;
+    }
+
+    setState("requesting");
+
+    let screenStream: MediaStream | null = null;
+    let audioCtx: AudioContext | null = null;
+
     try {
       const constraints: DisplayMediaStreamOptions = {
         video: {
-          frameRate: 30,
+          frameRate: { ideal: 30, max: 60 },
           displaySurface: displaySurfaceMap[sourceType],
         } as MediaTrackConstraints,
         audio: true,
       };
-      const screenStream =
-        await navigator.mediaDevices.getDisplayMedia(constraints);
+      screenStream = await navigator.mediaDevices.getDisplayMedia(constraints);
       screenStreamRef.current = screenStream;
 
       const videoTrack = screenStream.getVideoTracks()[0];
+      if (!videoTrack) throw new Error("No video track");
       const settings = videoTrack.getSettings();
-      dimsRef.current = {
-        w: settings.width ?? 1280,
-        h: settings.height ?? 720,
-      };
+      dimsRef.current = { w: settings.width ?? 1280, h: settings.height ?? 720 };
+
+      // Audio Mixing (Merged Logic)
+      let micTrack: MediaStreamTrack | null = null;
+      if (micEnabled) {
+        try {
+          const liveMic = micStream && micStream.getAudioTracks().some(t => t.readyState === "live")
+            ? micStream
+            : await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true } });
+          micStreamRef.current = liveMic;
+          if (liveMic !== micStream) setMicStream(liveMic);
+          micTrack = liveMic.getAudioTracks()[0] ?? null;
+        } catch (e) { console.warn("Mic acquisition failed", e); }
+      }
 
       const screenAudioTracks = screenStream.getAudioTracks();
-      const finalTracks: MediaStreamTrack[] = [videoTrack];
+      const tracks: MediaStreamTrack[] = [videoTrack];
 
-      // Mix Audio
-      try {
-        const audioCtx = new AudioContext();
-        audioCtxRef.current = audioCtx;
-        const dest = audioCtx.createMediaStreamDestination();
-        let hasAudio = false;
-
-        // 1. System audio
-        if (screenAudioTracks.length > 0) {
-          const source = audioCtx.createMediaStreamSource(new MediaStream(screenAudioTracks));
-          source.connect(dest);
-          hasAudio = true;
-        }
-
-        // 2. Mic audio
-        if (micEnabled) {
-          try {
-            let micStream: MediaStream;
-            if (webcamStream && webcamStream.getAudioTracks().length > 0) {
-              micStream = webcamStream;
-            } else {
-              micStream = await navigator.mediaDevices.getUserMedia({ 
-                audio: {
-                  echoCancellation: true,
-                  noiseSuppression: true,
-                  autoGainControl: true,
-                } 
-              });
-              micStreamRef.current = micStream; // Store for cleanup
-            }
-            const source = audioCtx.createMediaStreamSource(micStream);
-            source.connect(dest);
-            hasAudio = true;
-          } catch (e) {
-            console.warn("Mic access failed during mix", e);
+      if (screenAudioTracks.length > 0 || micTrack) {
+        try {
+          const AudioCtx = window.AudioContext || (window as any).webkitAudioContext;
+          audioCtx = new AudioCtx();
+          audioCtxRef.current = audioCtx;
+          const dest = audioCtx.createMediaStreamDestination();
+          
+          if (screenAudioTracks.length > 0) {
+            const sysSrc = audioCtx.createMediaStreamSource(new MediaStream(screenAudioTracks));
+            const sysGain = audioCtx.createGain();
+            sysGain.gain.value = 0.9;
+            sysSrc.connect(sysGain).connect(dest);
           }
+          if (micTrack) {
+            const micSrc = audioCtx.createMediaStreamSource(new MediaStream([micTrack]));
+            const micGain = audioCtx.createGain();
+            micGain.gain.value = 1.0;
+            micSrc.connect(micGain).connect(dest);
+          }
+          tracks.push(...dest.stream.getAudioTracks());
+        } catch (e) {
+          console.warn("Audio mixing failed", e);
+          if (screenAudioTracks.length > 0) tracks.push(screenAudioTracks[0]);
+          if (micTrack) tracks.push(micTrack);
         }
-
-        if (hasAudio) {
-          finalTracks.push(dest.stream.getAudioTracks()[0]);
-        }
-      } catch (e) {
-        console.error("Audio mixing failed, falling back to raw tracks", e);
-        if (screenAudioTracks.length > 0) finalTracks.push(screenAudioTracks[0]);
       }
 
-      const combined = new MediaStream(finalTracks);
-      const hasAudio = finalTracks.some(t => t.kind === 'audio');
-      
-      let mimeType = "video/webm";
-      if (hasAudio) {
-        mimeType = MediaRecorder.isTypeSupported("video/webm;codecs=vp9,opus")
-          ? "video/webm;codecs=vp9,opus"
-          : MediaRecorder.isTypeSupported("video/webm;codecs=vp8,opus")
-            ? "video/webm;codecs=vp8,opus"
-            : "video/webm";
-      } else {
-        mimeType = MediaRecorder.isTypeSupported("video/webm;codecs=vp9")
-          ? "video/webm;codecs=vp9"
-          : "video/webm";
-      }
+      const combined = new MediaStream(tracks);
+      const candidates = ["video/webm;codecs=vp9,opus", "video/webm;codecs=vp8,opus", "video/webm", "video/mp4"];
+      const mimeType = candidates.find(m => MediaRecorder.isTypeSupported(m)) ?? "video/webm";
       mimeRef.current = mimeType;
 
       const recorder = new MediaRecorder(combined, {
         mimeType,
-        videoBitsPerSecond: 3_000_000,
+        videoBitsPerSecond: 5_000_000,
+        audioBitsPerSecond: 128_000,
       });
 
-      recorder.ondataavailable = (e) => {
-        if (e.data.size > 0) chunksRef.current.push(e.data);
-      };
+      recorder.ondataavailable = (e) => { if (e.data.size > 0) chunksRef.current.push(e.data); };
       recorder.onstop = () => {
         const blob = new Blob(chunksRef.current, { type: mimeType });
         const url = URL.createObjectURL(blob);
-        
-        let cameraBlob;
-        let cameraUrl;
+        let cameraBlob, cameraUrl;
         if (camRecorderRef.current && camChunksRef.current.length > 0) {
           cameraBlob = new Blob(camChunksRef.current, { type: camRecorderRef.current.mimeType });
           cameraUrl = URL.createObjectURL(cameraBlob);
         }
-
         const duration = (Date.now() - startTimeRef.current) / 1000;
         const recordingResult: RecordingResult = {
-          blob,
-          url,
-          cameraBlob,
-          cameraUrl,
+          blob, url, cameraBlob, cameraUrl,
           cameraMimeType: camRecorderRef.current?.mimeType,
-          cameraShape,
-          duration,
-          width: dimsRef.current.w,
-          height: dimsRef.current.h,
+          cameraShape, duration,
+          width: dimsRef.current.w, height: dimsRef.current.h,
           clicks: clicksRef.current.slice(),
           scrolls: scrollsRef.current.slice(),
           pauses: pausesRef.current.slice(),
@@ -312,70 +313,42 @@ export function useScreenRecording() {
         setResult(recordingResult);
         saveRecording(recordingResult);
         setState("stopped");
-        
-        // Exit PiP and stop live webcam if active
-        if (document.pictureInPictureElement) {
-          document.exitPictureInPicture().catch(() => {});
-        }
+        if (document.pictureInPictureElement) document.exitPictureInPicture().catch(() => {});
         webcamStream?.getTracks().forEach(t => t.stop());
         setWebcamStream(null);
         setWebcamEnabled(false);
-
         cleanup();
       };
 
-      videoTrack.addEventListener("ended", () => {
-        if (recorder.state !== "inactive") recorder.stop();
-        if (camRecorderRef.current?.state !== "inactive") camRecorderRef.current?.stop();
-      });
-
+      videoTrack.addEventListener("ended", () => { if (recorder.state !== "inactive") recorder.stop(); });
       mediaRecorderRef.current = recorder;
 
-      // Handle Camera Recorder if enabled
       if (webcamEnabled && webcamStream) {
         try {
-          const camRecorder = new MediaRecorder(webcamStream, {
-            // Use a simpler mime for camera to avoid codec conflicts
-            mimeType: "video/webm", 
-            videoBitsPerSecond: 1_000_000,
-          });
-          camRecorder.ondataavailable = (e) => {
-            if (e.data.size > 0) camChunksRef.current.push(e.data);
-          };
+          const camRecorder = new MediaRecorder(webcamStream, { mimeType: "video/webm", videoBitsPerSecond: 1_000_000 });
+          camRecorder.ondataavailable = (e) => { if (e.data.size > 0) camChunksRef.current.push(e.data); };
           camRecorderRef.current = camRecorder;
-        } catch (e) {
-          console.warn("Camera recorder failed to init", e);
-        }
+        } catch (e) { console.warn("Cam recorder init failed", e); }
       }
 
-      // Countdown 3-2-1
       setState("countdown");
-      for (let i = 3; i > 0; i--) {
-        setCountdown(i);
-        await new Promise((r) => setTimeout(r, 800));
-      }
+      for (let i = 3; i > 0; i--) { setCountdown(i); await new Promise(r => setTimeout(r, 800)); }
       setCountdown(0);
 
+      if (videoTrack.readyState !== "live") throw new Error("Capture ended");
+
       recorder.start(1000);
-      try {
-        camRecorderRef.current?.start(1000);
-      } catch (e) {
-        console.warn("Cam recorder start failed", e);
-      }
+      camRecorderRef.current?.start(1000);
       startTimeRef.current = Date.now();
       setState("recording");
-      timerRef.current = setInterval(() => {
-        setElapsed(Math.floor((Date.now() - startTimeRef.current) / 1000));
-      }, 1000);
+      timerRef.current = setInterval(() => setElapsed(Math.floor((Date.now() - startTimeRef.current) / 1000)), 1000);
     } catch (err) {
-      console.error("Capture failed", err);
+      console.error("beginCapture failed", err);
+      screenStream?.getTracks().forEach(t => t.stop());
+      audioCtx?.close();
       cleanup();
       setState("idle");
-      if (err instanceof DOMException && err.name === "NotAllowedError") {
-        setError("Screen sharing was cancelled");
-      } else {
-        setError("Failed to start recording: " + (err as any).message);
-      }
+      setError(err instanceof Error ? err.message : "Failed to start recording");
     }
   }, [micEnabled, sourceType, webcamEnabled, webcamStream, cleanup]);
 
@@ -403,9 +376,7 @@ export function useScreenRecording() {
       camRecorderRef.current?.resume();
       setState("recording");
       const base = Date.now() - elapsed * 1000;
-      timerRef.current = setInterval(() => {
-        setElapsed(Math.floor((Date.now() - base) / 1000));
-      }, 1000);
+      timerRef.current = setInterval(() => setElapsed(Math.floor((Date.now() - base) / 1000)), 1000);
     }
   }, [elapsed]);
 
@@ -416,53 +387,29 @@ export function useScreenRecording() {
 
   const discardRecording = useCallback(() => {
     if (result?.url) URL.revokeObjectURL(result.url);
-    setResult(null);
-    clearRecording();
-    setState("idle");
-    setElapsed(0);
-    setError(null);
+    setResult(null); clearRecording(); setState("idle"); setElapsed(0); setError(null);
   }, [result]);
 
   const downloadRecording = useCallback(() => {
     if (!result) return;
     const a = document.createElement("a");
     a.href = result.url;
-    a.download = `zoomcast-${Date.now()}.webm`;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
+    a.download = `zoomly-${Date.now()}.webm`;
+    document.body.appendChild(a); a.click(); document.body.removeChild(a);
   }, [result]);
 
   useEffect(() => {
     return () => {
       cleanup();
-      webcamStream?.getTracks().forEach((t) => t.stop());
+      webcamStream?.getTracks().forEach(t => t.stop());
+      micStream?.getTracks().forEach(t => t.stop());
     };
-  }, [cleanup, webcamStream]);
+  }, [cleanup, webcamStream, micStream]);
 
   return {
-    state,
-    result,
-    elapsed,
-    countdown,
-    error,
-    micEnabled,
-    setMicEnabled,
-    webcamEnabled,
-    webcamStream,
-    cameraShape,
-    setCameraShape,
-    screenStream: screenStreamRef.current,
-    toggleWebcam,
-    sourceType,
-    setSourceType,
-    startRecording: beginCapture,
-    pauseRecording,
-    resumeRecording,
-    stopRecording,
-    discardRecording,
-    downloadRecording,
-    registerWebcamVideo,
-    recordClick,
+    state, result, elapsed, countdown, error, micEnabled, setMicEnabled, toggleMic, micStream,
+    webcamEnabled, webcamStream, cameraShape, setCameraShape, screenStream: screenStreamRef.current,
+    toggleWebcam, sourceType, setSourceType, startRecording: beginCapture, pauseRecording,
+    resumeRecording, stopRecording, discardRecording, downloadRecording, registerWebcamVideo, recordClick,
   };
 }

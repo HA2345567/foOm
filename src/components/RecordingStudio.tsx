@@ -1,8 +1,9 @@
-import { type ReactNode } from "react";
+import { type ReactNode, useEffect, useRef } from "react";
 import { Link } from "@tanstack/react-router";
 import { motion, AnimatePresence } from "framer-motion";
 import { useScreenRecording, type SourceType } from "../hooks/useScreenRecording";
 import { WebcamOverlay } from "./WebcamOverlay";
+import { MicMeter } from "./MicMeter";
 import { AutoZoomEditor } from "./AutoZoomEditor";
 
 function formatTime(seconds: number) {
@@ -55,8 +56,8 @@ export function RecordingStudio() {
       <header className="border-b border-border bg-background/80 backdrop-blur-xl">
         <div className="mx-auto max-w-6xl px-6 flex items-center justify-between h-14">
           <Link to="/" className="flex items-center gap-2">
-            <div className="w-7 h-7 rounded-md bg-primary flex items-center justify-center">
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" className="text-primary-foreground">
+            <div className="w-7 h-7 rounded-md bg-[#f5f5f7] flex items-center justify-center">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" className="text-black">
                 <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="2" />
                 <circle cx="12" cy="12" r="4" fill="currentColor" />
               </svg>
@@ -91,7 +92,6 @@ export function RecordingStudio() {
               </div>
 
               <div className="flex flex-col md:flex-row rounded-3xl border border-border shadow-2xl bg-card overflow-hidden relative">
-                {/* Subtle top glow */}
                 <div className="absolute top-0 inset-x-0 h-px bg-gradient-to-r from-transparent via-primary/50 to-transparent" />
                 
                 {/* Left: Source Selection */}
@@ -159,8 +159,11 @@ export function RecordingStudio() {
                             <p className="text-xs text-muted-foreground mt-0.5">{r.micEnabled ? "Voice active" : "Screen only"}</p>
                           </div>
                         </div>
-                        <div className={`w-12 h-6 rounded-full p-1 transition-colors ${r.micEnabled ? "bg-primary" : "bg-muted"}`}>
-                          <div className={`w-4 h-4 rounded-full bg-white transition-transform ${r.micEnabled ? "translate-x-6" : "translate-x-0 shadow-sm"}`} />
+                        <div className="flex items-center gap-3">
+                          {r.micEnabled && r.micStream && <MicMeter stream={r.micStream} className="w-8" />}
+                          <div className={`w-12 h-6 rounded-full p-1 transition-colors ${r.micEnabled ? "bg-primary" : "bg-muted"}`}>
+                            <div className={`w-4 h-4 rounded-full bg-white transition-transform ${r.micEnabled ? "translate-x-6" : "translate-x-0 shadow-sm"}`} />
+                          </div>
                         </div>
                       </button>
 
@@ -186,7 +189,6 @@ export function RecordingStudio() {
                         </div>
                       </button>
 
-                      {/* Camera Shape Selector (Conditional) */}
                       {r.webcamEnabled && (
                         <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: "auto" }} className="pt-2 px-1">
                           <p className="text-[10px] uppercase tracking-widest text-muted-foreground font-bold mb-3">Lens Shape</p>
@@ -205,6 +207,15 @@ export function RecordingStudio() {
                               </button>
                             ))}
                           </div>
+                          
+                          {r.webcamStream && (
+                            <div className="mt-4 flex items-center gap-3 p-3 rounded-xl bg-background border border-border">
+                               <WebcamPreview stream={r.webcamStream} />
+                               <div className="text-[11px] text-muted-foreground leading-tight">
+                                 Live preview active. Ensure you are well lit for the best result.
+                               </div>
+                            </div>
+                          )}
                         </motion.div>
                       )}
                     </div>
@@ -213,7 +224,7 @@ export function RecordingStudio() {
                   <div className="mt-8 pt-6 border-t border-border">
                     {r.error && (
                       <div className="mb-4 p-3 rounded-xl bg-destructive/10 border border-destructive/20 text-sm text-destructive text-center flex items-center justify-center gap-2">
-                         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
                         {r.error}
                       </div>
                     )}
@@ -260,9 +271,7 @@ export function RecordingStudio() {
                     autoPlay
                     playsInline
                     muted
-                    ref={(el) => {
-                      if (el && r.screenStream) el.srcObject = r.screenStream;
-                    }}
+                    ref={(el) => { if (el && r.screenStream) el.srcObject = r.screenStream; }}
                     className="w-full h-full object-contain"
                   />
                 ) : (
@@ -275,7 +284,6 @@ export function RecordingStudio() {
                   </div>
                 )}
                 
-                {/* Overlay status when video is showing */}
                 {r.screenStream && (
                   <div className="absolute top-4 left-4 flex items-center gap-2 bg-black/50 backdrop-blur-md px-3 py-1.5 rounded-full border border-white/10">
                     <span className={`w-2 h-2 rounded-full ${r.state === "recording" ? "bg-destructive animate-pulse" : "bg-muted-foreground"}`} />
@@ -304,15 +312,9 @@ export function RecordingStudio() {
             </motion.div>
           )}
 
-          {/* STOPPED — open the editor with live auto-zoom + background picker */}
+          {/* STOPPED — Editor */}
           {r.state === "stopped" && r.result && (
-            <motion.div
-              key="editor"
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -20 }}
-              className="w-full"
-            >
+            <motion.div key="editor" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -20 }} className="w-full">
               <div className="text-center mb-6">
                 <h2 className="text-display-section">Edit & Export</h2>
                 <p className="mt-2 text-body text-muted-foreground">
@@ -324,7 +326,6 @@ export function RecordingStudio() {
           )}
         </AnimatePresence>
         
-        {/* Persistent Global Webcam Overlay */}
         {r.webcamStream && (
           <WebcamOverlay stream={r.webcamStream} onRegister={r.registerWebcamVideo} />
         )}
@@ -333,3 +334,12 @@ export function RecordingStudio() {
   );
 }
 
+function WebcamPreview({ stream }: { stream: MediaStream }) {
+  const ref = useRef<HTMLVideoElement>(null);
+  useEffect(() => { if (ref.current) ref.current.srcObject = stream; }, [stream]);
+  return (
+    <div className="w-12 h-12 rounded-full overflow-hidden border-2 border-primary shadow-lg shadow-primary/20 shrink-0">
+      <video ref={ref} autoPlay playsInline muted className="w-full h-full object-cover scale-x-[-1]" />
+    </div>
+  );
+}
