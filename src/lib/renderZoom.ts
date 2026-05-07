@@ -45,6 +45,10 @@ export async function renderAutoZoom(
     frame: FrameStyle;
     subtitles?: Subtitle[];
     clicksOverride?: RecordingResult["clicks"];
+    cameraX?: number;
+    cameraY?: number;
+    cameraSize?: number;
+    cameraShape?: "circle" | "square" | "rounded";
     onProgress?: (p: RenderProgress) => void;
   },
 ): Promise<RenderOutput> {
@@ -101,8 +105,24 @@ export async function renderAutoZoom(
     setTimeout(resolve, 3000); // fallback for blob URLs
   });
 
-  const srcW = recording.width || video.videoWidth || 1280;
-  const srcH = recording.height || video.videoHeight || 720;
+  // ── Load Camera if exists ─────────────────────────────────────────────────
+  let camVideo: HTMLVideoElement | null = null;
+  if (recording.cameraUrl) {
+    camVideo = document.createElement("video");
+    camVideo.src = recording.cameraUrl;
+    camVideo.muted = true;
+    camVideo.playsInline = true;
+    camVideo.crossOrigin = "anonymous";
+    camVideo.preload = "auto";
+    await new Promise<void>((resolve) => {
+      camVideo!.onloadedmetadata = () => resolve();
+      camVideo!.onerror = () => resolve(); // continue without cam if fails
+      camVideo!.load();
+    });
+  }
+
+  const srcW = video.videoWidth || recording.width || 1280;
+  const srcH = video.videoHeight || recording.height || 720;
   const srcAspect = srcW / srcH;
 
   const outH = Math.min(preset.targetH, srcH * 2);
@@ -114,8 +134,11 @@ export async function renderAutoZoom(
   ctx.imageSmoothingEnabled = true;
   ctx.imageSmoothingQuality = "high";
 
-  // ── Muxer (video-only WebM) ───────────────────────────────────────────────
+  // ── Muxer (WebM with Audio) ────────────────────────────────────────────────
   const muxerTarget = new Muxer.ArrayBufferTarget();
+  
+  const hasAudio = recording.blob.type.includes('audio') || (recording.mimeType && recording.mimeType.includes('opus'));
+
   const muxer = new Muxer.Muxer({
     target: muxerTarget,
     video: {
@@ -123,6 +146,11 @@ export async function renderAutoZoom(
       width: outW,
       height: outH,
     },
+    audio: hasAudio ? {
+      codec: 'A_OPUS',
+      numberOfChannels: 2,
+      sampleRate: 48000
+    } : undefined,
     firstTimestampBehavior: "offset",
   });
 
@@ -140,6 +168,36 @@ export async function renderAutoZoom(
     framerate: OUTPUT_FPS,
   });
 
+  // ── AudioEncoder ──────────────────────────────────────────────────────────
+  let audioEncoder: AudioEncoder | null = null;
+  if (hasAudio) {
+    audioEncoder = new AudioEncoder({
+      output: (chunk, meta) => muxer.addAudioChunk(chunk, meta),
+      error: (e) => console.error("AudioEncoder error:", e),
+    });
+    audioEncoder.configure({
+      codec: 'opus',
+      numberOfChannels: 2,
+      sampleRate: 48000,
+      bitrate: 128000,
+    });
+  }
+
+  // ── Audio Capture Setup ───────────────────────────────────────────────────
+  let audioReader: ReadableStreamDefaultReader<AudioData> | null = null;
+  if (hasAudio) {
+    try {
+      const stream = (video as any).captureStream ? (video as any).captureStream() : (video as any).mozCaptureStream();
+      const track = stream.getAudioTracks()[0];
+      if (track) {
+        const processor = new (window as any).MediaStreamTrackProcessor({ track });
+        audioReader = processor.readable.getReader();
+      }
+    } catch (e) {
+      console.warn("Audio capture setup failed", e);
+    }
+  }
+
   // ── Real-time capture via requestVideoFrameCallback ───────────────────────
   // This is far faster than seek-per-frame: the browser decodes frames
   // sequentially as the video plays, and we capture each one as it arrives.
@@ -148,6 +206,30 @@ export async function renderAutoZoom(
   let lastReportedPct = -1;
 
   onProgress({ stage: "rendering", percent: 0 });
+  
+  // Audio loop
+  let audioDone = false;
+  const audioLoop = async () => {
+    if (!audioReader || !audioEncoder) {
+      audioDone = true;
+      return;
+    }
+    try {
+      while (true) {
+        const { value, done } = await audioReader.read();
+        if (done) break;
+        if (audioEncoder.state === 'configured') {
+          audioEncoder.encode(value);
+        }
+        value.close();
+      }
+    } catch (e) {
+      console.warn("Audio loop error", e);
+    }
+    audioDone = true;
+  };
+
+  const audioPromise = audioLoop();
 
   await new Promise<void>((resolve, reject) => {
     const onFrame = (_now: DOMHighResTimeStamp, metadata: VideoFrameCallbackMetadata) => {
@@ -159,6 +241,9 @@ export async function renderAutoZoom(
 
       // Draw composite (background + zoomed video + subtitles)
       const kf = interpolateZoom(keyframes, t);
+      // Sync camera if active
+      if (camVideo) camVideo.currentTime = t;
+
       drawComposite(ctx as unknown as CanvasRenderingContext2D, video, kf, {
         background: opts.background,
         frame: opts.frame,
@@ -168,6 +253,11 @@ export async function renderAutoZoom(
         srcH,
         outW,
         outH,
+        camera: camVideo || undefined,
+        cameraX: opts.cameraX,
+        cameraY: opts.cameraY,
+        cameraSize: opts.cameraSize,
+        cameraShape: opts.cameraShape,
       });
 
       // Encode this frame
@@ -190,7 +280,7 @@ export async function renderAutoZoom(
       }
 
       // Schedule next frame capture
-      if (t < recording.duration - 0.05) {
+      if (t < recording.duration - 0.1) {
         video.requestVideoFrameCallback(onFrame);
       } else {
         resolve();
@@ -209,11 +299,14 @@ export async function renderAutoZoom(
   });
 
   video.pause();
+  if (audioReader) await audioReader.cancel();
+  await audioPromise;
 
   // ── Flush encoder & finalize mux ──────────────────────────────────────────
   onProgress({ stage: "encoding", percent: 100 });
 
   if (videoEncoder.state === "configured") await videoEncoder.flush();
+  if (audioEncoder && audioEncoder.state === "configured") await audioEncoder.flush();
 
   muxer.finalize();
   const blob = new Blob([muxerTarget.buffer], { type: "video/webm" });

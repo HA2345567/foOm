@@ -1,112 +1,114 @@
 import { motion } from "framer-motion";
+import { Check } from "lucide-react";
+import { Link } from "@tanstack/react-router";
 
 const plans = [
   {
     name: "Free",
     price: "$0",
-    period: "forever",
-    description: "Get started with the basics.",
+    description: "Perfect for quick product walkthroughs.",
     features: [
-      "5 recordings / month",
-      "720p export",
-      "Basic MP4 download",
-      "ZoomCast watermark",
+      "5 recordings per month",
+      "720p max resolution",
+      "Product watermark",
+      "Basic auto-zoom",
     ],
-    cta: "Start Free",
-    highlighted: false,
+    cta: "Start for free",
+    highlight: false,
   },
   {
     name: "Pro",
     price: "$18",
-    period: "/month",
-    description: "For builders who ship demos weekly.",
+    description: "For founders and power users.",
     features: [
       "Unlimited recordings",
-      "AI auto-zoom engine",
-      "Auto subtitles",
-      "Silence removal",
-      "1080p export",
-      "Shareable link",
+      "1080p HD export",
       "No watermark",
+      "AI Subtitles & Smart Trim",
+      "Custom branding",
     ],
     cta: "Go Pro",
-    highlighted: true,
+    highlight: true,
   },
   {
     name: "Team",
     price: "$45",
-    period: "/month",
-    description: "For teams creating demo libraries.",
+    description: "Scale your product demos together.",
     features: [
       "Everything in Pro",
-      "Team workspace",
-      "Shared video library",
-      "Brand kit",
-      "Priority processing",
+      "Shared team library",
       "Admin controls",
+      "Priority processing",
+      "Custom domains",
     ],
-    cta: "Start Team Trial",
-    highlighted: false,
+    cta: "Contact Sales",
+    highlight: false,
   },
 ];
 
 export function PricingSection() {
   return (
-    <section id="pricing" className="py-24 md:py-32 px-6">
-      <div className="mx-auto max-w-5xl">
-        <div className="text-center mb-16">
-          <h2 className="text-display-section text-foreground">Simple pricing</h2>
-          <p className="mt-4 text-body-large text-muted-foreground max-w-xl mx-auto">
-            Start free. Upgrade when you need the AI engine.
-          </p>
+    <section id="pricing" className="py-24 md:py-32 px-6 bg-background">
+      <div className="mx-auto max-w-7xl">
+        <div className="max-w-3xl mb-20 md:mb-24">
+          <motion.h2
+            initial={{ opacity: 0, y: 20 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true }}
+            className="text-display-section"
+          >
+            Simple pricing.
+            <br />
+            <span className="text-muted-foreground">Pro demos shouldn't break the bank.</span>
+          </motion.h2>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          {plans.map((plan, i) => (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+          {plans.map((plan, index) => (
             <motion.div
               key={plan.name}
-              initial={{ opacity: 0, y: 24 }}
+              initial={{ opacity: 0, y: 20 }}
               whileInView={{ opacity: 1, y: 0 }}
               viewport={{ once: true }}
-              transition={{ duration: 0.5, delay: i * 0.1 }}
-              className={`flex flex-col p-6 rounded-xl border shadow-card ${
-                plan.highlighted
-                  ? "border-foreground/20 bg-card shadow-card-hover"
-                  : "border-border bg-card"
-              }`}
+              transition={{ delay: index * 0.1 }}
+              className={`p-10 rounded-2xl border ${
+                plan.highlight ? "border-white" : "border-border"
+              } bg-card shadow-card relative flex flex-col`}
             >
-              {plan.highlighted && (
-                <span className="self-start px-3 py-1 rounded-full text-xs font-medium bg-primary text-primary-foreground mb-4">
-                  Most popular
-                </span>
-              )}
-              <h3 className="font-display text-xl font-semibold text-foreground">{plan.name}</h3>
-              <div className="mt-3 flex items-baseline gap-1">
-                <span className="font-display text-4xl font-bold text-foreground">{plan.price}</span>
-                <span className="text-caption text-muted-foreground">{plan.period}</span>
+              <div className="mb-8">
+                <h3 className="text-[14px] font-bold uppercase tracking-widest text-muted-foreground mb-4">
+                  {plan.name}
+                </h3>
+                <div className="flex items-baseline gap-1 mb-2">
+                  <span className="text-display-section">
+                    {plan.price}
+                  </span>
+                  <span className="text-muted-foreground text-sm">/month</span>
+                </div>
+                <p className="text-body text-muted-foreground">
+                  {plan.description}
+                </p>
               </div>
-              <p className="mt-2 text-caption text-muted-foreground">{plan.description}</p>
 
-              <ul className="mt-6 space-y-3 flex-1">
-                {plan.features.map((f) => (
-                  <li key={f} className="flex items-start gap-2 text-caption text-surface-foreground">
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="mt-0.5 shrink-0 text-muted-foreground">
-                      <polyline points="20 6 9 17 4 12" />
-                    </svg>
-                    {f}
+              <ul className="space-y-4 mb-10 flex-1">
+                {plan.features.map((feature) => (
+                  <li key={feature} className="flex items-center gap-3 text-[14px] text-white/90">
+                    <Check className="w-4 h-4 text-white" />
+                    <span>{feature}</span>
                   </li>
                 ))}
               </ul>
 
-              <button
-                className={`mt-8 w-full py-3 rounded-lg text-sm font-medium transition-opacity ${
-                  plan.highlighted
-                    ? "bg-primary text-primary-foreground shadow-button hover:opacity-90"
-                    : "bg-surface text-foreground border border-border hover:bg-accent"
+              <Link
+                to="/record"
+                className={`w-full py-4 rounded-lg font-bold text-sm transition-all text-center ${
+                  plan.highlight
+                    ? "bg-white text-black shadow-button hover:opacity-90"
+                    : "border border-border text-white hover:bg-secondary"
                 }`}
               >
                 {plan.cta}
-              </button>
+              </Link>
             </motion.div>
           ))}
         </div>

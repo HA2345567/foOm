@@ -179,10 +179,10 @@ interface SpringParams { k: number; c: number; m: number }
 // points instead of snapping. This is the single biggest factor in making
 // the motion feel like a real camera operator vs. a CSS transform.
 const FEEL_PRESETS: Record<NonNullable<ZoomConfig["feel"]>, SpringParams> = {
-  glass:  { k: 3.2,  c: 3.6,  m: 1.0 },
-  silk:   { k: 7.0,  c: 5.3,  m: 1.0 },
-  snap:   { k: 18.0, c: 8.5,  m: 1.0 },
-  custom: { k: 7.0,  c: 5.3,  m: 1.0 },
+  glass: { k: 3.2, c: 3.6, m: 1.0 },
+  silk: { k: 7.0, c: 5.3, m: 1.0 },
+  snap: { k: 18.0, c: 8.5, m: 1.0 },
+  custom: { k: 7.0, c: 5.3, m: 1.0 },
 };
 
 // Position springs are intentionally softer than the scale spring (≈55-60%
@@ -370,25 +370,25 @@ function resolveConfig(opts: ZoomConfig): ResolvedConfig {
   const baseSpring = FEEL_PRESETS[feel];
   const spring: SpringParams = {
     k: clamp(opts.springStiffness ?? baseSpring.k, 0.1, 500),
-    c: clamp(opts.springDamping   ?? baseSpring.c, 0.1, 200),
-    m: clamp(opts.springMass      ?? baseSpring.m, 0.1, 10),
+    c: clamp(opts.springDamping ?? baseSpring.c, 0.1, 200),
+    m: clamp(opts.springMass ?? baseSpring.m, 0.1, 10),
   };
 
   return {
     spring,
-    clickScale:           clamp(opts.clickScale       ?? 1.32, 1, 4),
-    typeScale:            clamp(opts.typeScale         ?? 1.16, 1, 3),
-    pauseScale:           clamp(opts.pauseScale        ?? 1.09, 1, 2),
-    scrollOutScale:       clamp(opts.scrollOutScale    ?? 1.0,  0.5, 1.5),
-    hold:                 clamp(opts.hold              ?? 2.4,  0, 15),
-    holdPerClick:         clamp(opts.holdPerClick      ?? 0.55, 0, 3),
-    pauseThreshold:       clamp(opts.pauseThreshold    ?? 2.0,  0.5, 30),
+    clickScale: clamp(opts.clickScale ?? 1.32, 1, 4),
+    typeScale: clamp(opts.typeScale ?? 1.16, 1, 3),
+    pauseScale: clamp(opts.pauseScale ?? 1.09, 1, 2),
+    scrollOutScale: clamp(opts.scrollOutScale ?? 1.0, 0.5, 1.5),
+    hold: clamp(opts.hold ?? 2.4, 0, 15),
+    holdPerClick: clamp(opts.holdPerClick ?? 0.55, 0, 3),
+    pauseThreshold: clamp(opts.pauseThreshold ?? 2.0, 0.5, 30),
     scrollBurstThreshold: clamp(opts.scrollBurstThreshold ?? 0.25, 0, 5),
-    clickMergeWindow:     clamp(opts.clickMergeWindow  ?? 2.4,  0, 10),
-    clickMergeDistance:   clamp(opts.clickMergeDistance ?? 0.20, 0, 1),
-    simStep:              clamp(opts.simStep           ?? 1 / 120, 1 / 240, 1 / 30),
-    rdpEpsilon:           clamp(opts.rdpEpsilon        ?? 0.0004, 0, 0.1),
-    forcedZooms:    opts.forcedZooms    ?? [],
+    clickMergeWindow: clamp(opts.clickMergeWindow ?? 2.4, 0, 10),
+    clickMergeDistance: clamp(opts.clickMergeDistance ?? 0.20, 0, 1),
+    simStep: clamp(opts.simStep ?? 1 / 120, 1 / 240, 1 / 30),
+    rdpEpsilon: clamp(opts.rdpEpsilon ?? 0.0004, 0, 0.1),
+    forcedZooms: opts.forcedZooms ?? [],
     blackoutRanges: opts.blackoutRanges ?? [],
   };
 }
@@ -443,8 +443,8 @@ export function generateZoomKeyframes(
   const cfg = resolveConfig(opts);
   const { spring } = cfg;
 
-  const scrolls    = opts.scrolls    ?? [];
-  const pauses     = opts.pauses     ?? [];
+  const scrolls = opts.scrolls ?? [];
+  const pauses = opts.pauses ?? [];
   const typeBursts = opts.typeBursts ?? [];
 
   const inRange = (t: number) => isFinite(t) && t >= 0 && t <= duration;
@@ -477,8 +477,8 @@ export function generateZoomKeyframes(
       Math.hypot(cx - last.x, cy - last.y) < cfg.clickMergeDistance
     ) {
       last.end = c.t;
-      last.x   = (last.x * last.n + cx) / (last.n + 1);
-      last.y   = (last.y * last.n + cy) / (last.n + 1);
+      last.x = (last.x * last.n + cx) / (last.n + 1);
+      last.y = (last.y * last.n + cy) / (last.n + 1);
       last.n++;
     } else {
       groups.push({ start: c.t, end: c.t, x: cx, y: cy, n: 1 });
@@ -490,13 +490,13 @@ export function generateZoomKeyframes(
       // Pre-roll: start the push slightly before the click so the camera is
       // already moving when the user's action lands — this is the single
       // biggest "professional" tell vs. reactive zoom.
-      start:    Math.max(0, g.start - 0.18),
-      end:      Math.min(duration, g.end + hold),
-      scale:    cfg.clickScale,
-      x:        clamp01(g.x),
-      y:        clamp01(g.y),
+      start: Math.max(0, g.start - 0.18),
+      end: Math.min(duration, g.end + hold),
+      scale: cfg.clickScale,
+      x: clamp01(g.x),
+      y: clamp01(g.y),
       priority: 10,
-      trigger:  "click",
+      trigger: "click",
     });
   }
 
@@ -512,13 +512,13 @@ export function generateZoomKeyframes(
       }
     }
     intents.push({
-      start:    Math.max(0, tb.t - 0.05),
-      end:      Math.min(duration, tb.t + tb.duration + 0.6),
-      scale:    cfg.typeScale,
-      x:        fx,
-      y:        fy,
+      start: Math.max(0, tb.t - 0.05),
+      end: Math.min(duration, tb.t + tb.duration + 0.6),
+      scale: cfg.typeScale,
+      x: fx,
+      y: fy,
       priority: 8,
-      trigger:  "type_burst",
+      trigger: "type_burst",
     });
   }
 
@@ -535,13 +535,13 @@ export function generateZoomKeyframes(
       }
     }
     intents.push({
-      start:    Math.min(duration, p.t + 0.6),
-      end:      Math.min(duration, p.t + p.duration - 0.3),
-      scale:    cfg.pauseScale,
-      x:        fx,
-      y:        fy,
+      start: Math.min(duration, p.t + 0.6),
+      end: Math.min(duration, p.t + p.duration - 0.3),
+      scale: cfg.pauseScale,
+      x: fx,
+      y: fy,
       priority: 5,
-      trigger:  "pause",
+      trigger: "pause",
     });
   }
 
@@ -550,13 +550,13 @@ export function generateZoomKeyframes(
   for (const b of scrollBursts) {
     if (b.end - b.start < cfg.scrollBurstThreshold) continue;
     intents.push({
-      start:    Math.max(0, b.start - 0.08),
-      end:      Math.min(duration, b.end + 0.5),
-      scale:    cfg.scrollOutScale,
-      x:        0.5,
-      y:        0.5,
+      start: Math.max(0, b.start - 0.08),
+      end: Math.min(duration, b.end + 0.5),
+      scale: cfg.scrollOutScale,
+      x: 0.5,
+      y: 0.5,
       priority: 7,
-      trigger:  "scroll_out",
+      trigger: "scroll_out",
     });
   }
 
@@ -564,13 +564,13 @@ export function generateZoomKeyframes(
   for (const fz of cfg.forcedZooms) {
     if (!isFinite(fz.start) || !isFinite(fz.end) || fz.start >= fz.end) continue;
     intents.push({
-      start:    clamp(fz.start, 0, duration),
-      end:      clamp(fz.end,   0, duration),
-      scale:    clamp(fz.scale, 0.5, 4),
-      x:        clamp01(fz.x ?? 0.5),
-      y:        clamp01(fz.y ?? 0.5),
+      start: clamp(fz.start, 0, duration),
+      end: clamp(fz.end, 0, duration),
+      scale: clamp(fz.scale, 0.5, 4),
+      x: clamp01(fz.x ?? 0.5),
+      y: clamp01(fz.y ?? 0.5),
       priority: 100,
-      trigger:  "manual",
+      trigger: "manual",
     });
   }
 
@@ -584,10 +584,10 @@ export function generateZoomKeyframes(
   const { simStep, rdpEpsilon, blackoutRanges } = cfg;
 
   const scaleSpring: SpringState = { p: 1.0, v: 0 };
-  const xSpring:     SpringState = { p: 0.5, v: 0 };
-  const ySpring:     SpringState = { p: 0.5, v: 0 };
+  const xSpring: SpringState = { p: 0.5, v: 0 };
+  const ySpring: SpringState = { p: 0.5, v: 0 };
 
-  const nSteps   = Math.ceil(duration / simStep) + 2;
+  const nSteps = Math.ceil(duration / simStep) + 2;
   const rawSamples: ZoomKeyframe[] = [];
   rawSamples.length = nSteps;
   let sampleCount = 0;
@@ -602,19 +602,19 @@ export function generateZoomKeyframes(
     const liveSafeX = clampFocal(target.x, scaleSpring.p);
     const liveSafeY = clampFocal(target.y, scaleSpring.p);
 
-    const nextScale = springStep(scaleSpring, target.scale, k,    c,    m, simStep);
-    const nextX     = springStep(xSpring,     liveSafeX,    kPos, cPos, m, simStep);
-    const nextY     = springStep(ySpring,     liveSafeY,    kPos, cPos, m, simStep);
+    const nextScale = springStep(scaleSpring, target.scale, k, c, m, simStep);
+    const nextX = springStep(xSpring, liveSafeX, kPos, cPos, m, simStep);
+    const nextY = springStep(ySpring, liveSafeY, kPos, cPos, m, simStep);
 
     scaleSpring.p = nextScale.p; scaleSpring.v = nextScale.v;
-    xSpring.p     = nextX.p;     xSpring.v     = nextX.v;
-    ySpring.p     = nextY.p;     ySpring.v     = nextY.v;
+    xSpring.p = nextX.p; xSpring.v = nextX.v;
+    ySpring.p = nextY.p; ySpring.v = nextY.v;
 
     rawSamples[sampleCount++] = {
       t,
       scale: clamp(scaleSpring.p, 0.1, 10),
-      x:     clamp01(xSpring.p),
-      y:     clamp01(ySpring.p),
+      x: clamp01(xSpring.p),
+      y: clamp01(ySpring.p),
       trigger: lastTrigger,
     };
 
@@ -648,9 +648,9 @@ export function interpolateZoom(
   keyframes: ZoomKeyframe[],
   t: number,
 ): ZoomKeyframe {
-  if (keyframes.length === 0)  return { t, scale: 1, x: 0.5, y: 0.5 };
-  if (keyframes.length === 1)  return keyframes[0];
-  if (t <= keyframes[0].t)     return keyframes[0];
+  if (keyframes.length === 0) return { t, scale: 1, x: 0.5, y: 0.5 };
+  if (keyframes.length === 1) return keyframes[0];
+  if (t <= keyframes[0].t) return keyframes[0];
   const last = keyframes[keyframes.length - 1];
   if (t >= last.t) return last;
 
@@ -667,8 +667,8 @@ export function interpolateZoom(
   return {
     t,
     scale: a.scale + (b.scale - a.scale) * r,
-    x:     a.x     + (b.x     - a.x)     * r,
-    y:     a.y     + (b.y     - a.y)     * r,
+    x: a.x + (b.x - a.x) * r,
+    y: a.y + (b.y - a.y) * r,
     trigger: a.trigger,
   };
 }
@@ -687,7 +687,7 @@ export function applyZoomToCanvas(
   const oy = kf.y * height;
   ctx.setTransform(
     kf.scale, 0,
-    0,        kf.scale,
+    0, kf.scale,
     ox * (1 - kf.scale),
     oy * (1 - kf.scale),
   );
@@ -712,7 +712,7 @@ export function toFFmpegZoomPan(
   }
   if (keyframes.length === 1) {
     const kf = keyframes[0];
-    const px = (kf.x * width  * (1 - kf.scale)).toFixed(4);
+    const px = (kf.x * width * (1 - kf.scale)).toFixed(4);
     const py = (kf.y * height * (1 - kf.scale)).toFixed(4);
     return `zoompan=z='${kf.scale.toFixed(6)}':x='${px}':y='${py}':d=1:s=${width}x${height}:fps=${fps}`;
   }
@@ -730,11 +730,11 @@ export function toFFmpegZoomPan(
     const span = f1 - f0;
     const zA = a.scale.toFixed(6);
     const zB = b.scale.toFixed(6);
-    const xA = (a.x * width  * (1 - a.scale)).toFixed(4);
-    const xB = (b.x * width  * (1 - b.scale)).toFixed(4);
+    const xA = (a.x * width * (1 - a.scale)).toFixed(4);
+    const xB = (b.x * width * (1 - b.scale)).toFixed(4);
     const yA = (a.y * height * (1 - a.scale)).toFixed(4);
     const yB = (b.y * height * (1 - b.scale)).toFixed(4);
-    const u  = `(on-${f0})/${span}`;
+    const u = `(on-${f0})/${span}`;
     zParts.push(`if(between(on,${f0},${f1}),(${zA})+(${zB}-${zA})*${u},0)`);
     xParts.push(`if(between(on,${f0},${f1}),(${xA})+(${xB}-${xA})*${u},0)`);
     yParts.push(`if(between(on,${f0},${f1}),(${yA})+(${yB}-${yA})*${u},0)`);
@@ -742,7 +742,7 @@ export function toFFmpegZoomPan(
 
   const fallback = keyframes[keyframes.length - 1];
   const fz = fallback.scale.toFixed(6);
-  const fx = (fallback.x * width  * (1 - fallback.scale)).toFixed(4);
+  const fx = (fallback.x * width * (1 - fallback.scale)).toFixed(4);
   const fy = (fallback.y * height * (1 - fallback.scale)).toFixed(4);
 
   const z = zParts.length ? zParts.join("+") : fz;

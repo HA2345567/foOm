@@ -11,6 +11,7 @@ import {
   BACKGROUNDS,
   DEFAULT_FRAME,
   type Background,
+  type BackgroundCategory,
   type FrameStyle,
   type Subtitle,
 } from "../lib/backgrounds";
@@ -24,6 +25,7 @@ interface Props {
 
 export function AutoZoomEditor({ recording, onDiscard }: Props) {
   const videoRef = useRef<HTMLVideoElement>(null);
+  const cameraRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const audioElRef = useRef<HTMLAudioElement>(null);
   const rafRef = useRef<number | null>(null);
@@ -54,6 +56,14 @@ export function AutoZoomEditor({ recording, onDiscard }: Props) {
     if (saved) return parseInt(saved) as any;
     return 720;
   });
+
+  const [selectedCategory, setSelectedCategory] = useState<BackgroundCategory>("wallpaper");
+  const [cameraX, setCameraX] = useState(0.85);
+  const [cameraY, setCameraY] = useState(0.82);
+  const [cameraSize, setCameraSize] = useState(0.16);
+  const [cameraShape, setCameraShape] = useState<"circle" | "square" | "rounded">(recording.cameraShape || "circle");
+  const [showCamera, setShowCamera] = useState(true);
+  const [isLoaded, setIsLoaded] = useState(false);
 
   useEffect(() => {
     localStorage.setItem("zoomly_background", background.id);
@@ -132,12 +142,17 @@ export function AutoZoomEditor({ recording, onDiscard }: Props) {
     if (!video || !canvas) return;
 
     const ctx = canvas.getContext("2d")!;
-    const srcW = recording.width;
-    const srcH = recording.height;
+    const container = canvas.parentElement!;
 
-    // Match canvas to a reasonable preview resolution while keeping aspect
-    const PREVIEW_W = 1280;
-    const PREVIEW_H = Math.round((PREVIEW_W * srcH) / srcW);
+    // The WebM blob's intrinsic dimensions are the true source of truth.
+    // Stream track settings at start can be inaccurate if the browser cropped a window.
+    const srcW = video.videoWidth || recording.width || 1280;
+    const srcH = video.videoHeight || recording.height || 720;
+    const aspect = srcW / srcH;
+
+    const PREVIEW_W = container.clientWidth;
+    const PREVIEW_H = PREVIEW_W / aspect;
+
     canvas.width = PREVIEW_W;
     canvas.height = PREVIEW_H;
 
@@ -149,6 +164,10 @@ export function AutoZoomEditor({ recording, onDiscard }: Props) {
         lastT = t;
       }
       const kf = interpolateZoom(keyframes, t);
+
+      const cam = cameraRef.current;
+      if (cam) cam.currentTime = t;
+
       drawComposite(ctx, video, kf, {
         background,
         frame,
@@ -158,6 +177,11 @@ export function AutoZoomEditor({ recording, onDiscard }: Props) {
         srcH,
         outW: PREVIEW_W,
         outH: PREVIEW_H,
+        camera: (showCamera && cam) ? cam : undefined,
+        cameraX,
+        cameraY,
+        cameraSize,
+        cameraShape,
       });
       rafRef.current = requestAnimationFrame(tick);
     };
@@ -169,14 +193,17 @@ export function AutoZoomEditor({ recording, onDiscard }: Props) {
 
   const togglePlay = () => {
     const v = videoRef.current;
+    const c = cameraRef.current;
     const a = audioElRef.current;
     if (!v) return;
     if (v.paused) {
       v.play();
-      a?.play().catch(() => {});
+      c?.play().catch(() => { });
+      a?.play().catch(() => { });
       setPlaying(true);
     } else {
       v.pause();
+      c?.pause();
       a?.pause();
       setPlaying(false);
     }
@@ -184,8 +211,10 @@ export function AutoZoomEditor({ recording, onDiscard }: Props) {
 
   const seek = (t: number) => {
     const v = videoRef.current;
+    const c = cameraRef.current;
     const a = audioElRef.current;
     if (v) v.currentTime = t;
+    if (c) c.currentTime = t;
     if (a) a.currentTime = t;
   };
 
@@ -200,13 +229,17 @@ export function AutoZoomEditor({ recording, onDiscard }: Props) {
         frame,
         subtitles: subtitles || undefined,
         clicksOverride: effectiveClicks,
+        cameraX: showCamera ? cameraX : undefined,
+        cameraY: showCamera ? cameraY : undefined,
+        cameraSize: showCamera ? cameraSize : undefined,
+        cameraShape: showCamera ? cameraShape : undefined,
         onProgress: (p) => setRenderState(p),
       });
       setRendered(out);
       // Auto-trigger download
       const a = document.createElement("a");
       a.href = out.url;
-      a.download = `zoomcast-${Date.now()}.${out.format}`;
+      a.download = `zoomly-${Date.now()}.${out.format}`;
       document.body.appendChild(a);
       a.click();
       document.body.removeChild(a);
@@ -232,7 +265,63 @@ export function AutoZoomEditor({ recording, onDiscard }: Props) {
           className="relative rounded-2xl overflow-hidden border border-border shadow-2xl"
           style={{ background: background.css }}
         >
-          <canvas ref={canvasRef} className="w-full h-auto block" />
+          <canvas ref={canvasRef} className={`w-full h-auto block transition-opacity duration-500 ${isLoaded ? 'opacity-100' : 'opacity-0'}`} />
+
+          {!isLoaded && (
+            <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/20 backdrop-blur-md">
+              <div className="w-10 h-10 rounded-full border-4 border-white/20 border-t-white animate-spin mb-4" />
+              <p className="text-xs font-bold text-white uppercase tracking-widest">Optimizing Video…</p>
+            </div>
+          )}
+
+          {/* Draggable Camera Handle (Editor) */}
+          {recording.cameraUrl && showCamera && (
+            <motion.div
+              drag
+              dragMomentum={false}
+              dragElastic={0}
+              onDrag={(_, info) => {
+                const el = canvasRef.current;
+                if (!el) return;
+                const rect = el.getBoundingClientRect();
+                const x = (info.point.x - rect.left) / rect.width;
+                const y = (info.point.y - rect.top) / rect.height;
+                setCameraX(Math.max(0, Math.min(1, x)));
+                setCameraY(Math.max(0, Math.min(1, y)));
+              }}
+              style={{
+                position: 'absolute',
+                left: `${cameraX * 100}%`,
+                top: `${cameraY * 100}%`,
+                width: `${cameraSize * 100}%`,
+                aspectRatio: '1/1',
+                x: '-50%',
+                y: '-50%',
+              }}
+              className="z-20 cursor-grab active:cursor-grabbing group"
+            >
+              {/* Visual handle: Show a preview of the camera video inside the handle */}
+              <div className={`w-full h-full border-2 border-white/50 shadow-2xl bg-black overflow-hidden relative transition-all duration-300
+                ${cameraShape === 'circle' ? 'rounded-full' : cameraShape === 'rounded' ? 'rounded-[20%]' : 'rounded-lg'}
+              `}>
+                <video
+                  src={recording.cameraUrl}
+                  muted
+                  playsInline
+                  className="w-full h-full object-cover scale-x-[-1] opacity-50"
+                  ref={(el) => {
+                    if (el) el.currentTime = currentTime;
+                  }}
+                />
+                <div className="absolute inset-0 flex items-center justify-center bg-primary/20 opacity-0 group-hover:opacity-100 transition-opacity">
+                  <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="3">
+                    <path d="M5 9l-3 3 3 3M9 5l3-3 3 3M15 19l-3 3-3-3M19 9l3 3-3 3M2 12h20M12 2v20" />
+                  </svg>
+                </div>
+              </div>
+            </motion.div>
+          )}
+
           {/* Hidden source video — provides frames to canvas */}
           <video
             ref={videoRef}
@@ -240,9 +329,16 @@ export function AutoZoomEditor({ recording, onDiscard }: Props) {
             muted
             playsInline
             className="hidden"
+            onLoadedData={() => {
+              if (videoRef.current) videoRef.current.currentTime = 0.001;
+            }}
+            onCanPlay={() => setIsLoaded(true)}
             onEnded={() => setPlaying(false)}
           />
           <audio ref={audioElRef} src={recording.url} className="hidden" />
+          {recording.cameraUrl && (
+            <video ref={cameraRef} src={recording.cameraUrl} muted playsInline className="hidden" />
+          )}
         </div>
 
         {/* Transport */}
@@ -279,49 +375,52 @@ export function AutoZoomEditor({ recording, onDiscard }: Props) {
           </span>
         </div>
 
-        <p className="text-xs text-muted-foreground text-center">
-          ✨ Auto-zoom is active — preview shows clicks zooming in and easing out automatically.
-        </p>
 
-        {/* Backgrounds moved to 'down side' of video */}
-        <div className="pt-6 border-t border-border space-y-6">
-          <section className="space-y-4">
-            <div>
-              <h3 className="text-[10px] uppercase tracking-widest text-muted-foreground/60 mb-2.5">Professional Scenes</h3>
-              <div className="grid grid-cols-6 sm:grid-cols-8 md:grid-cols-10 lg:grid-cols-12 gap-1.5">
-                {BACKGROUNDS.filter(bg => bg.id.startsWith('pro_')).map((bg) => (
-                  <BackgroundButton key={bg.id} bg={bg} active={background.id === bg.id} onClick={() => setBackground(bg)} />
-                ))}
-              </div>
-            </div>
 
-            <div>
-              <h3 className="text-[10px] uppercase tracking-widest text-muted-foreground/60 mb-2.5">Dark Glow</h3>
-              <div className="grid grid-cols-6 sm:grid-cols-8 md:grid-cols-10 lg:grid-cols-12 gap-1.5">
-                {BACKGROUNDS.filter(bg => ["crimson", "ember", "gold", "neon_lime", "sapphire", "arctic", "violet", "amethyst", "rose", "magenta", "teal", "emerald", "copper", "infrared"].includes(bg.id)).map((bg) => (
-                  <BackgroundButton key={bg.id} bg={bg} active={background.id === bg.id} onClick={() => setBackground(bg)} />
-                ))}
-              </div>
+        {/* Structured Background Container */}
+        <div className="pt-6 border-t border-border space-y-4">
+          <div className="flex items-center justify-between">
+            <div className="flex p-1 rounded-xl bg-card border border-border shadow-sm">
+              {(["wallpaper", "gradient", "color", "image"] as const).map((cat) => (
+                <button
+                  key={cat}
+                  onClick={() => setSelectedCategory(cat)}
+                  className={`px-4 py-1.5 rounded-lg text-xs font-bold capitalize transition-all ${selectedCategory === cat
+                      ? "bg-foreground text-background shadow-sm"
+                      : "text-muted-foreground hover:text-foreground"
+                    }`}
+                >
+                  {cat}
+                </button>
+              ))}
             </div>
+            <p className="text-[10px] font-mono text-muted-foreground/60 uppercase tracking-widest mr-2">
+              Background Style
+            </p>
+          </div>
 
-            <div>
-              <h3 className="text-[10px] uppercase tracking-widest text-muted-foreground/60 mb-2.5">Minimal & Pro</h3>
-              <div className="grid grid-cols-6 sm:grid-cols-8 md:grid-cols-10 lg:grid-cols-12 gap-1.5">
-                {BACKGROUNDS.filter(bg => ["slate", "studio", "warm_white", "white", "black", "obsidian", "midnight", "carbon", "deep_space"].includes(bg.id)).map((bg) => (
-                  <BackgroundButton key={bg.id} bg={bg} active={background.id === bg.id} onClick={() => setBackground(bg)} />
-                ))}
-              </div>
+          <div className="bg-card/30 rounded-2xl p-4 border border-border min-h-[160px]">
+            <div className="grid grid-cols-6 sm:grid-cols-8 md:grid-cols-10 lg:grid-cols-12 gap-2">
+              {BACKGROUNDS.filter(bg => bg.category === selectedCategory).map((bg) => (
+                <BackgroundButton
+                  key={bg.id}
+                  bg={bg}
+                  active={background.id === bg.id}
+                  onClick={() => setBackground(bg)}
+                />
+              ))}
             </div>
+            {BACKGROUNDS.filter(bg => bg.category === selectedCategory).length === 0 && (
+              <div className="flex flex-col items-center justify-center h-24 text-muted-foreground italic">
+                <p className="text-xs">No {selectedCategory}s added yet.</p>
+              </div>
+            )}
+          </div>
 
-            <div>
-              <h3 className="text-[10px] uppercase tracking-widest text-muted-foreground/60 mb-2.5">Creative</h3>
-              <div className="grid grid-cols-6 sm:grid-cols-8 md:grid-cols-10 lg:grid-cols-12 gap-1.5">
-                {BACKGROUNDS.filter(bg => !bg.id.startsWith('pro_') && !["crimson", "ember", "gold", "neon_lime", "sapphire", "arctic", "violet", "amethyst", "rose", "magenta", "teal", "emerald", "copper", "infrared", "slate", "studio", "warm_white", "white", "black", "obsidian", "midnight", "carbon", "deep_space"].includes(bg.id)).map((bg) => (
-                  <BackgroundButton key={bg.id} bg={bg} active={background.id === bg.id} onClick={() => setBackground(bg)} />
-                ))}
-              </div>
-            </div>
-          </section>
+          <div className="flex items-center justify-between px-2 text-[10px] text-muted-foreground/40 font-medium italic">
+            <p>Selected: {background.name}</p>
+            <p>Gradients inspired by raycast.com</p>
+          </div>
         </div>
 
       </div>
@@ -352,9 +451,8 @@ export function AutoZoomEditor({ recording, onDiscard }: Props) {
               }
             }}
             disabled={transcribing}
-            className={`w-full flex items-center gap-3 p-3 rounded-xl border transition-all ${
-              subtitles ? "border-primary/30 bg-primary/5" : "border-border bg-card hover:border-foreground/20"
-            }`}
+            className={`w-full flex items-center gap-3 p-3 rounded-xl border transition-all ${subtitles ? "border-primary/30 bg-primary/5" : "border-border bg-card hover:border-foreground/20"
+              }`}
           >
             <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${subtitles ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground"}`}>
               {transcribing ? (
@@ -407,6 +505,56 @@ export function AutoZoomEditor({ recording, onDiscard }: Props) {
             display={`${frame.shadow}px`}
             onChange={(v) => setFrame((f) => ({ ...f, shadow: v }))}
           />
+
+          {recording.cameraUrl && (
+            <div className="pt-4 border-t border-border space-y-4">
+              <div className="flex items-center justify-between">
+                <h3 className="text-xs uppercase tracking-wider text-muted-foreground">Camera</h3>
+                <button
+                  onClick={() => setShowCamera(!showCamera)}
+                  className={`w-10 h-6 rounded-full p-0.5 transition-colors ${showCamera ? "bg-primary" : "bg-muted"}`}
+                >
+                  <div className={`w-5 h-5 rounded-full bg-white transition-transform ${showCamera ? "translate-x-4" : "translate-x-0 shadow-sm"}`} />
+                </button>
+              </div>
+
+              {showCamera && (
+                <>
+                  <div className="p-3 rounded-lg bg-primary/5 border border-primary/20 text-[11px] text-primary leading-tight">
+                    💡 <strong>Pro Tip:</strong> You can now drag your face bubble directly on the video preview above to place it anywhere!
+                  </div>
+
+                  <Slider
+                    label="Camera Size"
+                    value={cameraSize}
+                    min={0.05}
+                    max={0.3}
+                    step={0.01}
+                    display={`${Math.round(cameraSize * 100)}%`}
+                    onChange={(v) => setCameraSize(v)}
+                  />
+
+                  <div className="space-y-2">
+                    <p className="text-[10px] uppercase tracking-widest text-muted-foreground font-bold">Shape</p>
+                    <div className="flex gap-1.5 p-1 rounded-lg bg-card border border-border">
+                      {(["circle", "rounded", "square"] as const).map((shape) => (
+                        <button
+                          key={shape}
+                          onClick={() => setCameraShape(shape)}
+                          className={`flex-1 py-1.5 rounded-md text-[10px] font-bold uppercase transition-all ${cameraShape === shape
+                              ? "bg-foreground text-background"
+                              : "text-muted-foreground hover:text-foreground"
+                            }`}
+                        >
+                          {shape}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                </>
+              )}
+            </div>
+          )}
         </section>
 
         {/* Stats */}
@@ -414,11 +562,10 @@ export function AutoZoomEditor({ recording, onDiscard }: Props) {
           <div className="flex items-center justify-between">
             <p className="text-xs text-muted-foreground">Zoom moments</p>
             {isAuto && (
-              <span className={`text-[10px] uppercase font-bold tracking-widest ${
-                isAIVision 
-                  ? "bg-clip-text text-transparent bg-gradient-to-r from-primary to-purple-500 animate-shimmer" 
+              <span className={`text-[10px] uppercase font-bold tracking-widest ${isAIVision
+                  ? "bg-clip-text text-transparent bg-gradient-to-r from-primary to-purple-500 animate-shimmer"
                   : "text-primary"
-              }`}>
+                }`}>
                 {isAIVision ? "AI Vision active" : "AI-detected"}
               </span>
             )}
@@ -456,11 +603,10 @@ export function AutoZoomEditor({ recording, onDiscard }: Props) {
                 <button
                   key={q}
                   onClick={() => setQuality(q as any)}
-                  className={`py-1.5 rounded-lg text-[10px] font-bold transition-all ${
-                    quality === q
+                  className={`py-1.5 rounded-lg text-[10px] font-bold transition-all ${quality === q
                       ? "bg-foreground text-background shadow-sm scale-100"
                       : "text-muted-foreground hover:text-foreground hover:bg-muted/50 scale-95"
-                  }`}
+                    }`}
                 >
                   {q}P
                 </button>
@@ -489,7 +635,7 @@ export function AutoZoomEditor({ recording, onDiscard }: Props) {
           )}
 
           {rendered && !renderState && (
-            <motion.div 
+            <motion.div
               initial={{ opacity: 0, y: 10 }}
               animate={{ opacity: 1, y: 0 }}
               className="p-4 rounded-xl bg-primary/10 border border-primary/20 space-y-3"
@@ -509,7 +655,7 @@ export function AutoZoomEditor({ recording, onDiscard }: Props) {
                 onClick={() => {
                   const a = document.createElement("a");
                   a.href = rendered.url;
-                  a.download = `zoomcast-${Date.now()}.${rendered.format}`;
+                  a.download = `zoomly-${Date.now()}.${rendered.format}`;
                   document.body.appendChild(a);
                   a.click();
                   document.body.removeChild(a);
@@ -536,13 +682,12 @@ export function AutoZoomEditor({ recording, onDiscard }: Props) {
           <button
             onClick={handleExport}
             disabled={!!renderState}
-            className={`w-full py-3.5 rounded-xl text-sm font-semibold transition-all flex items-center justify-center gap-2.5 ${
-              renderState 
-                ? "bg-muted text-muted-foreground cursor-not-allowed" 
-                : rendered 
-                  ? "bg-secondary text-secondary-foreground hover:bg-secondary/80" 
+            className={`w-full py-3.5 rounded-xl text-sm font-semibold transition-all flex items-center justify-center gap-2.5 ${renderState
+                ? "bg-muted text-muted-foreground cursor-not-allowed"
+                : rendered
+                  ? "bg-secondary text-secondary-foreground hover:bg-secondary/80"
                   : "bg-foreground text-background hover:opacity-90 shadow-xl shadow-foreground/10"
-            }`}
+              }`}
           >
             {renderState ? (
               <>
@@ -570,12 +715,12 @@ export function AutoZoomEditor({ recording, onDiscard }: Props) {
               </>
             )}
           </button>
-          
+
           <button
             onClick={() => {
               const a = document.createElement("a");
               a.href = recording.url;
-              a.download = `zoomcast-raw-${Date.now()}.webm`;
+              a.download = `zoomly-raw-${Date.now()}.webm`;
               document.body.appendChild(a);
               a.click();
               document.body.removeChild(a);
@@ -592,8 +737,13 @@ export function AutoZoomEditor({ recording, onDiscard }: Props) {
 
           <button
             onClick={onDiscard}
-            className="w-full py-2 text-[10px] text-muted-foreground/50 hover:text-destructive transition-colors"
+            className="w-full py-3 rounded-xl border border-destructive/30 bg-destructive/5 text-destructive text-xs font-semibold hover:bg-destructive hover:text-destructive-foreground transition-all flex items-center justify-center gap-2 mt-2"
           >
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M3 6h18" />
+              <path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6" />
+              <path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2" />
+            </svg>
             Discard Recording
           </button>
 
@@ -635,13 +785,14 @@ function BackgroundButton({ bg, active, onClick }: { bg: Background; active: boo
   return (
     <button
       onClick={onClick}
-      className={`aspect-square rounded-lg border-2 transition-all relative overflow-hidden ${
-        active ? "border-foreground scale-105 z-10 shadow-lg" : "border-transparent hover:border-foreground/30"
-      }`}
+      className={`aspect-square rounded-lg border-2 transition-all relative overflow-hidden ${active ? "border-foreground scale-105 z-10 shadow-lg" : "border-transparent hover:border-foreground/30"
+        }`}
       style={{ background: bg.css }}
       title={bg.name}
       aria-label={bg.name}
     />
   );
 }
+
+
 

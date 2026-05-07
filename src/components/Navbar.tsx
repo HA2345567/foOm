@@ -12,26 +12,46 @@ export function Navbar() {
   const [mobileOpen, setMobileOpen] = useState(false);
 
   return (
-    <nav className="fixed top-0 left-0 right-0 z-50 bg-background/80 backdrop-blur-xl border-b border-border">
-      <div className="mx-auto max-w-6xl px-6 flex items-center justify-between h-16">
+    <nav className="fixed top-0 left-0 right-0 z-50 bg-black/60 backdrop-blur-xl border-b border-border">
+      <div className="mx-auto max-w-7xl px-6 flex items-center justify-between h-16">
         {/* Logo */}
-        <Link to="/" className="flex items-center gap-2">
-          <div className="w-8 h-8 rounded-lg bg-primary flex items-center justify-center">
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" className="text-primary-foreground">
-              <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="2" />
-              <circle cx="12" cy="12" r="4" fill="currentColor" />
+        <Link to="/" className="flex items-center gap-3 group">
+          <div className="w-11 h-11 rounded-2xl bg-[#f5f5f7] flex items-center justify-center transition-all duration-500 group-hover:shadow-[0_0_30px_rgba(255,255,255,0.2)] group-hover:-translate-y-0.5 relative overflow-hidden">
+            {/* Background Texture/Gradient for Premium Feel */}
+            <div className="absolute inset-0 bg-gradient-to-br from-[#f5f5f7] via-[#f5f5f7] to-gray-200 opacity-50" />
+            
+            <svg width="28" height="28" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" className="relative z-10">
+              {/* The "Z-Focus" Mark */}
+              <path 
+                d="M4 8L12 4L20 8V16L12 20L4 16V8Z" 
+                stroke="black" 
+                strokeWidth="2" 
+                strokeLinejoin="round"
+              />
+              <path 
+                d="M4 8L12 12M12 12L20 8M12 12V20" 
+                stroke="black" 
+                strokeWidth="1.5" 
+                strokeOpacity="0.3" 
+                strokeLinecap="round"
+              />
+              {/* The Core Focus Node */}
+              <circle cx="12" cy="12" r="2.5" fill="black" />
+              <circle cx="12" cy="12" r="5" stroke="black" strokeWidth="0.5" strokeDasharray="2 2" />
             </svg>
           </div>
-          <span className="font-display text-lg font-semibold tracking-tight text-foreground">ZoomCast</span>
+          <span className="font-display text-[21px] font-medium tracking-[-0.07em] text-foreground flex items-baseline">
+            Zo<span className="font-bold tracking-[-0.09em]">O</span>mly
+          </span>
         </Link>
 
         {/* Desktop links */}
-        <div className="hidden md:flex items-center gap-8">
+        <div className="hidden md:flex items-center gap-10">
           {navLinks.map((link) => (
             <a
               key={link.label}
               href={link.href}
-              className="text-caption text-muted-foreground hover:text-foreground transition-colors"
+              className="text-[14px] font-medium text-muted-foreground hover:text-white transition-colors"
             >
               {link.label}
             </a>
@@ -39,16 +59,16 @@ export function Navbar() {
         </div>
 
         {/* CTA */}
-        <div className="hidden md:flex items-center gap-3">
+        <div className="hidden md:flex items-center gap-6">
           <a
             href="#pricing"
-            className="text-caption text-muted-foreground hover:text-foreground transition-colors"
+            className="text-[14px] font-medium text-muted-foreground hover:text-white transition-colors"
           >
             Log in
           </a>
           <Link
             to="/record"
-            className="px-4 py-2 rounded-lg bg-primary text-primary-foreground text-sm font-medium shadow-button hover:opacity-90 transition-opacity"
+            className="px-5 py-2 rounded-full bg-[#f5f5f7] text-black text-[14px] font-bold shadow-button hover:bg-white transition-all active:scale-95"
           >
             Start Recording
           </Link>
@@ -56,15 +76,15 @@ export function Navbar() {
 
         {/* Mobile hamburger */}
         <button
-          className="md:hidden p-2 text-foreground"
+          className="md:hidden p-2 text-white"
           onClick={() => setMobileOpen(!mobileOpen)}
           aria-label="Menu"
         >
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
             {mobileOpen ? (
               <path d="M6 6l12 12M6 18L18 6" />
             ) : (
-              <path d="M4 6h16M4 12h16M4 18h16" />
+              <path d="M4 8h16M4 16h16" />
             )}
           </svg>
         </button>
@@ -77,20 +97,24 @@ export function Navbar() {
             initial={{ height: 0, opacity: 0 }}
             animate={{ height: "auto", opacity: 1 }}
             exit={{ height: 0, opacity: 0 }}
-            className="md:hidden overflow-hidden border-b border-border bg-background"
+            className="md:hidden overflow-hidden border-b border-border bg-black"
           >
-            <div className="px-6 py-4 flex flex-col gap-4">
+            <div className="px-6 py-6 flex flex-col gap-6">
               {navLinks.map((link) => (
                 <a
                   key={link.label}
                   href={link.href}
-                  className="text-body text-muted-foreground hover:text-foreground transition-colors"
+                  className="text-[16px] font-medium text-muted-foreground hover:text-white transition-colors"
                   onClick={() => setMobileOpen(false)}
                 >
                   {link.label}
                 </a>
               ))}
-              <Link to="/record" className="mt-2 block w-full px-4 py-3 rounded-lg bg-primary text-primary-foreground text-sm font-medium text-center" onClick={() => setMobileOpen(false)}>
+              <Link 
+                to="/record" 
+                className="block w-full px-4 py-3.5 rounded-full bg-[#f5f5f7] text-black text-[15px] font-bold text-center" 
+                onClick={() => setMobileOpen(false)}
+              >
                 Start Recording
               </Link>
             </div>
@@ -100,3 +124,4 @@ export function Navbar() {
     </nav>
   );
 }
+

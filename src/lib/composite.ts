@@ -12,6 +12,14 @@ export interface CompositeOptions {
   /** output canvas size */
   outW: number;
   outH: number;
+  /** PIP camera element */
+  camera?: HTMLVideoElement | HTMLCanvasElement;
+  /** PIP position normalized 0..1 (default 0.9, 0.9) */
+  cameraX?: number;
+  cameraY?: number;
+  /** PIP size (fraction of output width, default 0.15) */
+  cameraSize?: number;
+  cameraShape?: "circle" | "square" | "rounded";
 }
 
 
@@ -34,11 +42,24 @@ export function drawComposite(
   // 2) Inset target rect (video panel after padding)
   const padX = outW * frame.padding;
   const padY = outH * frame.padding;
-  const targetW = outW - padX * 2;
-  const targetH = outH - padY * 2;
-  const targetX = padX;
-  const targetY = padY;
-
+  const availableW = outW - padX * 2;
+  const availableH = outH - padY * 2;
+  
+  const videoAspect = srcW / srcH;
+  const targetAspect = availableW / availableH;
+  
+  let targetW, targetH;
+  if (videoAspect > targetAspect) {
+    targetW = availableW;
+    targetH = availableW / videoAspect;
+  } else {
+    targetH = availableH;
+    targetW = availableH * videoAspect;
+  }
+  
+  const targetX = padX + (availableW - targetW) / 2;
+  const targetY = padY + (availableH - targetH) / 2;
+  
   // 3) Source rect from zoom keyframe (crop window inside source)
   const sw = srcW / kf.scale;
   const sh = srcH / kf.scale;
@@ -47,18 +68,27 @@ export function drawComposite(
   sx = Math.max(0, Math.min(srcW - sw, sx));
   sy = Math.max(0, Math.min(srcH - sh, sy));
 
+  // Scale UI values (radius, shadow) relative to a baseline width of 1280px
+  // This ensures that the exported video looks identical to the preview,
+  // regardless of whether the user exports at 360P or 1080P.
+  const scaleRatio = outW / 1280;
+  const scaledRadius = frame.radius * scaleRatio;
+  const scaledShadow = frame.shadow * scaleRatio;
+
   // 4) Rounded clip + shadow
   ctx.save();
-  ctx.shadowColor = "rgba(0,0,0,0.45)";
-  ctx.shadowBlur = frame.shadow;
-  ctx.shadowOffsetY = frame.shadow * 0.4;
+  if (scaledShadow > 0) {
+    ctx.shadowColor = "rgba(0,0,0,0.45)";
+    ctx.shadowBlur = scaledShadow;
+    ctx.shadowOffsetY = scaledShadow * 0.4;
+  }
   ctx.fillStyle = "#000";
-  roundedRectPath(ctx, targetX, targetY, targetW, targetH, frame.radius);
+  roundedRectPath(ctx, targetX, targetY, targetW, targetH, scaledRadius);
   ctx.fill();
   ctx.restore();
 
   ctx.save();
-  roundedRectPath(ctx, targetX, targetY, targetW, targetH, frame.radius);
+  roundedRectPath(ctx, targetX, targetY, targetW, targetH, scaledRadius);
   ctx.clip();
   ctx.drawImage(video, sx, sy, sw, sh, targetX, targetY, targetW, targetH);
   ctx.restore();
@@ -75,7 +105,7 @@ export function drawComposite(
       const paddingH = fontSize * 0.8;
       const paddingV = fontSize * 0.4;
       const textW = ctx.measureText(sub.text).width;
-      
+
       const subX = outW / 2;
       const subY = targetY + targetH - fontSize * 1.5;
 
@@ -105,6 +135,65 @@ export function drawComposite(
       ctx.fillText(sub.text, subX, subY - fontSize / 2 + paddingV);
       ctx.restore();
     }
+  }
+
+  // 7) PIP Camera
+  if (opts.camera) {
+    ctx.save();
+    const pipSize = outW * (opts.cameraSize ?? 0.15);
+    const cx = opts.cameraX ?? 0.85;
+    const cy = opts.cameraY ?? 0.85;
+    
+    let px = cx * outW - pipSize / 2;
+    let py = cy * outH - pipSize / 2;
+
+    // Constrain to bounds
+    px = Math.max(0, Math.min(outW - pipSize, px));
+    py = Math.max(0, Math.min(outH - pipSize, py));
+
+    // Shadow for bubble
+    ctx.shadowColor = "rgba(0,0,0,0.3)";
+    ctx.shadowBlur = 15 * scaleRatio;
+    ctx.shadowOffsetY = 5 * scaleRatio;
+
+    // Shape clip
+    ctx.beginPath();
+    const shape = opts.cameraShape ?? "circle";
+    if (shape === "circle") {
+      ctx.arc(px + pipSize / 2, py + pipSize / 2, pipSize / 2, 0, Math.PI * 2);
+    } else if (shape === "rounded") {
+      roundedRectPath(ctx, px, py, pipSize, pipSize, pipSize * 0.2);
+    } else {
+      ctx.rect(px, py, pipSize, pipSize);
+    }
+    ctx.fillStyle = "#000";
+    ctx.fill();
+    ctx.clip();
+
+    // Draw camera (centered crop if possible)
+    const cw = opts.camera.width || (opts.camera as any).videoWidth || 320;
+    const ch = opts.camera.height || (opts.camera as any).videoHeight || 240;
+    const cSize = Math.min(cw, ch);
+    const csx = (cw - cSize) / 2;
+    const csy = (ch - cSize) / 2;
+
+    ctx.drawImage(opts.camera, csx, csy, cSize, cSize, px, py, pipSize, pipSize);
+    
+    // Border
+    ctx.restore();
+    ctx.save();
+    ctx.strokeStyle = "rgba(255,255,255,0.2)";
+    ctx.lineWidth = 3 * scaleRatio;
+    ctx.beginPath();
+    if (shape === "circle") {
+      ctx.arc(px + pipSize / 2, py + pipSize / 2, pipSize / 2, 0, Math.PI * 2);
+    } else if (shape === "rounded") {
+      roundedRectPath(ctx, px, py, pipSize, pipSize, pipSize * 0.2);
+    } else {
+      ctx.rect(px, py, pipSize, pipSize);
+    }
+    ctx.stroke();
+    ctx.restore();
   }
 }
 

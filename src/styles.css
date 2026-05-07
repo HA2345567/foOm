@@ -4,22 +4,21 @@
 @custom-variant dark (&:is(.dark *));
 
 /* === Font imports === */
-@import url("https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Inter:wght@300;400;500;600&display=swap");
+@import url("https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap");
 
 @theme inline {
-  --radius-sm: calc(var(--radius) - 4px);
-  --radius-md: calc(var(--radius) - 2px);
-  --radius-lg: var(--radius);
-  --radius-xl: calc(var(--radius) + 4px);
-  --radius-2xl: calc(var(--radius) + 8px);
-  --radius-3xl: calc(var(--radius) + 12px);
-  --radius-4xl: calc(var(--radius) + 16px);
+  --radius-sm: 2px;
+  --radius-md: 4px;
+  --radius-lg: 8px;
+  --radius-xl: 12px;
+  --radius-2xl: 16px;
+  --radius-3xl: 24px;
+  --radius-pill: 9999px;
+
   --color-background: var(--background);
   --color-foreground: var(--foreground);
   --color-card: var(--card);
   --color-card-foreground: var(--card-foreground);
-  --color-popover: var(--popover);
-  --color-popover-foreground: var(--popover-foreground);
   --color-primary: var(--primary);
   --color-primary-foreground: var(--primary-foreground);
   --color-secondary: var(--secondary);
@@ -28,81 +27,48 @@
   --color-muted-foreground: var(--muted-foreground);
   --color-accent: var(--accent);
   --color-accent-foreground: var(--accent-foreground);
-  --color-destructive: var(--destructive);
-  --color-destructive-foreground: var(--destructive-foreground);
   --color-border: var(--border);
   --color-input: var(--input);
   --color-ring: var(--ring);
-  --color-ring-offset-background: var(--background);
-  --color-chart-1: var(--chart-1);
-  --color-chart-2: var(--chart-2);
-  --color-chart-3: var(--chart-3);
-  --color-chart-4: var(--chart-4);
-  --color-chart-5: var(--chart-5);
-  --color-sidebar: var(--sidebar);
-  --color-sidebar-foreground: var(--sidebar-foreground);
-  --color-sidebar-primary: var(--sidebar-primary);
-  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
-  --color-sidebar-accent: var(--sidebar-accent);
-  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
-  --color-sidebar-border: var(--sidebar-border);
-  --color-sidebar-ring: var(--sidebar-ring);
 
-  /* Custom design tokens */
-  --color-surface: var(--surface);
-  --color-surface-foreground: var(--surface-foreground);
-  --color-glow: var(--glow);
-
-  --font-display: "Space Grotesk", system-ui, sans-serif;
+  --font-display: "Inter", system-ui, sans-serif;
   --font-body: "Inter", system-ui, sans-serif;
 }
 
 :root {
-  --radius: 0.5rem;
-  --background: oklch(0.08 0 0);
-  --foreground: oklch(0.97 0 0);
-  --card: oklch(0.12 0 0);
-  --card-foreground: oklch(0.97 0 0);
-  --popover: oklch(0.12 0 0);
-  --popover-foreground: oklch(0.97 0 0);
-  --primary: oklch(0.97 0 0);
-  --primary-foreground: oklch(0.08 0 0);
-  --secondary: oklch(0.16 0 0);
-  --secondary-foreground: oklch(0.85 0 0);
-  --muted: oklch(0.16 0 0);
-  --muted-foreground: oklch(0.55 0 0);
-  --accent: oklch(0.18 0 0);
-  --accent-foreground: oklch(0.97 0 0);
-  --destructive: oklch(0.577 0.245 27.325);
-  --destructive-foreground: oklch(0.97 0 0);
-  --border: oklch(1 0 0 / 8%);
-  --input: oklch(1 0 0 / 10%);
-  --ring: oklch(1 0 0 / 20%);
+  /* Cal.com Dark Mode Palette */
+  --background: #000000;
+  --foreground: #E5E5E5;
+  /* Refined off-white from user request */
 
-  /* Custom tokens */
-  --surface: oklch(0.14 0 0);
-  --surface-foreground: oklch(0.70 0 0);
-  --glow: oklch(1 0 0 / 4%);
+  --card: #0a0a0a;
+  --card-foreground: #ffffff;
 
-  /* Shadow system adapted for dark mode */
-  --shadow-card: 0px 0px 0px 1px oklch(1 0 0 / 6%), 0px 1px 5px -4px oklch(0 0 0 / 50%), 0px 4px 16px oklch(0 0 0 / 30%);
-  --shadow-card-hover: 0px 0px 0px 1px oklch(1 0 0 / 10%), 0px 2px 8px -2px oklch(0 0 0 / 60%), 0px 8px 24px oklch(0 0 0 / 40%);
-  --shadow-button: 0px 0px 0px 1px oklch(1 0 0 / 12%), 0px 1px 2px oklch(0 0 0 / 40%);
-  --shadow-glow: 0px 0px 40px oklch(1 0 0 / 4%);
+  --primary: #ffffff;
+  --primary-foreground: #000000;
 
-  --chart-1: oklch(0.70 0 0);
-  --chart-2: oklch(0.60 0 0);
-  --chart-3: oklch(0.50 0 0);
-  --chart-4: oklch(0.40 0 0);
-  --chart-5: oklch(0.30 0 0);
-  --sidebar: oklch(0.10 0 0);
-  --sidebar-foreground: oklch(0.97 0 0);
-  --sidebar-primary: oklch(0.97 0 0);
-  --sidebar-primary-foreground: oklch(0.08 0 0);
-  --sidebar-accent: oklch(0.18 0 0);
-  --sidebar-accent-foreground: oklch(0.97 0 0);
-  --sidebar-border: oklch(1 0 0 / 8%);
-  --sidebar-ring: oklch(1 0 0 / 20%);
+  --secondary: #161616;
+  --secondary-foreground: #a1a1a1;
+
+  --muted: #161616;
+  --muted-foreground: #898989;
+
+  --accent: #ffffff;
+  --accent-foreground: #000000;
+
+  --border: rgba(255, 255, 255, 0.1);
+  --input: rgba(255, 255, 255, 0.05);
+  --ring: rgba(255, 255, 255, 0.2);
+
+  /* Cal.com 11-Shadow System (adapted for Dark Mode) */
+  --shadow-ring: 0px 0px 0px 1px rgba(255, 255, 255, 0.1);
+  --shadow-soft: 0px 4px 8px rgba(0, 0, 0, 0.5);
+  --shadow-contact: 0px 1px 5px -4px rgba(0, 0, 0, 0.8);
+
+  /* Layered Shadow Composition */
+  --shadow-card: var(--shadow-ring), var(--shadow-soft), var(--shadow-contact);
+  --shadow-card-hover: 0px 0px 0px 1px rgba(255, 255, 255, 0.2), 0px 8px 24px rgba(0, 0, 0, 0.6);
+  --shadow-button: 0px 0px 0px 1px rgba(255, 255, 255, 0.15), 0px 2px 4px rgba(0, 0, 0, 0.4);
 }
 
 @layer base {
@@ -118,37 +84,48 @@
     -moz-osx-font-smoothing: grayscale;
   }
 
-  h1, h2, h3, h4, h5, h6 {
+  h1,
+  h2,
+  h3,
+  h4,
+  h5,
+  h6 {
     font-family: var(--font-display);
-    font-weight: 600;
-    letter-spacing: -0.02em;
+    font-weight: 400;
+    /* Ultra-tight architectural tracking from the image */
+    letter-spacing: -0.05em;
+    color: var(--color-foreground);
+    line-height: 1.1;
   }
 }
 
-/* Utility classes for the design system */
 @layer utilities {
   .text-display-hero {
     font-family: var(--font-display);
-    font-size: clamp(2.5rem, 6vw, 4rem);
-    font-weight: 700;
-    line-height: 1.05;
-    letter-spacing: -0.03em;
+    font-size: clamp(2.5rem, 8vw, 5rem);
+    font-weight: 300;
+    /* Ultra-thin Light weight */
+    line-height: 1;
+    letter-spacing: -0.07em;
+    color: var(--color-foreground);
   }
 
   .text-display-section {
     font-family: var(--font-display);
-    font-size: clamp(2rem, 4vw, 3rem);
-    font-weight: 600;
-    line-height: 1.10;
-    letter-spacing: -0.02em;
+    font-size: clamp(2.25rem, 6vw, 3.5rem);
+    font-weight: 400;
+    line-height: 1.1;
+    letter-spacing: -0.06em;
+    color: var(--color-foreground);
   }
 
   .text-display-feature {
     font-family: var(--font-display);
-    font-size: 1.25rem;
-    font-weight: 600;
-    line-height: 1.30;
-    letter-spacing: -0.01em;
+    font-size: 1.5rem;
+    font-weight: 400;
+    line-height: 1.2;
+    letter-spacing: -0.05em;
+    color: var(--color-foreground);
   }
 
   .text-body-large {
@@ -156,6 +133,8 @@
     font-size: 1.125rem;
     font-weight: 300;
     line-height: 1.6;
+    letter-spacing: -0.02em;
+    color: var(--color-muted-foreground);
   }
 
   .text-body {
@@ -165,22 +144,7 @@
     line-height: 1.6;
   }
 
-  .text-caption {
-    font-family: var(--font-body);
-    font-size: 0.875rem;
-    font-weight: 400;
-    line-height: 1.5;
-  }
-
-  .shadow-card {
+  .shadow-pill {
     box-shadow: var(--shadow-card);
-  }
-
-  .shadow-card-hover {
-    box-shadow: var(--shadow-card-hover);
-  }
-
-  .shadow-glow {
-    box-shadow: var(--shadow-glow);
   }
 }

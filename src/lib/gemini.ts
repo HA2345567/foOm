@@ -67,11 +67,13 @@ export async function transcribeAudioAI(blob: Blob): Promise<Subtitle[]> {
     generationConfig: { responseMimeType: "application/json" }
   });
 
+  // Extract only the audio to drastically reduce payload size (prevents 400 Payload Too Large)
+  const audioBlob = await extractAudioFromVideo(blob);
 
   const base64 = await new Promise<string>((resolve) => {
     const reader = new FileReader();
     reader.onloadend = () => resolve(reader.result as string);
-    reader.readAsDataURL(blob);
+    reader.readAsDataURL(audioBlob);
   });
 
   const prompt = `Transcribe this audio recording precisely. 
@@ -90,13 +92,21 @@ Ensure timestamps are accurate and align with the speech.`;
   ]);
 
   const response = await result.response;
-  const text = response.text();
+  let text = response.text();
+
+  // Strip potential markdown code blocks if the model ignored responseMimeType
+  if (text.startsWith("```json")) {
+    text = text.replace(/^```json\n?/, "").replace(/\n?```$/, "");
+  } else if (text.startsWith("```")) {
+    text = text.replace(/^```\n?/, "").replace(/\n?```$/, "");
+  }
 
   try {
     const data = JSON.parse(text);
     return Array.isArray(data) ? data : [];
   } catch (e) {
-    console.error("Failed to parse Gemini transcription", e, text);
+    console.error("Failed to parse Gemini transcription. Raw response:", text);
+    console.error(e);
     return [];
   }
 }
@@ -126,4 +136,75 @@ async function captureFrames(url: string, duration: number, count: number) {
   }
 
   return frames;
+}
+
+/**
+ * Extracts the audio track from a video Blob and encodes it as a mono 16kHz WAV.
+ * This massively reduces the payload size sent to the Gemini API (from ~50MB to ~1MB).
+ */
+async function extractAudioFromVideo(videoBlob: Blob): Promise<Blob> {
+  const audioCtx = new AudioContext({ sampleRate: 16000 });
+  const arrayBuffer = await videoBlob.arrayBuffer();
+  
+  let audioBuffer: AudioBuffer;
+  try {
+    audioBuffer = await audioCtx.decodeAudioData(arrayBuffer);
+  } catch (e) {
+    console.warn("No audio track found or decode failed. Sending original blob.", e);
+    return videoBlob;
+  }
+
+  const offlineCtx = new OfflineAudioContext(1, audioBuffer.length, audioBuffer.sampleRate);
+  const source = offlineCtx.createBufferSource();
+  source.buffer = audioBuffer;
+  source.connect(offlineCtx.destination);
+  source.start();
+  
+  const renderedBuffer = await offlineCtx.startRendering();
+  return bufferToWav(renderedBuffer);
+}
+
+function bufferToWav(abuffer: AudioBuffer): Blob {
+  const numOfChan = abuffer.numberOfChannels;
+  const length = abuffer.length * numOfChan * 2 + 44;
+  const buffer = new ArrayBuffer(length);
+  const view = new DataView(buffer);
+  const channels = [];
+  let offset = 0;
+  let pos = 0;
+
+  function setUint16(data: number) { view.setUint16(offset, data, true); offset += 2; }
+  function setUint32(data: number) { view.setUint32(offset, data, true); offset += 4; }
+
+  setUint32(0x46464952); // "RIFF"
+  setUint32(length - 8); // file length - 8
+  setUint32(0x45564157); // "WAVE"
+
+  setUint32(0x20746d66); // "fmt " chunk
+  setUint32(16); // length = 16
+  setUint16(1); // PCM
+  setUint16(numOfChan);
+  setUint32(abuffer.sampleRate);
+  setUint32(abuffer.sampleRate * 2 * numOfChan); // avg. bytes/sec
+  setUint16(numOfChan * 2); // block-align
+  setUint16(16); // 16-bit
+
+  setUint32(0x61746164); // "data" - chunk
+  setUint32(length - pos - 4); // chunk length
+
+  for (let i = 0; i < abuffer.numberOfChannels; i++) {
+    channels.push(abuffer.getChannelData(i));
+  }
+
+  while (pos < abuffer.length) {
+    for (let i = 0; i < numOfChan; i++) {
+      let sample = Math.max(-1, Math.min(1, channels[i][pos])); // clamp
+      sample = (0.5 + sample < 0 ? sample * 32768 : sample * 32767) | 0; // scale
+      view.setInt16(offset, sample, true);
+      offset += 2;
+    }
+    pos++;
+  }
+
+  return new Blob([buffer], { type: "audio/wav" });
 }
