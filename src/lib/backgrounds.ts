@@ -821,6 +821,74 @@ export const BACKGROUNDS: Background[] = [
         { cx: 0.85, cy: 0.20, r: 0.50, color: "rgba(245,158,11,0.80)" },
       ], 6),
   },
+  
+  // ── SOFT MESH (APPLE STYLE) ──────────────────────────────────────────────
+  {
+    id: "mesh_lollipop",
+    name: "Lollipop",
+    category: "gradient",
+    css: "radial-gradient(circle at 30% 70%, #ff80b5, transparent), radial-gradient(circle at 70% 30%, #9089fc, transparent), #ffffff",
+    paint: (ctx, w, h) => meshGradient(ctx, w, h, "#ffffff", [
+      { cx: 0.3, cy: 0.7, r: 0.6, color: "rgba(255, 128, 181, 0.6)" },
+      { cx: 0.7, cy: 0.3, r: 0.6, color: "rgba(144, 137, 252, 0.6)" },
+      { cx: 0.5, cy: 0.5, r: 0.5, color: "rgba(100, 210, 255, 0.3)" },
+    ], 4),
+  },
+  {
+    id: "mesh_skyline",
+    name: "Skyline",
+    category: "gradient",
+    css: "radial-gradient(circle at 20% 80%, #bae6fd, transparent), radial-gradient(circle at 80% 20%, #e0f2fe, transparent), #f8fafc",
+    paint: (ctx, w, h) => meshGradient(ctx, w, h, "#f8fafc", [
+      { cx: 0.2, cy: 0.8, r: 0.7, color: "rgba(186, 230, 253, 0.8)" },
+      { cx: 0.8, cy: 0.2, r: 0.7, color: "rgba(224, 242, 254, 0.8)" },
+      { cx: 0.5, cy: 0.5, r: 0.6, color: "rgba(56, 189, 248, 0.3)" },
+    ], 3),
+  },
+  {
+    id: "mesh_peachy",
+    name: "Peachy",
+    category: "gradient",
+    css: "radial-gradient(circle at 30% 70%, #ffedd5, transparent), radial-gradient(circle at 70% 30%, #fce7f3, transparent), #fffafb",
+    paint: (ctx, w, h) => meshGradient(ctx, w, h, "#fffafb", [
+      { cx: 0.3, cy: 0.7, r: 0.6, color: "rgba(255, 237, 213, 0.9)" },
+      { cx: 0.7, cy: 0.3, r: 0.6, color: "rgba(252, 231, 243, 0.9)" },
+      { cx: 0.5, cy: 0.5, r: 0.5, color: "rgba(254, 215, 170, 0.4)" },
+    ], 3),
+  },
+  {
+    id: "mesh_breeze",
+    name: "Breeze",
+    category: "gradient",
+    css: "radial-gradient(circle at 30% 70%, #dcfce7, transparent), radial-gradient(circle at 70% 30%, #ecfeff, transparent), #f0fdfa",
+    paint: (ctx, w, h) => meshGradient(ctx, w, h, "#f0fdfa", [
+      { cx: 0.3, cy: 0.7, r: 0.6, color: "rgba(220, 252, 231, 0.8)" },
+      { cx: 0.7, cy: 0.3, r: 0.6, color: "rgba(236, 254, 255, 0.8)" },
+      { cx: 0.5, cy: 0.5, r: 0.5, color: "rgba(187, 247, 208, 0.3)" },
+    ], 3),
+  },
+  {
+    id: "mesh_midnight_mist",
+    name: "Midnight Mist",
+    category: "gradient",
+    css: "radial-gradient(circle at 20% 20%, #312e81, transparent), radial-gradient(circle at 80% 80%, #1e1b4b, transparent), #030712",
+    paint: (ctx, w, h) => meshGradient(ctx, w, h, "#030712", [
+      { cx: 0.2, cy: 0.2, r: 0.8, color: "rgba(49, 46, 129, 0.6)" },
+      { cx: 0.8, cy: 0.8, r: 0.8, color: "rgba(30, 27, 75, 0.6)" },
+      { cx: 0.5, cy: 0.5, r: 0.7, color: "rgba(67, 56, 202, 0.3)" },
+    ], 10),
+  },
+  {
+    id: "mesh_lavender",
+    name: "Lavender",
+    category: "gradient",
+    css: "radial-gradient(circle at 30% 30%, #ede9fe, transparent), radial-gradient(circle at 70% 70%, #f5f3ff, transparent), #fafafa",
+    paint: (ctx, w, h) => meshGradient(ctx, w, h, "#fafafa", [
+      { cx: 0.3, cy: 0.3, r: 0.7, color: "rgba(237, 233, 254, 0.9)" },
+      { cx: 0.7, cy: 0.7, r: 0.7, color: "rgba(245, 243, 255, 0.9)" },
+      { cx: 0.5, cy: 0.5, r: 0.5, color: "rgba(196, 181, 253, 0.3)" },
+    ], 4),
+  },
 ];
 
 /** IDs of Raycast-style mesh wallpapers, used by the editor for grouping. */
