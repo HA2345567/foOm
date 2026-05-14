@@ -1,6 +1,9 @@
+export type BackgroundCategory = "wallpaper" | "gradient" | "color" | "image";
+
 export type Background = {
   id: string;
   name: string;
+  category: BackgroundCategory;
   /** CSS string for UI swatches */
   css: string;
   /** Optional image URL for image-based backgrounds */
@@ -220,6 +223,7 @@ export const BACKGROUNDS: Background[] = [
   {
     id: "crimson",
     name: "Crimson",
+    category: "color",
     css: swatchRadial("rgba(210,0,25,0.98)", "#080000"),
     paint: (ctx, w, h) => darkGlow(ctx, w, h, "#080000", [
       { cx: 0.38, cy: 0.52, color: "rgba(210,0,25,0.98)",   rf: 0.42 }, // core
@@ -233,6 +237,7 @@ export const BACKGROUNDS: Background[] = [
   {
     id: "ember",
     name: "Ember",
+    category: "color",
     css: swatchRadial("rgba(235,85,0,0.98)", "#060200"),
     paint: (ctx, w, h) => darkGlow(ctx, w, h, "#060200", [
       { cx: 0.40, cy: 0.55, color: "rgba(235,85,0,0.98)",   rf: 0.44 },
@@ -246,6 +251,7 @@ export const BACKGROUNDS: Background[] = [
   {
     id: "gold",
     name: "Gold",
+    category: "color",
     css: swatchRadial("rgba(225,165,0,0.98)", "#060500"),
     paint: (ctx, w, h) => darkGlow(ctx, w, h, "#060500", [
       { cx: 0.40, cy: 0.52, color: "rgba(225,165,0,0.98)",  rf: 0.42 },
@@ -259,6 +265,7 @@ export const BACKGROUNDS: Background[] = [
   {
     id: "neon_lime",
     name: "Neon Lime",
+    category: "color",
     css: swatchRadial("rgba(90,225,0,0.98)", "#010700"),
     paint: (ctx, w, h) => darkGlow(ctx, w, h, "#010700", [
       { cx: 0.40, cy: 0.52, color: "rgba(90,225,0,0.98)",   rf: 0.42 },
@@ -272,6 +279,7 @@ export const BACKGROUNDS: Background[] = [
   {
     id: "sapphire",
     name: "Sapphire",
+    category: "color",
     css: swatchRadial("rgba(25,75,255,0.98)", "#00000c"),
     paint: (ctx, w, h) => darkGlow(ctx, w, h, "#00000c", [
       { cx: 0.38, cy: 0.52, color: "rgba(25,75,255,0.98)",  rf: 0.44 },
@@ -285,6 +293,7 @@ export const BACKGROUNDS: Background[] = [
   {
     id: "arctic",
     name: "Arctic",
+    category: "color",
     css: swatchRadial("rgba(0,205,255,0.98)", "#000910"),
     paint: (ctx, w, h) => darkGlow(ctx, w, h, "#000910", [
       { cx: 0.40, cy: 0.52, color: "rgba(0,205,255,0.98)",  rf: 0.42 },
@@ -298,6 +307,7 @@ export const BACKGROUNDS: Background[] = [
   {
     id: "violet",
     name: "Violet",
+    category: "color",
     css: swatchRadial("rgba(115,0,255,0.98)", "#030010"),
     paint: (ctx, w, h) => darkGlow(ctx, w, h, "#030010", [
       { cx: 0.38, cy: 0.52, color: "rgba(115,0,255,0.98)",  rf: 0.44 },
@@ -311,6 +321,7 @@ export const BACKGROUNDS: Background[] = [
   {
     id: "amethyst",
     name: "Amethyst",
+    category: "color",
     css: swatchDual("rgba(170,0,230,0.92)", "rgba(230,0,175,0.85)", "#05000f"),
     paint: (ctx, w, h) => darkGlow(ctx, w, h, "#05000f", [
       { cx: 0.25, cy: 0.48, color: "rgba(170,0,230,0.92)",  rf: 0.40 }, // left bloom
@@ -324,6 +335,7 @@ export const BACKGROUNDS: Background[] = [
   {
     id: "rose",
     name: "Rose",
+    category: "color",
     css: swatchRadial("rgba(245,0,118,0.98)", "#090006"),
     paint: (ctx, w, h) => darkGlow(ctx, w, h, "#090006", [
       { cx: 0.40, cy: 0.52, color: "rgba(245,0,118,0.98)",  rf: 0.42 },
@@ -337,6 +349,7 @@ export const BACKGROUNDS: Background[] = [
   {
     id: "magenta",
     name: "Magenta",
+    category: "color",
     css: swatchDual("rgba(225,0,205,0.95)", "rgba(255,0,155,0.80)", "#070007"),
     paint: (ctx, w, h) => darkGlow(ctx, w, h, "#070007", [
       { cx: 0.28, cy: 0.50, color: "rgba(225,0,205,0.95)",  rf: 0.40 }, // left bloom
@@ -350,6 +363,7 @@ export const BACKGROUNDS: Background[] = [
   {
     id: "teal",
     name: "Teal",
+    category: "color",
     css: swatchRadial("rgba(0,205,172,0.98)", "#000908"),
     paint: (ctx, w, h) => darkGlow(ctx, w, h, "#000908", [
       { cx: 0.40, cy: 0.52, color: "rgba(0,205,172,0.98)",  rf: 0.42 },
@@ -363,6 +377,7 @@ export const BACKGROUNDS: Background[] = [
   {
     id: "emerald",
     name: "Emerald",
+    category: "color",
     css: swatchRadial("rgba(0,205,75,0.98)", "#000900"),
     paint: (ctx, w, h) => darkGlow(ctx, w, h, "#000900", [
       { cx: 0.40, cy: 0.52, color: "rgba(0,205,75,0.98)",   rf: 0.42 },
@@ -376,6 +391,7 @@ export const BACKGROUNDS: Background[] = [
   {
     id: "copper",
     name: "Copper",
+    category: "color",
     css: swatchRadial("rgba(200,95,18,0.98)", "#070300"),
     paint: (ctx, w, h) => darkGlow(ctx, w, h, "#070300", [
       { cx: 0.40, cy: 0.52, color: "rgba(200,95,18,0.98)",  rf: 0.42 },
@@ -389,6 +405,7 @@ export const BACKGROUNDS: Background[] = [
   {
     id: "infrared",
     name: "Infrared",
+    category: "color",
     css: swatchDual("rgba(225,20,0,0.95)", "rgba(255,95,0,0.88)", "#050000"),
     paint: (ctx, w, h) => darkGlow(ctx, w, h, "#050000", [
       { cx: 0.25, cy: 0.52, color: "rgba(225,20,0,0.95)",   rf: 0.42 }, // left bloom
@@ -402,6 +419,7 @@ export const BACKGROUNDS: Background[] = [
   {
     id: "white",
     name: "White",
+    category: "color",
     css: "radial-gradient(ellipse at 50% 50%, #ffffff 0%, #f0f0f0 100%)",
     paint: (ctx, w, h) => {
       solid(ctx, w, h, "#fafafa");
@@ -413,6 +431,7 @@ export const BACKGROUNDS: Background[] = [
   {
     id: "black",
     name: "Black",
+    category: "color",
     css: "#000000",
     paint: (ctx, w, h) => {
       solid(ctx, w, h, "#000000");
@@ -427,6 +446,7 @@ export const BACKGROUNDS: Background[] = [
   {
     id: "obsidian",
     name: "Obsidian",
+    category: "gradient",
     css: "linear-gradient(135deg, #0f0f11 0%, #1a1a2e 50%, #0f0f11 100%)",
     paint: (ctx, w, h) => {
       linear(ctx, w, h, [
@@ -440,6 +460,7 @@ export const BACKGROUNDS: Background[] = [
   {
     id: "midnight",
     name: "Midnight",
+    category: "gradient",
     css: "radial-gradient(ellipse at 30% 40%, #1e1b4b, #0f172a)",
     paint: (ctx, w, h) => {
       solid(ctx, w, h, "#090b14");
@@ -451,6 +472,7 @@ export const BACKGROUNDS: Background[] = [
   {
     id: "carbon",
     name: "Carbon",
+    category: "gradient",
     css: "linear-gradient(160deg, #1c1c1e 0%, #2c2c2e 100%)",
     paint: (ctx, w, h) => {
       linear(ctx, w, h, [
@@ -464,6 +486,7 @@ export const BACKGROUNDS: Background[] = [
   {
     id: "deep_space",
     name: "Deep Space",
+    category: "gradient",
     css: "radial-gradient(ellipse at 60% 30%, #0c1445, #000000)",
     paint: (ctx, w, h) => {
       solid(ctx, w, h, "#000000");
@@ -478,6 +501,7 @@ export const BACKGROUNDS: Background[] = [
   {
     id: "aurora",
     name: "Aurora",
+    category: "gradient",
     css: "radial-gradient(ellipse at 25% 60%, #0d9488, #6d28d9)",
     paint: (ctx, w, h) =>
       meshGradient(ctx, w, h, "#05080f", [
@@ -489,6 +513,7 @@ export const BACKGROUNDS: Background[] = [
   {
     id: "nebula",
     name: "Nebula",
+    category: "gradient",
     css: "radial-gradient(ellipse at 70% 30%, #7c3aed, #db2777)",
     paint: (ctx, w, h) =>
       meshGradient(ctx, w, h, "#0a040f", [
@@ -500,6 +525,7 @@ export const BACKGROUNDS: Background[] = [
   {
     id: "northern",
     name: "Northern",
+    category: "gradient",
     css: "radial-gradient(ellipse at 40% 50%, #064e3b, #1e3a5f)",
     paint: (ctx, w, h) =>
       meshGradient(ctx, w, h, "#020d09", [
@@ -514,6 +540,7 @@ export const BACKGROUNDS: Background[] = [
   {
     id: "cosmic",
     name: "Cosmic",
+    category: "gradient",
     css: "linear-gradient(135deg, #1a0533 0%, #4f1787 40%, #e91e8c 100%)",
     paint: (ctx, w, h) => {
       linear(ctx, w, h, [
@@ -528,6 +555,7 @@ export const BACKGROUNDS: Background[] = [
   {
     id: "horizon",
     name: "Horizon",
+    category: "gradient",
     css: "linear-gradient(160deg, #0f2027 0%, #203a43 50%, #2c5364 100%)",
     paint: (ctx, w, h) => {
       linear(ctx, w, h, [
@@ -542,6 +570,7 @@ export const BACKGROUNDS: Background[] = [
   {
     id: "rose_gold",
     name: "Rose Gold",
+    category: "gradient",
     css: "linear-gradient(135deg, #b76e79 0%, #f4c2c2 50%, #e8a87c 100%)",
     paint: (ctx, w, h) => {
       linear(ctx, w, h, [
@@ -556,6 +585,7 @@ export const BACKGROUNDS: Background[] = [
   {
     id: "forest_vivid",
     name: "Forest Vivid",
+    category: "gradient",
     css: "linear-gradient(135deg, #1b4332 0%, #2d6a4f 50%, #52b788 100%)",
     paint: (ctx, w, h) => {
       linear(ctx, w, h, [
@@ -573,6 +603,7 @@ export const BACKGROUNDS: Background[] = [
   {
     id: "slate",
     name: "Slate",
+    category: "gradient",
     css: "linear-gradient(160deg, #334155 0%, #1e293b 100%)",
     paint: (ctx, w, h) => {
       linear(ctx, w, h, [
@@ -585,6 +616,7 @@ export const BACKGROUNDS: Background[] = [
   {
     id: "studio_neutral",
     name: "Studio Neutral",
+    category: "gradient",
     css: "linear-gradient(160deg, #f8fafc 0%, #e2e8f0 100%)",
     paint: (ctx, w, h) => {
       linear(ctx, w, h, [
@@ -598,6 +630,7 @@ export const BACKGROUNDS: Background[] = [
   {
     id: "warm_white",
     name: "Warm White",
+    category: "gradient",
     css: "linear-gradient(135deg, #fefce8 0%, #fef3c7 100%)",
     paint: (ctx, w, h) => {
       linear(ctx, w, h, [
@@ -613,6 +646,7 @@ export const BACKGROUNDS: Background[] = [
   {
     id: "pro_office",
     name: "Office",
+    category: "image",
     css: "url('/bg/office.png') center/cover",
     url: "/bg/office.png",
     paint: (ctx, w, h) => image(ctx, w, h, "/bg/office.png"),
@@ -620,6 +654,7 @@ export const BACKGROUNDS: Background[] = [
   {
     id: "pro_studio",
     name: "Studio",
+    category: "image",
     css: "url('/bg/studio.png') center/cover",
     url: "/bg/studio.png",
     paint: (ctx, w, h) => image(ctx, w, h, "/bg/studio.png"),
@@ -627,6 +662,7 @@ export const BACKGROUNDS: Background[] = [
   {
     id: "pro_boardroom",
     name: "Boardroom",
+    category: "image",
     css: "url('/bg/boardroom.png') center/cover",
     url: "/bg/boardroom.png",
     paint: (ctx, w, h) => image(ctx, w, h, "/bg/boardroom.png"),
@@ -639,6 +675,7 @@ export const BACKGROUNDS: Background[] = [
   {
     id: "ray_pulse",
     name: "Pulse",
+    category: "wallpaper",
     css: "linear-gradient(135deg, #ff0080 0%, #7928ca 50%, #2563eb 100%)",
     paint: (ctx, w, h) =>
       meshGradient(ctx, w, h, "#0a0014", [
@@ -651,6 +688,7 @@ export const BACKGROUNDS: Background[] = [
   {
     id: "ray_glass",
     name: "Glass",
+    category: "wallpaper",
     css: "linear-gradient(135deg, #06b6d4 0%, #3b82f6 50%, #8b5cf6 100%)",
     paint: (ctx, w, h) =>
       meshGradient(ctx, w, h, "#03060f", [
@@ -663,6 +701,7 @@ export const BACKGROUNDS: Background[] = [
   {
     id: "ray_sunset",
     name: "Sunset",
+    category: "wallpaper",
     css: "linear-gradient(135deg, #fbbf24 0%, #f97316 45%, #db2777 100%)",
     paint: (ctx, w, h) =>
       meshGradient(ctx, w, h, "#1a0010", [
@@ -675,6 +714,7 @@ export const BACKGROUNDS: Background[] = [
   {
     id: "ray_mint",
     name: "Mint",
+    category: "wallpaper",
     css: "linear-gradient(135deg, #6ee7b7 0%, #22d3ee 50%, #6366f1 100%)",
     paint: (ctx, w, h) =>
       meshGradient(ctx, w, h, "#03100c", [
@@ -686,6 +726,7 @@ export const BACKGROUNDS: Background[] = [
   {
     id: "ray_blossom",
     name: "Blossom",
+    category: "wallpaper",
     css: "linear-gradient(135deg, #fda4af 0%, #f472b6 50%, #a855f7 100%)",
     paint: (ctx, w, h) =>
       meshGradient(ctx, w, h, "#15041a", [
@@ -697,6 +738,7 @@ export const BACKGROUNDS: Background[] = [
   {
     id: "ray_ocean",
     name: "Ocean",
+    category: "wallpaper",
     css: "linear-gradient(135deg, #1e3a8a 0%, #0ea5e9 50%, #06b6d4 100%)",
     paint: (ctx, w, h) =>
       meshGradient(ctx, w, h, "#020617", [
@@ -709,6 +751,7 @@ export const BACKGROUNDS: Background[] = [
   {
     id: "ray_lava",
     name: "Lava",
+    category: "wallpaper",
     css: "linear-gradient(135deg, #7c2d12 0%, #dc2626 45%, #f59e0b 100%)",
     paint: (ctx, w, h) =>
       meshGradient(ctx, w, h, "#150403", [
@@ -720,6 +763,7 @@ export const BACKGROUNDS: Background[] = [
   {
     id: "ray_aurora2",
     name: "Polaris",
+    category: "wallpaper",
     css: "linear-gradient(135deg, #064e3b 0%, #0891b2 45%, #6366f1 100%)",
     paint: (ctx, w, h) =>
       meshGradient(ctx, w, h, "#020a10", [
@@ -732,6 +776,7 @@ export const BACKGROUNDS: Background[] = [
   {
     id: "ray_candy",
     name: "Candy",
+    category: "wallpaper",
     css: "linear-gradient(135deg, #f0abfc 0%, #818cf8 50%, #22d3ee 100%)",
     paint: (ctx, w, h) =>
       meshGradient(ctx, w, h, "#0a0418", [
@@ -743,6 +788,7 @@ export const BACKGROUNDS: Background[] = [
   {
     id: "ray_void",
     name: "Void",
+    category: "wallpaper",
     css: "linear-gradient(135deg, #18181b 0%, #3f3f46 50%, #71717a 100%)",
     paint: (ctx, w, h) =>
       meshGradient(ctx, w, h, "#050507", [
@@ -754,6 +800,7 @@ export const BACKGROUNDS: Background[] = [
   {
     id: "ray_solar",
     name: "Solar",
+    category: "wallpaper",
     css: "linear-gradient(135deg, #facc15 0%, #f97316 50%, #b91c1c 100%)",
     paint: (ctx, w, h) =>
       meshGradient(ctx, w, h, "#15030a", [
@@ -765,6 +812,7 @@ export const BACKGROUNDS: Background[] = [
   {
     id: "ray_iris",
     name: "Iris",
+    category: "wallpaper",
     css: "linear-gradient(135deg, #4f46e5 0%, #ec4899 50%, #f59e0b 100%)",
     paint: (ctx, w, h) =>
       meshGradient(ctx, w, h, "#0a0418", [

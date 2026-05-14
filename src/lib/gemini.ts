@@ -59,7 +59,14 @@ t should be the exact timestamp provided for each frame. x and y must be normali
 /**
  * Uses Gemini 1.5 Flash to transcribe the audio from a recording.
  */
-export async function transcribeAudioAI(blob: Blob): Promise<Subtitle[]> {
+/**
+ * Uses Gemini 1.5 Flash to transcribe the audio and generate a summary + title.
+ */
+export async function analyzeRecordingAI(blob: Blob): Promise<{
+  subtitles: Subtitle[];
+  summary: string;
+  title: string;
+}> {
   if (!genAI) throw new Error("Gemini API key not configured");
 
   const model = genAI.getGenerativeModel({
@@ -76,10 +83,21 @@ export async function transcribeAudioAI(blob: Blob): Promise<Subtitle[]> {
     reader.readAsDataURL(audioBlob);
   });
 
-  const prompt = `Transcribe this audio recording precisely. 
-Return a JSON array of objects: { "start": number, "end": number, "text": string }.
-Break the text into short, readable phrases suitable for video subtitles (3-7 words per subtitle).
-Ensure timestamps are accurate and align with the speech.`;
+  const prompt = `You are a professional video editor and copywriter. Analyze this audio recording from a screen recording.
+  
+  Perform three tasks:
+  1. Transcribe the audio precisely. Break the text into short, readable phrases suitable for video subtitles (3-7 words per subtitle).
+  2. Write a concise, engaging summary of what is happening or being discussed in the recording.
+  3. Suggest a professional, "catchy" title for the video.
+
+  Return a JSON object: 
+  { 
+    "subtitles": [ { "start": number, "end": number, "text": string } ],
+    "summary": "string",
+    "title": "string"
+  }
+  
+  Ensure timestamps are accurate and align with the speech.`;
 
   const result = await model.generateContent([
     prompt,
@@ -103,11 +121,15 @@ Ensure timestamps are accurate and align with the speech.`;
 
   try {
     const data = JSON.parse(text);
-    return Array.isArray(data) ? data : [];
+    return {
+      subtitles: Array.isArray(data.subtitles) ? data.subtitles : [],
+      summary: data.summary || "",
+      title: data.title || "Untitled Recording"
+    };
   } catch (e) {
     console.error("Failed to parse Gemini transcription. Raw response:", text);
     console.error(e);
-    return [];
+    return { subtitles: [], summary: "", title: "" };
   }
 }
 

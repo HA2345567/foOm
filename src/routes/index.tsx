@@ -12,13 +12,13 @@ export const Route = createFileRoute("/")({
   component: Index,
   head: () => ({
     meta: [
-      { title: "ZoOmly — AI Screen Recorder That Makes Demos Look Pro" },
+      { title: "foOm — AI Screen Recorder That Makes Demos Look Pro" },
       {
         name: "description",
         content:
           "Record your screen in the browser. AI auto-zoom, silence removal, and subtitles make every demo look cinematic. No downloads required.",
       },
-      { property: "og:title", content: "ZoOmly — AI Screen Recorder" },
+      { property: "og:title", content: "foOm — AI Screen Recorder" },
       {
         property: "og:description",
         content: "Record your screen. AI makes it look pro. No downloads, no editing.",

@@ -26,6 +26,17 @@ export interface ScrollEvent {
   intensity: number;
 }
 
+export interface MouseMoveEvent {
+  t: number;
+  x: number;
+  y: number;
+}
+export interface TypeBurstEvent {
+  t: number;
+  duration: number;
+  keyCount?: number;
+}
+
 export interface PauseEvent {
   /** start time, seconds */
   t: number;
@@ -40,6 +51,8 @@ export interface RecordingResult {
   width: number;
   height: number;
   clicks: ClickEvent[];
+  mouseMoves: MouseMoveEvent[];
+  typeBursts: TypeBurstEvent[];
   scrolls: ScrollEvent[];
   pauses: PauseEvent[];
   mimeType: string;
@@ -78,6 +91,7 @@ export function useScreenRecording() {
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const startTimeRef = useRef(0);
   const clicksRef = useRef<ClickEvent[]>([]);
+  const mouseMovesRef = useRef<MouseMoveEvent[]>([]);
   const scrollsRef = useRef<ScrollEvent[]>([]);
   const pausesRef = useRef<PauseEvent[]>([]);
   const lastActivityRef = useRef<number>(0);
@@ -181,6 +195,22 @@ export function useScreenRecording() {
 
   useEffect(() => {
     if (state !== "recording") return;
+    let lastMove = 0;
+    const handler = (e: MouseEvent) => {
+      const now = Date.now();
+      if (startTimeRef.current === 0 || now - lastMove < 30) return; // Throttle and ensure recording started
+      lastMove = now;
+      const t = (now - startTimeRef.current) / 1000;
+      const x = e.clientX / window.innerWidth;
+      const y = e.clientY / window.innerHeight;
+      mouseMovesRef.current.push({ t, x: Math.max(0, Math.min(1, x)), y: Math.max(0, Math.min(1, y)) });
+    };
+    window.addEventListener("mousemove", handler, { passive: true });
+    return () => window.removeEventListener("mousemove", handler);
+  }, [state]);
+
+  useEffect(() => {
+    if (state !== "recording") return;
     const handler = (e: WheelEvent) => {
       const t = (Date.now() - startTimeRef.current) / 1000;
       const intensity = Math.min(1, Math.abs(e.deltaY) / 500);
@@ -203,6 +233,7 @@ export function useScreenRecording() {
     chunksRef.current = [];
     camChunksRef.current = [];
     clicksRef.current = [];
+    mouseMovesRef.current = [];
     scrollsRef.current = [];
     pausesRef.current = [];
 
@@ -225,6 +256,7 @@ export function useScreenRecording() {
         video: {
           frameRate: { ideal: 30, max: 60 },
           displaySurface: displaySurfaceMap[sourceType],
+          cursor: "never",
         } as MediaTrackConstraints,
         audio: true,
       };
@@ -306,6 +338,8 @@ export function useScreenRecording() {
           cameraShape, duration,
           width: dimsRef.current.w, height: dimsRef.current.h,
           clicks: clicksRef.current.slice(),
+          mouseMoves: mouseMovesRef.current.slice(),
+          typeBursts: [], // TODO: Add type burst recording logic if needed
           scrolls: scrollsRef.current.slice(),
           pauses: pausesRef.current.slice(),
           mimeType,
@@ -394,7 +428,7 @@ export function useScreenRecording() {
     if (!result) return;
     const a = document.createElement("a");
     a.href = result.url;
-    a.download = `zoomly-${Date.now()}.webm`;
+    a.download = `foom-${Date.now()}.webm`;
     document.body.appendChild(a); a.click(); document.body.removeChild(a);
   }, [result]);
 

@@ -5,7 +5,7 @@ export const Route = createFileRoute("/record")({
   component: RecordPage,
   head: () => ({
     meta: [
-      { title: "Record — ZoOmly" },
+      { title: "Record — foOm" },
       { name: "description", content: "Start a new screen recording with AI auto-zoom, mic, and webcam." },
     ],
   }),

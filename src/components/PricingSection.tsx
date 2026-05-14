@@ -1,52 +1,52 @@
 import { motion } from "framer-motion";
 import { Check } from "lucide-react";
+import { useEffect, useState } from "react";
 import { Link } from "@tanstack/react-router";
-
-const plans = [
-  {
-    name: "Free",
-    price: "$0",
-    description: "Perfect for quick product walkthroughs.",
-    features: [
-      "5 recordings per month",
-      "720p max resolution",
-      "Product watermark",
-      "Basic auto-zoom",
-    ],
-    cta: "Start for free",
-    highlight: false,
-  },
-  {
-    name: "Pro",
-    price: "$18",
-    description: "For founders and power users.",
-    features: [
-      "Unlimited recordings",
-      "1080p HD export",
-      "No watermark",
-      "AI Subtitles & Smart Trim",
-      "Custom branding",
-    ],
-    cta: "Go Pro",
-    highlight: true,
-  },
-  {
-    name: "Team",
-    price: "$45",
-    description: "Scale your product demos together.",
-    features: [
-      "Everything in Pro",
-      "Shared team library",
-      "Admin controls",
-      "Priority processing",
-      "Custom domains",
-    ],
-    cta: "Contact Sales",
-    highlight: false,
-  },
-];
+import { PolarEmbedCheckout } from "@polar-sh/checkout/embed";
 
 export function PricingSection() {
+  const plans = [
+    {
+      name: "Free",
+      price: "$0",
+      description: "Perfect for quick product walkthroughs.",
+      features: [
+        "5 recordings per month",
+        "720p max resolution",
+        "Product watermark",
+        "Basic auto-zoom",
+      ],
+      cta: "Start for free",
+      highlight: false,
+      href: "/record",
+      isExternal: false,
+    },
+    {
+      name: "Pro",
+      price: "$25",
+      description: "For founders and power users.",
+      features: [
+        "Unlimited recordings",
+        "1080p HD export",
+        "No watermark",
+        "AI Subtitles & Smart Trim",
+        "Custom branding",
+      ],
+      cta: "Get Access",
+      highlight: true,
+      href: "https://polar.sh/checkout/polar_c_0mPJOWfoIhDqTIEwCfQpquBgZHEXiFa8hzPTt0sN6yn?success_url=http://localhost:8080/record",
+      isExternal: true,
+    },
+  ];
+
+  useEffect(() => {
+    // Small delay to ensure script is loaded and ready
+    const timer = setTimeout(() => {
+      PolarEmbedCheckout.init();
+    }, 500);
+    return () => clearTimeout(timer);
+  }, []);
+
   return (
     <section id="pricing" className="py-24 md:py-32 px-6 bg-background">
       <div className="mx-auto max-w-7xl">
@@ -63,7 +63,7 @@ export function PricingSection() {
           </motion.h2>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-8 max-w-5xl">
           {plans.map((plan, index) => (
             <motion.div
               key={plan.name}
@@ -71,9 +71,8 @@ export function PricingSection() {
               whileInView={{ opacity: 1, y: 0 }}
               viewport={{ once: true }}
               transition={{ delay: index * 0.1 }}
-              className={`p-10 rounded-2xl border ${
-                plan.highlight ? "border-white" : "border-border"
-              } bg-card shadow-card relative flex flex-col`}
+              className={`p-10 rounded-2xl border ${plan.highlight ? "border-white" : "border-border"
+                } bg-card shadow-card relative flex flex-col`}
             >
               <div className="mb-8">
                 <h3 className="text-[14px] font-bold uppercase tracking-widest text-muted-foreground mb-4">
@@ -99,16 +98,29 @@ export function PricingSection() {
                 ))}
               </ul>
 
-              <Link
-                to="/record"
-                className={`w-full py-4 rounded-lg font-bold text-sm transition-all text-center ${
-                  plan.highlight
-                    ? "bg-white text-black shadow-button hover:opacity-90"
-                    : "border border-border text-white hover:bg-secondary"
-                }`}
-              >
-                {plan.cta}
-              </Link>
+              {plan.isExternal ? (
+                <a
+                  href={plan.href}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className={`w-full py-4 rounded-lg font-bold text-sm transition-all text-center cursor-pointer ${plan.highlight
+                      ? "bg-white text-black shadow-button hover:opacity-90"
+                      : "border border-border text-white hover:bg-secondary"
+                    }`}
+                >
+                  {plan.cta}
+                </a>
+              ) : (
+                <Link
+                  to={plan.href as any}
+                  className={`w-full py-4 rounded-lg font-bold text-sm transition-all text-center ${plan.highlight
+                      ? "bg-white text-black shadow-button hover:opacity-90"
+                      : "border border-border text-white hover:bg-secondary"
+                    }`}
+                >
+                  {plan.cta}
+                </Link>
+              )}
             </motion.div>
           ))}
         </div>

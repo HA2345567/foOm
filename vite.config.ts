@@ -10,8 +10,8 @@ export default defineConfig({
   vite: {
     server: {
       headers: {
-        "Cross-Origin-Embedder-Policy": "require-corp",
-        "Cross-Origin-Opener-Policy": "same-origin",
+        "Cross-Origin-Embedder-Policy": "credentialless",
+        "Cross-Origin-Opener-Policy": "same-origin-allow-popups",
       },
     },
     optimizeDeps: {

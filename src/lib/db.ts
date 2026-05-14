@@ -1,4 +1,4 @@
-const DB_NAME = "ZoOmlyDB";
+const DB_NAME = "foOmDB";
 const STORE_NAME = "recordings";
 const RECORDING_KEY = "latest_recording";
 

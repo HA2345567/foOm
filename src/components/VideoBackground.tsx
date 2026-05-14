@@ -50,11 +50,12 @@ export function VideoBackground({ src }: VideoBackgroundProps) {
       {/* 1. The Video Layer - Centered better to ensure the vortex is visible */}
       <video
         ref={videoRef}
+        autoPlay
         muted
         loop
         playsInline
         className="absolute inset-0 w-full h-full object-cover opacity-100 scale-125 origin-top translate-y-[5%]"
-        style={{ filter: 'contrast(1.1) brightness(1.2)' }}
+        style={{ filter: 'contrast(1.2) brightness(1.3)' }}
       />
 
       {/* 2. Refined Vignette (Lighter at top, deep at bottom) */}

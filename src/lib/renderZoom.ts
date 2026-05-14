@@ -9,6 +9,7 @@ import {
 } from "./backgrounds";
 import * as WebMMuxer from "webm-muxer";
 import * as MP4Muxer from "mp4-muxer";
+import { type AudioSegment } from "./audioAnalysis";
 
 export interface RenderProgress {
   stage: "preparing" | "rendering" | "encoding" | "done";
@@ -43,6 +44,19 @@ export async function renderAutoZoom(
     frame: FrameStyle;
     subtitles?: Subtitle[];
     clicksOverride?: RecordingResult["clicks"];
+    cameraX?: number;
+    cameraY?: number;
+    cameraSize?: number;
+    cameraShape?: "circle" | "square" | "rounded";
+    cameraZoom?: number;
+    mouseMoves?: { t: number, x: number, y: number }[];
+    showCursor?: boolean;
+    removeSilence?: boolean;
+    segments?: AudioSegment[];
+    trimStart?: number;
+    trimEnd?: number;
+    aspectRatio?: "16:9" | "9:16" | "1:1";
+    feel?: "glass" | "velvet" | "silk" | "snap";
     onProgress?: (p: RenderProgress) => void;
   },
 ): Promise<RenderOutput> {
@@ -103,6 +117,24 @@ export async function renderAutoZoom(
     video.onerror = () => reject(new Error("Video failed to load"));
     video.load();
   });
+
+  // ── Load camera video if exists ───────────────────────────────────────────
+  let cameraVideo: HTMLVideoElement | null = null;
+  if (recording.cameraUrl) {
+    cameraVideo = document.createElement("video");
+    cameraVideo.src = recording.cameraUrl;
+    cameraVideo.muted = true;
+    cameraVideo.playsInline = true;
+    cameraVideo.crossOrigin = "anonymous";
+    cameraVideo.preload = "auto";
+    cameraVideo.playbackRate = 1.0;
+    await new Promise<void>((resolve) => {
+      cameraVideo!.onloadedmetadata = () => resolve();
+      cameraVideo!.onerror = () => { cameraVideo = null; resolve(); };
+      cameraVideo!.load();
+    });
+  }
+
   await new Promise<void>((resolve) => {
     if (video.readyState >= 4) return resolve();
     const onReady = () => { video.removeEventListener("canplaythrough", onReady); resolve(); };
@@ -114,10 +146,20 @@ export async function renderAutoZoom(
   const srcH = recording.height || video.videoHeight || 720;
   const srcAspect = srcW / srcH;
 
-  const outH = Math.min(preset.targetH, srcH * 2);
-  // Both encoders prefer even dims; H.264 in particular requires it.
-  const outW = Math.round(outH * srcAspect) & ~1;
-  const outHEven = outH & ~1;
+  const outH_target = preset.targetH;
+  let outW, outHEven;
+
+  if (opts.aspectRatio === "9:16") {
+    outHEven = outH_target & ~1;
+    outW = Math.round(outHEven * (9 / 16)) & ~1;
+  } else if (opts.aspectRatio === "1:1") {
+    outHEven = outH_target & ~1;
+    outW = outHEven;
+  } else {
+    // Default 16:9 or auto
+    outHEven = outH_target & ~1;
+    outW = Math.round(outHEven * (16 / 9)) & ~1;
+  }
 
   const canvas = new OffscreenCanvas(outW, outHEven);
   const ctx = canvas.getContext("2d", { alpha: false }) as OffscreenCanvasRenderingContext2D;
@@ -191,6 +233,8 @@ export async function renderAutoZoom(
     height: outHEven,
     bitrate: preset.videoBps,
     framerate: OUTPUT_FPS,
+    latencyMode: "realtime",
+    hardwareAcceleration: "prefer-hardware",
     ...(format === "mp4" ? { avc: { format: "avc" } as AvcEncoderConfig } : {}),
   });
 
@@ -217,58 +261,206 @@ export async function renderAutoZoom(
     }
   }
 
-  // Encode audio in chunks of ~50ms
+  // Encode audio in chunks
   if (audioEncoder && audioBuffer) {
     const totalFrames = audioBuffer.length;
     const chunkFrames = Math.max(1, Math.floor(sampleRate * 0.05)); // 50ms
-    const interleaved = new Float32Array(chunkFrames * channelCount);
-    let frameOffset = 0;
-    while (frameOffset < totalFrames) {
-      const frames = Math.min(chunkFrames, totalFrames - frameOffset);
-      const slice = new Float32Array(frames * channelCount);
-      for (let ch = 0; ch < channelCount; ch++) {
-        const channelData = audioBuffer.getChannelData(ch);
-        for (let i = 0; i < frames; i++) {
-          slice[i * channelCount + ch] = channelData[frameOffset + i];
+    
+    // If removeSilence is true, we only encode the non-silent segments within the trim range
+    if (opts.removeSilence && opts.segments) {
+      const trimStart = opts.trimStart ?? 0;
+      const trimEnd = opts.trimEnd ?? recording.duration;
+      const activeSegments = opts.segments
+        .filter(s => s.end > trimStart && s.start < trimEnd)
+        .map(s => ({
+          start: Math.max(trimStart, s.start),
+          end: Math.min(trimEnd, s.end)
+        }));
+
+      let logicalTimeUs = 0;
+      for (const seg of activeSegments) {
+        const startFrame = Math.floor(seg.start * sampleRate);
+        const endFrame = Math.min(totalFrames, Math.floor(seg.end * sampleRate));
+        
+        for (let f = startFrame; f < endFrame; f += chunkFrames) {
+          const frames = Math.min(chunkFrames, endFrame - f);
+          const slice = new Float32Array(frames * channelCount);
+          for (let ch = 0; ch < channelCount; ch++) {
+            const data = audioBuffer.getChannelData(ch);
+            for (let i = 0; i < frames; i++) {
+              slice[i * channelCount + ch] = data[f + i];
+            }
+          }
+          const ad = new AudioData({
+            format: "f32",
+            sampleRate,
+            numberOfFrames: frames,
+            numberOfChannels: channelCount,
+            timestamp: logicalTimeUs,
+            data: slice,
+          });
+          audioEncoder.encode(ad);
+          ad.close();
+          logicalTimeUs += Math.round((frames / sampleRate) * 1_000_000);
         }
       }
-      const ad = new AudioData({
-        format: "f32",
-        sampleRate,
-        numberOfFrames: frames,
-        numberOfChannels: channelCount,
-        timestamp: Math.round((frameOffset / sampleRate) * 1_000_000),
-        data: slice,
-      });
-      audioEncoder.encode(ad);
-      ad.close();
-      frameOffset += frames;
+    } else {
+      const trimStart = opts.trimStart ?? 0;
+      const trimEnd = opts.trimEnd ?? recording.duration;
+      const startFrame = Math.floor(trimStart * sampleRate);
+      const endFrame = Math.min(totalFrames, Math.floor(trimEnd * sampleRate));
+      
+      let frameOffset = startFrame;
+      let logicalTimeUs = 0;
+      while (frameOffset < endFrame) {
+        const frames = Math.min(chunkFrames, endFrame - frameOffset);
+        const slice = new Float32Array(frames * channelCount);
+        for (let ch = 0; ch < channelCount; ch++) {
+          const channelData = audioBuffer.getChannelData(ch);
+          for (let i = 0; i < frames; i++) {
+            slice[i * channelCount + ch] = channelData[frameOffset + i];
+          }
+        }
+        const ad = new AudioData({
+          format: "f32",
+          sampleRate,
+          numberOfFrames: frames,
+          numberOfChannels: channelCount,
+          timestamp: logicalTimeUs,
+          data: slice,
+        });
+        audioEncoder.encode(ad);
+        ad.close();
+        frameOffset += frames;
+        logicalTimeUs += Math.round((frames / sampleRate) * 1_000_000);
+      }
     }
   }
 
-  // ── Render frames via requestVideoFrameCallback ───────────────────────────
+  // ── Render frames ────────────────────────────────────────────────────────
   let frameIndex = 0;
   let lastReportedPct = -1;
-  onProgress({ stage: "rendering", percent: 0 });
+  const trimStart = opts.trimStart ?? 0;
+  const trimEnd = opts.trimEnd ?? recording.duration;
 
-  await new Promise<void>((resolve, reject) => {
-    const onFrame = (_now: DOMHighResTimeStamp, metadata: VideoFrameCallbackMetadata) => {
-      if (videoError) { reject(videoError); return; }
+  const totalDuration = opts.removeSilence && opts.segments
+    ? opts.segments
+        .filter(s => s.end > trimStart && s.start < trimEnd)
+        .reduce((sum, s) => sum + (Math.min(trimEnd, s.end) - Math.max(trimStart, s.start)), 0)
+    : trimEnd - trimStart;
 
-      const t = metadata.mediaTime;
-      const timestampUs = Math.round(t * 1_000_000);
-      const frameDurationUs = Math.round((1 / OUTPUT_FPS) * 1_000_000);
+  if (opts.removeSilence && opts.segments) {
+    const activeSegments = opts.segments
+      .filter(s => s.end > trimStart && s.start < trimEnd)
+      .map(s => ({
+        start: Math.max(trimStart, s.start),
+        end: Math.min(trimEnd, s.end)
+      }));
+
+    let logicalTime = 0;
+    for (const seg of activeSegments) {
+      let segTime = seg.start;
+      while (segTime < seg.end) {
+        const timestampUs = Math.round(logicalTime * 1_000_000);
+        const frameDurationS = 1 / OUTPUT_FPS;
+        const frameDurationUs = Math.round(frameDurationS * 1_000_000);
+
+        // SMART SEEK: Skip the expensive 'await seeked' for small sequential jumps.
+        const needsSeek = Math.abs(video.currentTime - segTime) > 0.04;
+        video.currentTime = segTime;
+        if (needsSeek) {
+          await new Promise<void>((r) => {
+            const onSeek = () => { video.removeEventListener("seeked", onSeek); r(); };
+            video.addEventListener("seeked", onSeek);
+            setTimeout(r, 60); // Safety timeout
+          });
+        }
+
+        const kf = interpolateZoom(keyframes, segTime);
+        if (cameraVideo) {
+          const camNeedsSeek = Math.abs(cameraVideo.currentTime - segTime) > 0.04;
+          cameraVideo.currentTime = segTime;
+          if (camNeedsSeek) {
+            await new Promise<void>((r) => {
+              const onSeek = () => { cameraVideo!.removeEventListener("seeked", onSeek); r(); };
+              cameraVideo!.addEventListener("seeked", onSeek);
+              setTimeout(r, 60); 
+            });
+          }
+        }
+
+        drawComposite(ctx as unknown as CanvasRenderingContext2D, video, kf, {
+          background: opts.background,
+          frame: opts.frame,
+          subtitles: opts.subtitles,
+          currentTime: segTime,
+          srcW, srcH, outW, outH: outHEven,
+          camera: cameraVideo || undefined,
+          cameraX: opts.cameraX, cameraY: opts.cameraY,
+          cameraSize: opts.cameraSize, cameraShape: opts.cameraShape,
+          cameraZoom: opts.cameraZoom,
+          mouseMoves: opts.mouseMoves,
+          showCursor: opts.showCursor,
+        });
+
+        const outFrame = new VideoFrame(canvas, {
+          timestamp: timestampUs,
+          duration: frameDurationUs,
+          alpha: "discard",
+        });
+
+        const isKey = frameIndex % (OUTPUT_FPS * KEYFRAME_INTERVAL_S) === 0;
+        videoEncoder.encode(outFrame, { keyFrame: isKey });
+        outFrame.close();
+        frameIndex++;
+
+        logicalTime += frameDurationS;
+        segTime += frameDurationS;
+
+        const pct = Math.min(99, Math.round((logicalTime / totalDuration) * 100));
+        if (pct !== lastReportedPct) {
+          lastReportedPct = pct;
+          onProgress({ stage: "rendering", percent: pct });
+        }
+      }
+    }
+  } else {
+    // Linear rendering logic respecting trim range
+    let t = trimStart;
+    while (t < trimEnd) {
+      if (videoError) throw videoError;
+
+      const timestampUs = Math.round((t - trimStart) * 1_000_000);
+      const frameDurationS = 1 / OUTPUT_FPS;
+      const frameDurationUs = Math.round(frameDurationS * 1_000_000);
+
+      video.currentTime = t;
+      await new Promise<void>((r) => {
+        const onSeek = () => { video.removeEventListener("seeked", onSeek); r(); };
+        video.addEventListener("seeked", onSeek);
+      });
 
       const kf = interpolateZoom(keyframes, t);
+      if (cameraVideo) {
+        cameraVideo.currentTime = t;
+        await new Promise<void>((r) => {
+          const onSeek = () => { cameraVideo!.removeEventListener("seeked", onSeek); r(); };
+          cameraVideo!.addEventListener("seeked", onSeek);
+        });
+      }
+
       drawComposite(ctx as unknown as CanvasRenderingContext2D, video, kf, {
         background: opts.background,
         frame: opts.frame,
         subtitles: opts.subtitles,
         currentTime: t,
-        srcW,
-        srcH,
-        outW,
-        outH: outHEven,
+        srcW, srcH, outW, outH: outHEven,
+        camera: cameraVideo || undefined,
+        cameraX: opts.cameraX, cameraY: opts.cameraY,
+        cameraSize: opts.cameraSize, cameraShape: opts.cameraShape,
+        cameraZoom: opts.cameraZoom,
+        mouseMoves: opts.mouseMoves,
+        showCursor: opts.showCursor,
       });
 
       const outFrame = new VideoFrame(canvas, {
@@ -277,29 +469,20 @@ export async function renderAutoZoom(
         alpha: "discard",
       });
 
-      const isKey = frameIndex === 0 || t % KEYFRAME_INTERVAL_S < (1 / OUTPUT_FPS);
+      const isKey = frameIndex % (OUTPUT_FPS * KEYFRAME_INTERVAL_S) === 0;
       videoEncoder.encode(outFrame, { keyFrame: isKey });
       outFrame.close();
       frameIndex++;
 
-      const pct = Math.min(99, Math.round((t / recording.duration) * 100));
+      t += frameDurationS;
+
+      const pct = Math.min(99, Math.round(((t - trimStart) / (trimEnd - trimStart)) * 100));
       if (pct !== lastReportedPct) {
         lastReportedPct = pct;
         onProgress({ stage: "rendering", percent: pct });
       }
-
-      if (t < recording.duration - 0.05) {
-        video.requestVideoFrameCallback(onFrame);
-      } else {
-        resolve();
-      }
-    };
-
-    video.requestVideoFrameCallback(onFrame);
-    video.play().catch(reject);
-    video.addEventListener("ended", () => resolve(), { once: true });
-    setTimeout(() => resolve(), (recording.duration + 10) * 1000);
-  });
+    }
+  }
 
   video.pause();
 

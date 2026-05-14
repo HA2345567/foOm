@@ -4,7 +4,7 @@ const steps = [
   {
     number: "01",
     title: "Open a Tab",
-    description: "No installation required. Just navigate to ZoOmly in any modern browser.",
+    description: "No installation required. Just navigate to foOm in any modern browser.",
   },
   {
     number: "02",

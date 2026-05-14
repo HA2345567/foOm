@@ -80,11 +80,12 @@ export interface ZoomConfig {
   /**
    * Motion feel preset — controls spring stiffness + damping globally.
    * "glass"    → glacial, near-floating cinematic drift
-   * "silk"     → makhan smooth, slow and luxurious  (DEFAULT)
-   * "snap"     → smoother but noticeably quicker — good for dev tools
+   * "velvet"   → ultra-smooth, high inertia, the absolute butter feel
+   * "silk"     → pro-smooth, slow and luxurious (DEFAULT)
+   * "snap"     → quicker but still spring-based — good for dev tools
    * "custom"   → set springStiffness / springDamping / springMass yourself
    */
-  feel?: "glass" | "silk" | "snap" | "custom";
+  feel?: "glass" | "velvet" | "silk" | "snap" | "custom";
 
   // ── Spring physics (only used when feel = "custom") ───────────────────────
   /** Spring stiffness k — lower = slower response (default 1.1 for silk) */
@@ -180,6 +181,7 @@ interface SpringParams { k: number; c: number; m: number }
 // the motion feel like a real camera operator vs. a CSS transform.
 const FEEL_PRESETS: Record<NonNullable<ZoomConfig["feel"]>, SpringParams> = {
   glass: { k: 3.2, c: 3.6, m: 1.0 },
+  velvet: { k: 4.5, c: 4.8, m: 1.2 }, // Slightly heavier, more inertia
   silk: { k: 7.0, c: 5.3, m: 1.0 },
   snap: { k: 18.0, c: 8.5, m: 1.0 },
   custom: { k: 7.0, c: 5.3, m: 1.0 },
@@ -190,6 +192,7 @@ const FEEL_PRESETS: Record<NonNullable<ZoomConfig["feel"]>, SpringParams> = {
 // smooth dolly rather than a hard cut to the new target.
 const POSITION_SPRING_RATIO = 0.55;
 const POSITION_DAMPING_RATIO = 0.92; // slight under-damp = organic settle
+const FOCAL_JITTER_THRESHOLD = 0.025; // 2.5% of frame width
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Internal: ZoomIntent
@@ -599,8 +602,16 @@ export function generateZoomKeyframes(
     const target = resolveTarget(t, intents, blackoutRanges);
     if (target.trigger !== undefined) lastTrigger = target.trigger;
 
-    const liveSafeX = clampFocal(target.x, scaleSpring.p);
-    const liveSafeY = clampFocal(target.y, scaleSpring.p);
+    // Apply focal point hysteresis: only update the spring's goal if the 
+    // target focal point has moved significantly from the current goal.
+    // This filters out jitter and produces much smoother 'dolly' moves.
+    let goalX = xSpring.p;
+    let goalY = ySpring.p;
+    if (Math.abs(target.x - xSpring.p) > FOCAL_JITTER_THRESHOLD) goalX = target.x;
+    if (Math.abs(target.y - ySpring.p) > FOCAL_JITTER_THRESHOLD) goalY = target.y;
+
+    const liveSafeX = clampFocal(goalX, scaleSpring.p);
+    const liveSafeY = clampFocal(goalY, scaleSpring.p);
 
     const nextScale = springStep(scaleSpring, target.scale, k, c, m, simStep);
     const nextX = springStep(xSpring, liveSafeX, kPos, cPos, m, simStep);

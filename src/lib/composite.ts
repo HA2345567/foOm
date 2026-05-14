@@ -20,6 +20,12 @@ export interface CompositeOptions {
   /** PIP size (fraction of output width, default 0.15) */
   cameraSize?: number;
   cameraShape?: "circle" | "square" | "rounded";
+  /** Zoom level for the PIP camera (default 1.0) */
+  cameraZoom?: number;
+  /** Mouse movement data for custom cursor */
+  mouseMoves?: { t: number, x: number, y: number }[];
+  /** Whether to show the designer cursor */
+  showCursor?: boolean;
 }
 
 
@@ -69,8 +75,6 @@ export function drawComposite(
   sy = Math.max(0, Math.min(srcH - sh, sy));
 
   // Scale UI values (radius, shadow) relative to a baseline width of 1280px
-  // This ensures that the exported video looks identical to the preview,
-  // regardless of whether the user exports at 360P or 1080P.
   const scaleRatio = outW / 1280;
   const scaledRadius = frame.radius * scaleRatio;
   const scaledShadow = frame.shadow * scaleRatio;
@@ -137,6 +141,11 @@ export function drawComposite(
     }
   }
 
+  // 6) Designer Cursor
+  if (opts.showCursor && opts.mouseMoves) {
+    drawDesignerCursor(ctx, opts.mouseMoves, opts.currentTime ?? 0, targetX, targetY, targetW, targetH, kf);
+  }
+
   // 7) PIP Camera
   if (opts.camera) {
     ctx.save();
@@ -147,16 +156,13 @@ export function drawComposite(
     let px = cx * outW - pipSize / 2;
     let py = cy * outH - pipSize / 2;
 
-    // Constrain to bounds
     px = Math.max(0, Math.min(outW - pipSize, px));
     py = Math.max(0, Math.min(outH - pipSize, py));
 
-    // Shadow for bubble
     ctx.shadowColor = "rgba(0,0,0,0.3)";
     ctx.shadowBlur = 15 * scaleRatio;
     ctx.shadowOffsetY = 5 * scaleRatio;
 
-    // Shape clip
     ctx.beginPath();
     const shape = opts.cameraShape ?? "circle";
     if (shape === "circle") {
@@ -170,16 +176,15 @@ export function drawComposite(
     ctx.fill();
     ctx.clip();
 
-    // Draw camera (centered crop if possible)
     const cw = opts.camera.width || (opts.camera as any).videoWidth || 320;
     const ch = opts.camera.height || (opts.camera as any).videoHeight || 240;
-    const cSize = Math.min(cw, ch);
+    const zoom = opts.cameraZoom ?? 1.0;
+    const cSize = Math.min(cw, ch) / zoom;
     const csx = (cw - cSize) / 2;
     const csy = (ch - cSize) / 2;
 
     ctx.drawImage(opts.camera, csx, csy, cSize, cSize, px, py, pipSize, pipSize);
     
-    // Border
     ctx.restore();
     ctx.save();
     ctx.strokeStyle = "rgba(255,255,255,0.2)";
@@ -197,6 +202,95 @@ export function drawComposite(
   }
 }
 
+function drawDesignerCursor(
+  ctx: CanvasRenderingContext2D,
+  moves: { t: number, x: number, y: number }[],
+  t: number,
+  panelX: number,
+  panelY: number,
+  panelW: number,
+  panelH: number,
+  kf: ZoomKeyframe
+) {
+  let x, y;
+
+  // 1. Determine Position (Real Data vs. Cinematic Fallback)
+  if (moves.length > 0) {
+    // Standard Interpolation
+    let lo = 0, hi = moves.length - 1;
+    if (t <= moves[0].t) { lo = 0; hi = 0; }
+    else if (t >= moves[hi].t) { lo = hi; hi = hi; }
+    else {
+      while (lo < hi - 1) {
+        const mid = (lo + hi) >> 1;
+        if (moves[mid].t <= t) lo = mid; else hi = mid;
+      }
+    }
+    const a = moves[lo];
+    const b = moves[hi];
+    const span = b.t - a.t;
+    if (span < 0.001) {
+      x = a.x; y = a.y;
+    } else {
+      const r = (t - a.t) / span;
+      x = a.x + (b.x - a.x) * r;
+      y = a.y + (b.y - a.y) * r;
+    }
+  } else {
+    // Fallback: If no mouse data, follow the focus
+    x = kf.x;
+    y = kf.y;
+  }
+
+  const zoomX = (x - kf.x) * kf.scale + 0.5;
+  const zoomY = (y - kf.y) * kf.scale + 0.5;
+
+  const screenX = panelX + zoomX * panelW;
+  const screenY = panelY + zoomY * panelH;
+
+  ctx.save();
+  ctx.translate(screenX, screenY);
+  
+  // Spotlight
+  const aura = ctx.createRadialGradient(0, 0, 0, 0, 0, 30);
+  aura.addColorStop(0, "rgba(255, 255, 255, 0.25)");
+  aura.addColorStop(1, "rgba(255, 255, 255, 0)");
+  ctx.fillStyle = aura;
+  ctx.beginPath();
+  ctx.arc(0, 0, 30, 0, Math.PI * 2);
+  ctx.fill();
+
+  // Vector Body
+  ctx.scale(2.2, 2.2); 
+  ctx.shadowColor = "rgba(0,0,0,0.6)";
+  ctx.shadowBlur = 12;
+  ctx.shadowOffsetY = 5;
+  
+  ctx.beginPath();
+  ctx.moveTo(0, 0);
+  ctx.lineTo(0, 18);
+  ctx.lineTo(5, 14);
+  ctx.lineTo(9, 22);
+  ctx.lineTo(11, 21);
+  ctx.lineTo(7, 13);
+  ctx.lineTo(13, 13);
+  ctx.closePath();
+  
+  ctx.fillStyle = "black";
+  ctx.fill();
+  
+  ctx.strokeStyle = "white";
+  ctx.lineWidth = 1.4;
+  ctx.stroke();
+
+  // Active Tip
+  ctx.fillStyle = "#3b82f6"; 
+  ctx.beginPath();
+  ctx.arc(0, 0, 1.5, 0, Math.PI * 2);
+  ctx.fill();
+
+  ctx.restore();
+}
 
 function roundedRectPath(
   ctx: CanvasRenderingContext2D,

@@ -1,0 +1,28 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model User {
+  id            String      @id @default(cuid())
+  email         String      @unique
+  isPro         Boolean     @default(false)
+  recordingCount Int        @default(0)
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
+  recordings    Recording[]
+}
+
+model Recording {
+  id        String   @id @default(cuid())
+  title     String?
+  url       String
+  duration  Float?
+  size      Int?
+  userId    String
+  user      User     @relation(fields: [userId], references: [id])
+  createdAt DateTime @default(now())
+}

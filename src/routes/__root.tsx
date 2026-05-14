@@ -29,19 +29,30 @@ export const Route = createRootRoute({
     meta: [
       { charSet: "utf-8" },
       { name: "viewport", content: "width=device-width, initial-scale=1" },
-      { title: "Lovable App" },
-      { name: "description", content: "Lovable Generated Project" },
-      { name: "author", content: "Lovable" },
-      { property: "og:title", content: "Lovable App" },
-      { property: "og:description", content: "Lovable Generated Project" },
+      { title: "foOm" },
+      { name: "description", content: "Professional auto-zoom video recorder" },
+      { name: "author", content: "foOm" },
+      { property: "og:title", content: "foOm" },
+      { property: "og:description", content: "Professional auto-zoom video recorder" },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary" },
-      { name: "twitter:site", content: "@Lovable" },
+      { name: "twitter:site", content: "@foOm" },
     ],
     links: [
       {
         rel: "stylesheet",
         href: appCss,
+      },
+      {
+        rel: "icon",
+        type: "image/svg+xml",
+        href: "/logo.svg",
+      },
+    ],
+    scripts: [
+      {
+        src: "https://cdn.jsdelivr.net/npm/@polar-sh/checkout/dist/embed.js",
+        defer: true,
       },
     ],
   }),

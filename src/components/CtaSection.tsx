@@ -28,7 +28,7 @@ export function CtaSection() {
           transition={{ delay: 0.1 }}
           className="mt-8 text-body-large max-w-xl mx-auto"
         >
-          Join 2,000+ founders and engineers using ZoOmly to ship better product updates.
+          Join 2,000+ founders and engineers using foOm to ship better product updates.
         </motion.p>
         
         <motion.div
