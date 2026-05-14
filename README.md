@@ -1,5 +1,5 @@
 <div align="center">
-  <video src="https://github.com/HA2345567/foOm/raw/main/public/foom-vedio.mp4" width="100%" autoplay loop muted playsinline style="border-radius: 12px; box-shadow: 0 20px 50px rgba(0,0,0,0.3); margin-bottom: 24px;"></video>
+  <video src="public/foom-vedio.mp4" width="100%" autoplay loop muted playsinline style="border-radius: 12px; box-shadow: 0 20px 50px rgba(0,0,0,0.3); margin-bottom: 24px;"></video>
 </div>
 
 # foOm — AI-Powered Cinematic Screen Recorder
