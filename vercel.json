@@ -1,8 +1,14 @@
 {
   "version": 2,
-  "buildCommand": "NITRO_PRESET=vercel npm run build",
-  "outputDirectory": ".vercel/output",
+  "buildCommand": "npm run build",
+  "outputDirectory": "dist/client",
   "framework": "vite",
+  "rewrites": [
+    {
+      "source": "/(.*)",
+      "destination": "/api/index"
+    }
+  ],
   "headers": [
     {
       "source": "/(.*)",
