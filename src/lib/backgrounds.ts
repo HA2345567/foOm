@@ -218,676 +218,716 @@ const swatchDual = (c1: string, c2: string, base: string) =>
 // ─────────────────────────────────────────────────────────────────────────────
 
 export const BACKGROUNDS: Background[] = [
-
-  // ── RED ───────────────────────────────────────────────────────────────────
   {
-    id: "crimson",
-    name: "Crimson",
+    id: "default_transparent",
+    name: "Transparent",
     category: "color",
-    css: swatchRadial("rgba(210,0,25,0.98)", "#080000"),
-    paint: (ctx, w, h) => darkGlow(ctx, w, h, "#080000", [
-      { cx: 0.38, cy: 0.52, color: "rgba(210,0,25,0.98)",   rf: 0.42 }, // core
-      { cx: 0.38, cy: 0.52, color: "rgba(160,0,15,0.65)",   rf: 0.78 }, // spread
-      { cx: 0.80, cy: 0.12, color: "rgba(255,40,40,0.30)",  rf: 0.32 }, // specular
-      { cx: 0.10, cy: 0.88, color: "rgba(120,0,10,0.25)",   rf: 0.30 }, // shadow bleed
-    ]),
-  },
-
-  // ── ORANGE ────────────────────────────────────────────────────────────────
-  {
-    id: "ember",
-    name: "Ember",
-    category: "color",
-    css: swatchRadial("rgba(235,85,0,0.98)", "#060200"),
-    paint: (ctx, w, h) => darkGlow(ctx, w, h, "#060200", [
-      { cx: 0.40, cy: 0.55, color: "rgba(235,85,0,0.98)",   rf: 0.44 },
-      { cx: 0.40, cy: 0.55, color: "rgba(190,55,0,0.60)",   rf: 0.80 },
-      { cx: 0.82, cy: 0.14, color: "rgba(255,170,0,0.38)",  rf: 0.34 },
-      { cx: 0.08, cy: 0.80, color: "rgba(150,30,0,0.22)",   rf: 0.28 },
-    ]),
-  },
-
-  // ── YELLOW ────────────────────────────────────────────────────────────────
-  {
-    id: "gold",
-    name: "Gold",
-    category: "color",
-    css: swatchRadial("rgba(225,165,0,0.98)", "#060500"),
-    paint: (ctx, w, h) => darkGlow(ctx, w, h, "#060500", [
-      { cx: 0.40, cy: 0.52, color: "rgba(225,165,0,0.98)",  rf: 0.42 },
-      { cx: 0.40, cy: 0.52, color: "rgba(175,120,0,0.60)",  rf: 0.80 },
-      { cx: 0.82, cy: 0.14, color: "rgba(255,220,30,0.32)", rf: 0.32 },
-      { cx: 0.12, cy: 0.82, color: "rgba(140,80,0,0.20)",   rf: 0.28 },
-    ]),
-  },
-
-  // ── LIME ──────────────────────────────────────────────────────────────────
-  {
-    id: "neon_lime",
-    name: "Neon Lime",
-    category: "color",
-    css: swatchRadial("rgba(90,225,0,0.98)", "#010700"),
-    paint: (ctx, w, h) => darkGlow(ctx, w, h, "#010700", [
-      { cx: 0.40, cy: 0.52, color: "rgba(90,225,0,0.98)",   rf: 0.42 },
-      { cx: 0.40, cy: 0.52, color: "rgba(55,175,0,0.58)",   rf: 0.80 },
-      { cx: 0.82, cy: 0.14, color: "rgba(150,255,30,0.30)", rf: 0.32 },
-      { cx: 0.10, cy: 0.82, color: "rgba(30,130,0,0.20)",   rf: 0.28 },
-    ]),
-  },
-
-  // ── BLUE ──────────────────────────────────────────────────────────────────
-  {
-    id: "sapphire",
-    name: "Sapphire",
-    category: "color",
-    css: swatchRadial("rgba(25,75,255,0.98)", "#00000c"),
-    paint: (ctx, w, h) => darkGlow(ctx, w, h, "#00000c", [
-      { cx: 0.38, cy: 0.52, color: "rgba(25,75,255,0.98)",  rf: 0.44 },
-      { cx: 0.38, cy: 0.52, color: "rgba(10,45,205,0.65)",  rf: 0.80 },
-      { cx: 0.82, cy: 0.14, color: "rgba(80,140,255,0.35)", rf: 0.34 },
-      { cx: 0.10, cy: 0.84, color: "rgba(5,20,140,0.22)",   rf: 0.28 },
-    ]),
-  },
-
-  // ── CYAN ──────────────────────────────────────────────────────────────────
-  {
-    id: "arctic",
-    name: "Arctic",
-    category: "color",
-    css: swatchRadial("rgba(0,205,255,0.98)", "#000910"),
-    paint: (ctx, w, h) => darkGlow(ctx, w, h, "#000910", [
-      { cx: 0.40, cy: 0.52, color: "rgba(0,205,255,0.98)",  rf: 0.42 },
-      { cx: 0.40, cy: 0.52, color: "rgba(0,155,225,0.60)",  rf: 0.80 },
-      { cx: 0.82, cy: 0.14, color: "rgba(100,235,255,0.32)",rf: 0.32 },
-      { cx: 0.10, cy: 0.82, color: "rgba(0,80,140,0.20)",   rf: 0.28 },
-    ]),
-  },
-
-  // ── PURPLE ────────────────────────────────────────────────────────────────
-  {
-    id: "violet",
-    name: "Violet",
-    category: "color",
-    css: swatchRadial("rgba(115,0,255,0.98)", "#030010"),
-    paint: (ctx, w, h) => darkGlow(ctx, w, h, "#030010", [
-      { cx: 0.38, cy: 0.52, color: "rgba(115,0,255,0.98)",  rf: 0.44 },
-      { cx: 0.38, cy: 0.52, color: "rgba(80,0,205,0.65)",   rf: 0.80 },
-      { cx: 0.82, cy: 0.14, color: "rgba(175,70,255,0.32)", rf: 0.34 },
-      { cx: 0.10, cy: 0.84, color: "rgba(50,0,150,0.22)",   rf: 0.28 },
-    ]),
-  },
-
-  // ── PURPLE + PINK dual ────────────────────────────────────────────────────
-  {
-    id: "amethyst",
-    name: "Amethyst",
-    category: "color",
-    css: swatchDual("rgba(170,0,230,0.92)", "rgba(230,0,175,0.85)", "#05000f"),
-    paint: (ctx, w, h) => darkGlow(ctx, w, h, "#05000f", [
-      { cx: 0.25, cy: 0.48, color: "rgba(170,0,230,0.92)",  rf: 0.40 }, // left bloom
-      { cx: 0.72, cy: 0.52, color: "rgba(230,0,175,0.85)",  rf: 0.38 }, // right bloom
-      { cx: 0.48, cy: 0.50, color: "rgba(140,0,210,0.25)",  rf: 0.70 }, // centre blend
-      { cx: 0.50, cy: 0.08, color: "rgba(200,50,255,0.18)", rf: 0.28 }, // top specular
-    ]),
-  },
-
-  // ── PINK ──────────────────────────────────────────────────────────────────
-  {
-    id: "rose",
-    name: "Rose",
-    category: "color",
-    css: swatchRadial("rgba(245,0,118,0.98)", "#090006"),
-    paint: (ctx, w, h) => darkGlow(ctx, w, h, "#090006", [
-      { cx: 0.40, cy: 0.52, color: "rgba(245,0,118,0.98)",  rf: 0.42 },
-      { cx: 0.40, cy: 0.52, color: "rgba(200,0,88,0.62)",   rf: 0.80 },
-      { cx: 0.82, cy: 0.14, color: "rgba(255,70,155,0.32)", rf: 0.32 },
-      { cx: 0.10, cy: 0.82, color: "rgba(140,0,65,0.20)",   rf: 0.28 },
-    ]),
-  },
-
-  // ── MAGENTA dual ──────────────────────────────────────────────────────────
-  {
-    id: "magenta",
-    name: "Magenta",
-    category: "color",
-    css: swatchDual("rgba(225,0,205,0.95)", "rgba(255,0,155,0.80)", "#070007"),
-    paint: (ctx, w, h) => darkGlow(ctx, w, h, "#070007", [
-      { cx: 0.28, cy: 0.50, color: "rgba(225,0,205,0.95)",  rf: 0.40 }, // left bloom
-      { cx: 0.74, cy: 0.50, color: "rgba(255,0,155,0.80)",  rf: 0.38 }, // right bloom
-      { cx: 0.50, cy: 0.50, color: "rgba(190,0,220,0.22)",  rf: 0.72 }, // centre blend
-      { cx: 0.50, cy: 0.10, color: "rgba(220,0,180,0.16)",  rf: 0.26 }, // top specular
-    ]),
-  },
-
-  // ── TEAL ──────────────────────────────────────────────────────────────────
-  {
-    id: "teal",
-    name: "Teal",
-    category: "color",
-    css: swatchRadial("rgba(0,205,172,0.98)", "#000908"),
-    paint: (ctx, w, h) => darkGlow(ctx, w, h, "#000908", [
-      { cx: 0.40, cy: 0.52, color: "rgba(0,205,172,0.98)",  rf: 0.42 },
-      { cx: 0.40, cy: 0.52, color: "rgba(0,158,138,0.62)",  rf: 0.80 },
-      { cx: 0.82, cy: 0.14, color: "rgba(0,245,205,0.30)",  rf: 0.32 },
-      { cx: 0.10, cy: 0.82, color: "rgba(0,90,80,0.20)",    rf: 0.28 },
-    ]),
-  },
-
-  // ── GREEN ─────────────────────────────────────────────────────────────────
-  {
-    id: "emerald",
-    name: "Emerald",
-    category: "color",
-    css: swatchRadial("rgba(0,205,75,0.98)", "#000900"),
-    paint: (ctx, w, h) => darkGlow(ctx, w, h, "#000900", [
-      { cx: 0.40, cy: 0.52, color: "rgba(0,205,75,0.98)",   rf: 0.42 },
-      { cx: 0.40, cy: 0.52, color: "rgba(0,158,55,0.62)",   rf: 0.80 },
-      { cx: 0.82, cy: 0.14, color: "rgba(30,245,100,0.30)", rf: 0.32 },
-      { cx: 0.10, cy: 0.82, color: "rgba(0,90,30,0.20)",    rf: 0.28 },
-    ]),
-  },
-
-  // ── COPPER ────────────────────────────────────────────────────────────────
-  {
-    id: "copper",
-    name: "Copper",
-    category: "color",
-    css: swatchRadial("rgba(200,95,18,0.98)", "#070300"),
-    paint: (ctx, w, h) => darkGlow(ctx, w, h, "#070300", [
-      { cx: 0.40, cy: 0.52, color: "rgba(200,95,18,0.98)",  rf: 0.42 },
-      { cx: 0.40, cy: 0.52, color: "rgba(165,68,8,0.62)",   rf: 0.80 },
-      { cx: 0.82, cy: 0.14, color: "rgba(245,140,38,0.35)", rf: 0.32 },
-      { cx: 0.10, cy: 0.82, color: "rgba(110,40,5,0.22)",   rf: 0.28 },
-    ]),
-  },
-
-  // ── RED + ORANGE dual ─────────────────────────────────────────────────────
-  {
-    id: "infrared",
-    name: "Infrared",
-    category: "color",
-    css: swatchDual("rgba(225,20,0,0.95)", "rgba(255,95,0,0.88)", "#050000"),
-    paint: (ctx, w, h) => darkGlow(ctx, w, h, "#050000", [
-      { cx: 0.25, cy: 0.52, color: "rgba(225,20,0,0.95)",   rf: 0.42 }, // left bloom
-      { cx: 0.72, cy: 0.48, color: "rgba(255,95,0,0.88)",   rf: 0.40 }, // right bloom
-      { cx: 0.48, cy: 0.50, color: "rgba(200,40,0,0.28)",   rf: 0.75 }, // centre blend
-      { cx: 0.50, cy: 0.10, color: "rgba(255,60,0,0.18)",   rf: 0.26 }, // top specular
-    ]),
-  },
-
-  // ── PURE ──────────────────────────────────────────────────────────────────
-  {
-    id: "white",
-    name: "White",
-    category: "color",
-    css: "radial-gradient(ellipse at 50% 50%, #ffffff 0%, #f0f0f0 100%)",
-    paint: (ctx, w, h) => {
-      solid(ctx, w, h, "#fafafa");
-      radialGlow(ctx, w, h, 0.5, 0.5, "rgba(255,255,255,0.90)", 0.55);
-      radialGlow(ctx, w, h, 0.5, 0.5, "rgba(200,200,200,0.35)", 0.95);
-      grain(ctx, w, h, 4);
-    },
+    css: "transparent",
+    paint: (ctx, w, h) => { ctx.clearRect(0, 0, w, h); },
   },
   {
-    id: "black",
-    name: "Black",
-    category: "color",
-    css: "#000000",
-    paint: (ctx, w, h) => {
-      solid(ctx, w, h, "#000000");
-      radialGlow(ctx, w, h, 0.38, 0.48, "rgba(30,30,30,0.70)", 0.55);
-      radialGlow(ctx, w, h, 0.82, 0.18, "rgba(20,20,20,0.30)", 0.35);
-      grain(ctx, w, h, 12);
-    },
-  },
-
-  // ── PREMIUM DARK ───────────────────────────────────────────────────────────
-
-  {
-    id: "obsidian",
-    name: "Obsidian",
+    id: "bg_Screenshot_2026_05_17_214005_png",
+    name: "Gradient 1",
     category: "gradient",
-    css: "linear-gradient(135deg, #0f0f11 0%, #1a1a2e 50%, #0f0f11 100%)",
-    paint: (ctx, w, h) => {
-      linear(ctx, w, h, [
-        [0,   "#0f0f11"],
-        [0.5, "#1a1a2e"],
-        [1,   "#0d0d0f"],
-      ], 135);
-      grain(ctx, w, h, 8);
-    },
+    css: "url('/bg/Screenshot 2026-05-17 214005.png') center/cover",
+    url: "/bg/Screenshot 2026-05-17 214005.png",
+    paint: (ctx, w, h) => image(ctx, w, h, "/bg/Screenshot 2026-05-17 214005.png"),
   },
   {
-    id: "midnight",
-    name: "Midnight",
+    id: "bg_Screenshot_2026_05_17_214214_png",
+    name: "Gradient 2",
     category: "gradient",
-    css: "radial-gradient(ellipse at 30% 40%, #1e1b4b, #0f172a)",
-    paint: (ctx, w, h) => {
-      solid(ctx, w, h, "#090b14");
-      radialGlow(ctx, w, h, 0.3, 0.38, "rgba(79,70,229,0.55)", 0.6);
-      radialGlow(ctx, w, h, 0.75, 0.65, "rgba(139,92,246,0.25)", 0.45);
-      grain(ctx, w, h, 10);
-    },
+    css: "url('/bg/Screenshot 2026-05-17 214214.png') center/cover",
+    url: "/bg/Screenshot 2026-05-17 214214.png",
+    paint: (ctx, w, h) => image(ctx, w, h, "/bg/Screenshot 2026-05-17 214214.png"),
   },
   {
-    id: "carbon",
-    name: "Carbon",
+    id: "bg_Screenshot_2026_05_17_214246_png",
+    name: "Gradient 3",
     category: "gradient",
-    css: "linear-gradient(160deg, #1c1c1e 0%, #2c2c2e 100%)",
-    paint: (ctx, w, h) => {
-      linear(ctx, w, h, [
-        [0,    "#1c1c1e"],
-        [0.45, "#242426"],
-        [1,    "#2c2c2e"],
-      ], 160);
-      grain(ctx, w, h, 7);
-    },
+    css: "url('/bg/Screenshot 2026-05-17 214246.png') center/cover",
+    url: "/bg/Screenshot 2026-05-17 214246.png",
+    paint: (ctx, w, h) => image(ctx, w, h, "/bg/Screenshot 2026-05-17 214246.png"),
   },
   {
-    id: "deep_space",
-    name: "Deep Space",
+    id: "bg_Screenshot_2026_05_17_214324_png",
+    name: "Gradient 4",
     category: "gradient",
-    css: "radial-gradient(ellipse at 60% 30%, #0c1445, #000000)",
-    paint: (ctx, w, h) => {
-      solid(ctx, w, h, "#000000");
-      radialGlow(ctx, w, h, 0.6, 0.28, "rgba(14,30,89,0.9)", 0.65);
-      radialGlow(ctx, w, h, 0.15, 0.75, "rgba(30,14,89,0.5)", 0.4);
-      grain(ctx, w, h, 11);
-    },
+    css: "url('/bg/Screenshot 2026-05-17 214324.png') center/cover",
+    url: "/bg/Screenshot 2026-05-17 214324.png",
+    paint: (ctx, w, h) => image(ctx, w, h, "/bg/Screenshot 2026-05-17 214324.png"),
   },
-
-  // ── MESH / LIT ──────────────────────────────────────────────────────────────
-
   {
-    id: "aurora",
-    name: "Aurora",
+    id: "bg_Screenshot_2026_05_17_215058_png",
+    name: "Gradient 5",
     category: "gradient",
-    css: "radial-gradient(ellipse at 25% 60%, #0d9488, #6d28d9)",
-    paint: (ctx, w, h) =>
-      meshGradient(ctx, w, h, "#05080f", [
-        { cx: 0.22, cy: 0.62, r: 0.275, color: "rgba(13,148,136,0.7)"  },
-        { cx: 0.75, cy: 0.3,  r: 0.25,  color: "rgba(109,40,217,0.65)" },
-        { cx: 0.5,  cy: 0.85, r: 0.175, color: "rgba(6,182,212,0.3)"   },
-      ], 10),
+    css: "url('/bg/Screenshot 2026-05-17 215058.png') center/cover",
+    url: "/bg/Screenshot 2026-05-17 215058.png",
+    paint: (ctx, w, h) => image(ctx, w, h, "/bg/Screenshot 2026-05-17 215058.png"),
   },
   {
-    id: "nebula",
-    name: "Nebula",
+    id: "bg_Screenshot_2026_05_17_215258_png",
+    name: "Gradient 6",
     category: "gradient",
-    css: "radial-gradient(ellipse at 70% 30%, #7c3aed, #db2777)",
-    paint: (ctx, w, h) =>
-      meshGradient(ctx, w, h, "#0a040f", [
-        { cx: 0.68, cy: 0.28, r: 0.275, color: "rgba(124,58,237,0.75)"  },
-        { cx: 0.25, cy: 0.7,  r: 0.25,  color: "rgba(219,39,119,0.6)"   },
-        { cx: 0.5,  cy: 0.45, r: 0.15,  color: "rgba(251,113,133,0.2)"  },
-      ], 10),
+    css: "url('/bg/Screenshot 2026-05-17 215258.png') center/cover",
+    url: "/bg/Screenshot 2026-05-17 215258.png",
+    paint: (ctx, w, h) => image(ctx, w, h, "/bg/Screenshot 2026-05-17 215258.png"),
   },
   {
-    id: "northern",
-    name: "Northern",
+    id: "bg_Screenshot_2026_05_17_215405_png",
+    name: "Gradient 7",
     category: "gradient",
-    css: "radial-gradient(ellipse at 40% 50%, #064e3b, #1e3a5f)",
-    paint: (ctx, w, h) =>
-      meshGradient(ctx, w, h, "#020d09", [
-        { cx: 0.4,  cy: 0.45, r: 0.3,  color: "rgba(6,78,59,0.8)"    },
-        { cx: 0.75, cy: 0.3,  r: 0.225, color: "rgba(30,58,95,0.7)"   },
-        { cx: 0.15, cy: 0.7,  r: 0.2,  color: "rgba(16,185,129,0.25)" },
-      ], 9),
+    css: "url('/bg/Screenshot 2026-05-17 215405.png') center/cover",
+    url: "/bg/Screenshot 2026-05-17 215405.png",
+    paint: (ctx, w, h) => image(ctx, w, h, "/bg/Screenshot 2026-05-17 215405.png"),
   },
-
-  // ── VIVID ──────────────────────────────────────────────────────────────────
-
   {
-    id: "cosmic",
-    name: "Cosmic",
+    id: "bg_Screenshot_2026_05_17_215748_png",
+    name: "Gradient 8",
     category: "gradient",
-    css: "linear-gradient(135deg, #1a0533 0%, #4f1787 40%, #e91e8c 100%)",
-    paint: (ctx, w, h) => {
-      linear(ctx, w, h, [
-        [0,    "#1a0533"],
-        [0.38, "#4f1787"],
-        [0.72, "#c2185b"],
-        [1,    "#e91e8c"],
-      ], 135);
-      grain(ctx, w, h, 8);
-    },
+    css: "url('/bg/Screenshot 2026-05-17 215748.png') center/cover",
+    url: "/bg/Screenshot 2026-05-17 215748.png",
+    paint: (ctx, w, h) => image(ctx, w, h, "/bg/Screenshot 2026-05-17 215748.png"),
   },
   {
-    id: "horizon",
-    name: "Horizon",
+    id: "bg_Screenshot_2026_05_17_215824_png",
+    name: "Gradient 9",
     category: "gradient",
-    css: "linear-gradient(160deg, #0f2027 0%, #203a43 50%, #2c5364 100%)",
-    paint: (ctx, w, h) => {
-      linear(ctx, w, h, [
-        [0,    "#0f2027"],
-        [0.5,  "#203a43"],
-        [1,    "#2c5364"],
-      ], 160);
-      radialGlow(ctx, w, h, 0.5, 1.05, "rgba(56,189,248,0.12)", 0.45);
-      grain(ctx, w, h, 8);
-    },
+    css: "url('/bg/Screenshot 2026-05-17 215824.png') center/cover",
+    url: "/bg/Screenshot 2026-05-17 215824.png",
+    paint: (ctx, w, h) => image(ctx, w, h, "/bg/Screenshot 2026-05-17 215824.png"),
   },
   {
-    id: "rose_gold",
-    name: "Rose Gold",
+    id: "bg_Screenshot_2026_05_17_215919_png",
+    name: "Gradient 10",
     category: "gradient",
-    css: "linear-gradient(135deg, #b76e79 0%, #f4c2c2 50%, #e8a87c 100%)",
-    paint: (ctx, w, h) => {
-      linear(ctx, w, h, [
-        [0,    "#8b4a52"],
-        [0.35, "#b76e79"],
-        [0.65, "#f4c2c2"],
-        [1,    "#e8a87c"],
-      ], 135);
-      grain(ctx, w, h, 6);
-    },
+    css: "url('/bg/Screenshot 2026-05-17 215919.png') center/cover",
+    url: "/bg/Screenshot 2026-05-17 215919.png",
+    paint: (ctx, w, h) => image(ctx, w, h, "/bg/Screenshot 2026-05-17 215919.png"),
   },
   {
-    id: "forest_vivid",
-    name: "Forest Vivid",
+    id: "bg__Pngtree_pastel_watercolor_gradient_background_with_16657211_jpg",
+    name: "Gradient 11",
     category: "gradient",
-    css: "linear-gradient(135deg, #1b4332 0%, #2d6a4f 50%, #52b788 100%)",
-    paint: (ctx, w, h) => {
-      linear(ctx, w, h, [
-        [0,    "#0d2119"],
-        [0.4,  "#1b4332"],
-        [0.75, "#2d6a4f"],
-        [1,    "#52b788"],
-      ], 135);
-      grain(ctx, w, h, 7);
-    },
-  },
-
-  // ── NEUTRAL ────────────────────────────────────────────────────────────────
-
-  {
-    id: "slate",
-    name: "Slate",
-    category: "gradient",
-    css: "linear-gradient(160deg, #334155 0%, #1e293b 100%)",
-    paint: (ctx, w, h) => {
-      linear(ctx, w, h, [
-        [0,   "#334155"],
-        [1,   "#1e293b"],
-      ], 160);
-      grain(ctx, w, h, 6);
-    },
+    css: "url('/bg/—Pngtree—pastel watercolor gradient background with_16657211.jpg') center/cover",
+    url: "/bg/—Pngtree—pastel watercolor gradient background with_16657211.jpg",
+    paint: (ctx, w, h) => image(ctx, w, h, "/bg/—Pngtree—pastel watercolor gradient background with_16657211.jpg"),
   },
   {
-    id: "studio_neutral",
-    name: "Studio Neutral",
-    category: "gradient",
-    css: "linear-gradient(160deg, #f8fafc 0%, #e2e8f0 100%)",
-    paint: (ctx, w, h) => {
-      linear(ctx, w, h, [
-        [0,   "#f8fafc"],
-        [0.6, "#f1f5f9"],
-        [1,   "#e2e8f0"],
-      ], 160);
-      grain(ctx, w, h, 5);
-    },
-  },
-  {
-    id: "warm_white",
-    name: "Warm White",
-    category: "gradient",
-    css: "linear-gradient(135deg, #fefce8 0%, #fef3c7 100%)",
-    paint: (ctx, w, h) => {
-      linear(ctx, w, h, [
-        [0,   "#fefce8"],
-        [1,   "#fef3c7"],
-      ], 135);
-      grain(ctx, w, h, 4);
-    },
-  },
-
-  // ── PROFESSIONAL SCENES ────────────────────────────────────────────────────
-
-  {
-    id: "pro_office",
-    name: "Office",
-    category: "image",
-    css: "url('/bg/office.png') center/cover",
-    url: "/bg/office.png",
-    paint: (ctx, w, h) => image(ctx, w, h, "/bg/office.png"),
-  },
-  {
-    id: "pro_studio",
-    name: "Studio",
-    category: "image",
-    css: "url('/bg/studio.png') center/cover",
-    url: "/bg/studio.png",
-    paint: (ctx, w, h) => image(ctx, w, h, "/bg/studio.png"),
-  },
-  {
-    id: "pro_boardroom",
-    name: "Boardroom",
-    category: "image",
-    css: "url('/bg/boardroom.png') center/cover",
-    url: "/bg/boardroom.png",
-    paint: (ctx, w, h) => image(ctx, w, h, "/bg/boardroom.png"),
-  },
-
-  // ── RAYCAST WALLPAPERS ─────────────────────────────────────────────────────
-  // Premium multi-blob mesh gradients inspired by raycast.com/wallpapers.
-  // Smooth, saturated, blended via "screen" composite for that signature glow.
-
-  {
-    id: "ray_pulse",
-    name: "Pulse",
+    id: "wp_001-desktop",
+    name: "Wallpaper 001",
     category: "wallpaper",
-    css: "linear-gradient(135deg, #ff0080 0%, #7928ca 50%, #2563eb 100%)",
-    paint: (ctx, w, h) =>
-      meshGradient(ctx, w, h, "#0a0014", [
-        { cx: 0.18, cy: 0.78, r: 0.55, color: "rgba(255,0,128,0.85)" },
-        { cx: 0.55, cy: 0.50, r: 0.50, color: "rgba(121,40,202,0.80)" },
-        { cx: 0.88, cy: 0.22, r: 0.50, color: "rgba(37,99,235,0.80)" },
-        { cx: 0.50, cy: 0.05, r: 0.30, color: "rgba(255,90,180,0.35)" },
-      ], 6),
+    css: "url('/thumbnails/001-desktop.jpg') center/cover",
+    url: "/thumbnails/001-desktop.jpg",
+    paint: (ctx, w, h) => image(ctx, w, h, "/wallpapers/001-desktop.jpg"),
   },
   {
-    id: "ray_glass",
-    name: "Glass",
+    id: "wp_002-desktop",
+    name: "Wallpaper 002",
     category: "wallpaper",
-    css: "linear-gradient(135deg, #06b6d4 0%, #3b82f6 50%, #8b5cf6 100%)",
-    paint: (ctx, w, h) =>
-      meshGradient(ctx, w, h, "#03060f", [
-        { cx: 0.22, cy: 0.75, r: 0.55, color: "rgba(6,182,212,0.85)" },
-        { cx: 0.55, cy: 0.42, r: 0.50, color: "rgba(59,130,246,0.85)" },
-        { cx: 0.85, cy: 0.18, r: 0.50, color: "rgba(139,92,246,0.80)" },
-        { cx: 0.10, cy: 0.20, r: 0.30, color: "rgba(34,211,238,0.30)" },
-      ], 6),
+    css: "url('/thumbnails/002-desktop.jpg') center/cover",
+    url: "/thumbnails/002-desktop.jpg",
+    paint: (ctx, w, h) => image(ctx, w, h, "/wallpapers/002-desktop.jpg"),
   },
   {
-    id: "ray_sunset",
-    name: "Sunset",
+    id: "wp_003-desktop",
+    name: "Wallpaper 003",
     category: "wallpaper",
-    css: "linear-gradient(135deg, #fbbf24 0%, #f97316 45%, #db2777 100%)",
-    paint: (ctx, w, h) =>
-      meshGradient(ctx, w, h, "#1a0010", [
-        { cx: 0.18, cy: 0.78, r: 0.55, color: "rgba(251,191,36,0.80)" },
-        { cx: 0.50, cy: 0.55, r: 0.50, color: "rgba(249,115,22,0.85)" },
-        { cx: 0.82, cy: 0.25, r: 0.50, color: "rgba(219,39,119,0.85)" },
-        { cx: 0.40, cy: 0.10, r: 0.28, color: "rgba(255,200,80,0.30)" },
-      ], 6),
+    css: "url('/thumbnails/003-desktop.jpg') center/cover",
+    url: "/thumbnails/003-desktop.jpg",
+    paint: (ctx, w, h) => image(ctx, w, h, "/wallpapers/003-desktop.jpg"),
   },
   {
-    id: "ray_mint",
-    name: "Mint",
+    id: "wp_004-desktop",
+    name: "Wallpaper 004",
     category: "wallpaper",
-    css: "linear-gradient(135deg, #6ee7b7 0%, #22d3ee 50%, #6366f1 100%)",
-    paint: (ctx, w, h) =>
-      meshGradient(ctx, w, h, "#03100c", [
-        { cx: 0.20, cy: 0.78, r: 0.55, color: "rgba(110,231,183,0.80)" },
-        { cx: 0.55, cy: 0.45, r: 0.50, color: "rgba(34,211,238,0.80)" },
-        { cx: 0.85, cy: 0.20, r: 0.55, color: "rgba(99,102,241,0.85)" },
-      ], 6),
+    css: "url('/thumbnails/004-desktop.jpg') center/cover",
+    url: "/thumbnails/004-desktop.jpg",
+    paint: (ctx, w, h) => image(ctx, w, h, "/wallpapers/004-desktop.jpg"),
   },
   {
-    id: "ray_blossom",
-    name: "Blossom",
+    id: "wp_005-desktop",
+    name: "Wallpaper 005",
     category: "wallpaper",
-    css: "linear-gradient(135deg, #fda4af 0%, #f472b6 50%, #a855f7 100%)",
-    paint: (ctx, w, h) =>
-      meshGradient(ctx, w, h, "#15041a", [
-        { cx: 0.22, cy: 0.78, r: 0.55, color: "rgba(253,164,175,0.80)" },
-        { cx: 0.55, cy: 0.45, r: 0.50, color: "rgba(244,114,182,0.85)" },
-        { cx: 0.85, cy: 0.18, r: 0.50, color: "rgba(168,85,247,0.85)" },
-      ], 6),
+    css: "url('/thumbnails/005-desktop.jpg') center/cover",
+    url: "/thumbnails/005-desktop.jpg",
+    paint: (ctx, w, h) => image(ctx, w, h, "/wallpapers/005-desktop.jpg"),
   },
   {
-    id: "ray_ocean",
-    name: "Ocean",
+    id: "wp_006-desktop",
+    name: "Wallpaper 006",
     category: "wallpaper",
-    css: "linear-gradient(135deg, #1e3a8a 0%, #0ea5e9 50%, #06b6d4 100%)",
-    paint: (ctx, w, h) =>
-      meshGradient(ctx, w, h, "#020617", [
-        { cx: 0.20, cy: 0.78, r: 0.60, color: "rgba(30,58,138,0.85)" },
-        { cx: 0.55, cy: 0.45, r: 0.50, color: "rgba(14,165,233,0.80)" },
-        { cx: 0.85, cy: 0.20, r: 0.50, color: "rgba(6,182,212,0.75)" },
-        { cx: 0.10, cy: 0.10, r: 0.25, color: "rgba(96,165,250,0.30)" },
-      ], 7),
+    css: "url('/thumbnails/006-desktop.jpg') center/cover",
+    url: "/thumbnails/006-desktop.jpg",
+    paint: (ctx, w, h) => image(ctx, w, h, "/wallpapers/006-desktop.jpg"),
   },
   {
-    id: "ray_lava",
-    name: "Lava",
+    id: "wp_007-desktop",
+    name: "Wallpaper 007",
     category: "wallpaper",
-    css: "linear-gradient(135deg, #7c2d12 0%, #dc2626 45%, #f59e0b 100%)",
-    paint: (ctx, w, h) =>
-      meshGradient(ctx, w, h, "#150403", [
-        { cx: 0.18, cy: 0.78, r: 0.55, color: "rgba(124,45,18,0.90)" },
-        { cx: 0.52, cy: 0.50, r: 0.50, color: "rgba(220,38,38,0.85)" },
-        { cx: 0.85, cy: 0.22, r: 0.50, color: "rgba(245,158,11,0.80)" },
-      ], 7),
+    css: "url('/thumbnails/007-desktop.jpg') center/cover",
+    url: "/thumbnails/007-desktop.jpg",
+    paint: (ctx, w, h) => image(ctx, w, h, "/wallpapers/007-desktop.jpg"),
   },
   {
-    id: "ray_aurora2",
-    name: "Polaris",
+    id: "wp_008-desktop",
+    name: "Wallpaper 008",
     category: "wallpaper",
-    css: "linear-gradient(135deg, #064e3b 0%, #0891b2 45%, #6366f1 100%)",
-    paint: (ctx, w, h) =>
-      meshGradient(ctx, w, h, "#020a10", [
-        { cx: 0.18, cy: 0.80, r: 0.55, color: "rgba(6,78,59,0.90)" },
-        { cx: 0.50, cy: 0.50, r: 0.50, color: "rgba(8,145,178,0.85)" },
-        { cx: 0.85, cy: 0.18, r: 0.55, color: "rgba(99,102,241,0.85)" },
-        { cx: 0.30, cy: 0.10, r: 0.25, color: "rgba(52,211,153,0.30)" },
-      ], 7),
+    css: "url('/thumbnails/008-desktop.jpg') center/cover",
+    url: "/thumbnails/008-desktop.jpg",
+    paint: (ctx, w, h) => image(ctx, w, h, "/wallpapers/008-desktop.jpg"),
   },
   {
-    id: "ray_candy",
-    name: "Candy",
+    id: "wp_009-desktop",
+    name: "Wallpaper 009",
     category: "wallpaper",
-    css: "linear-gradient(135deg, #f0abfc 0%, #818cf8 50%, #22d3ee 100%)",
-    paint: (ctx, w, h) =>
-      meshGradient(ctx, w, h, "#0a0418", [
-        { cx: 0.20, cy: 0.78, r: 0.55, color: "rgba(240,171,252,0.85)" },
-        { cx: 0.55, cy: 0.45, r: 0.50, color: "rgba(129,140,248,0.85)" },
-        { cx: 0.85, cy: 0.18, r: 0.50, color: "rgba(34,211,238,0.85)" },
-      ], 6),
+    css: "url('/thumbnails/009-desktop.jpg') center/cover",
+    url: "/thumbnails/009-desktop.jpg",
+    paint: (ctx, w, h) => image(ctx, w, h, "/wallpapers/009-desktop.jpg"),
   },
   {
-    id: "ray_void",
-    name: "Void",
+    id: "wp_010-desktop",
+    name: "Wallpaper 010",
     category: "wallpaper",
-    css: "linear-gradient(135deg, #18181b 0%, #3f3f46 50%, #71717a 100%)",
-    paint: (ctx, w, h) =>
-      meshGradient(ctx, w, h, "#050507", [
-        { cx: 0.20, cy: 0.80, r: 0.55, color: "rgba(63,63,70,0.95)" },
-        { cx: 0.55, cy: 0.45, r: 0.50, color: "rgba(113,113,122,0.55)" },
-        { cx: 0.85, cy: 0.20, r: 0.50, color: "rgba(161,161,170,0.30)" },
-      ], 8),
+    css: "url('/thumbnails/010-desktop.jpg') center/cover",
+    url: "/thumbnails/010-desktop.jpg",
+    paint: (ctx, w, h) => image(ctx, w, h, "/wallpapers/010-desktop.jpg"),
   },
   {
-    id: "ray_solar",
-    name: "Solar",
+    id: "wp_011-desktop",
+    name: "Wallpaper 011",
     category: "wallpaper",
-    css: "linear-gradient(135deg, #facc15 0%, #f97316 50%, #b91c1c 100%)",
-    paint: (ctx, w, h) =>
-      meshGradient(ctx, w, h, "#15030a", [
-        { cx: 0.22, cy: 0.78, r: 0.55, color: "rgba(250,204,21,0.85)" },
-        { cx: 0.55, cy: 0.45, r: 0.50, color: "rgba(249,115,22,0.85)" },
-        { cx: 0.85, cy: 0.20, r: 0.50, color: "rgba(185,28,28,0.85)" },
-      ], 7),
+    css: "url('/thumbnails/011-desktop.jpg') center/cover",
+    url: "/thumbnails/011-desktop.jpg",
+    paint: (ctx, w, h) => image(ctx, w, h, "/wallpapers/011-desktop.jpg"),
   },
   {
-    id: "ray_iris",
-    name: "Iris",
+    id: "wp_012-desktop",
+    name: "Wallpaper 012",
     category: "wallpaper",
-    css: "linear-gradient(135deg, #4f46e5 0%, #ec4899 50%, #f59e0b 100%)",
-    paint: (ctx, w, h) =>
-      meshGradient(ctx, w, h, "#0a0418", [
-        { cx: 0.18, cy: 0.78, r: 0.55, color: "rgba(79,70,229,0.85)" },
-        { cx: 0.52, cy: 0.45, r: 0.50, color: "rgba(236,72,153,0.85)" },
-        { cx: 0.85, cy: 0.20, r: 0.50, color: "rgba(245,158,11,0.80)" },
-      ], 6),
-  },
-  
-  // ── SOFT MESH (APPLE STYLE) ──────────────────────────────────────────────
-  {
-    id: "mesh_lollipop",
-    name: "Lollipop",
-    category: "gradient",
-    css: "radial-gradient(circle at 30% 70%, #ff80b5, transparent), radial-gradient(circle at 70% 30%, #9089fc, transparent), #ffffff",
-    paint: (ctx, w, h) => meshGradient(ctx, w, h, "#ffffff", [
-      { cx: 0.3, cy: 0.7, r: 0.6, color: "rgba(255, 128, 181, 0.6)" },
-      { cx: 0.7, cy: 0.3, r: 0.6, color: "rgba(144, 137, 252, 0.6)" },
-      { cx: 0.5, cy: 0.5, r: 0.5, color: "rgba(100, 210, 255, 0.3)" },
-    ], 4),
+    css: "url('/thumbnails/012-desktop.jpg') center/cover",
+    url: "/thumbnails/012-desktop.jpg",
+    paint: (ctx, w, h) => image(ctx, w, h, "/wallpapers/012-desktop.jpg"),
   },
   {
-    id: "mesh_skyline",
-    name: "Skyline",
-    category: "gradient",
-    css: "radial-gradient(circle at 20% 80%, #bae6fd, transparent), radial-gradient(circle at 80% 20%, #e0f2fe, transparent), #f8fafc",
-    paint: (ctx, w, h) => meshGradient(ctx, w, h, "#f8fafc", [
-      { cx: 0.2, cy: 0.8, r: 0.7, color: "rgba(186, 230, 253, 0.8)" },
-      { cx: 0.8, cy: 0.2, r: 0.7, color: "rgba(224, 242, 254, 0.8)" },
-      { cx: 0.5, cy: 0.5, r: 0.6, color: "rgba(56, 189, 248, 0.3)" },
-    ], 3),
+    id: "wp_013-desktop",
+    name: "Wallpaper 013",
+    category: "wallpaper",
+    css: "url('/thumbnails/013-desktop.jpg') center/cover",
+    url: "/thumbnails/013-desktop.jpg",
+    paint: (ctx, w, h) => image(ctx, w, h, "/wallpapers/013-desktop.jpg"),
   },
   {
-    id: "mesh_peachy",
-    name: "Peachy",
-    category: "gradient",
-    css: "radial-gradient(circle at 30% 70%, #ffedd5, transparent), radial-gradient(circle at 70% 30%, #fce7f3, transparent), #fffafb",
-    paint: (ctx, w, h) => meshGradient(ctx, w, h, "#fffafb", [
-      { cx: 0.3, cy: 0.7, r: 0.6, color: "rgba(255, 237, 213, 0.9)" },
-      { cx: 0.7, cy: 0.3, r: 0.6, color: "rgba(252, 231, 243, 0.9)" },
-      { cx: 0.5, cy: 0.5, r: 0.5, color: "rgba(254, 215, 170, 0.4)" },
-    ], 3),
+    id: "wp_014-desktop",
+    name: "Wallpaper 014",
+    category: "wallpaper",
+    css: "url('/thumbnails/014-desktop.jpg') center/cover",
+    url: "/thumbnails/014-desktop.jpg",
+    paint: (ctx, w, h) => image(ctx, w, h, "/wallpapers/014-desktop.jpg"),
   },
   {
-    id: "mesh_breeze",
-    name: "Breeze",
-    category: "gradient",
-    css: "radial-gradient(circle at 30% 70%, #dcfce7, transparent), radial-gradient(circle at 70% 30%, #ecfeff, transparent), #f0fdfa",
-    paint: (ctx, w, h) => meshGradient(ctx, w, h, "#f0fdfa", [
-      { cx: 0.3, cy: 0.7, r: 0.6, color: "rgba(220, 252, 231, 0.8)" },
-      { cx: 0.7, cy: 0.3, r: 0.6, color: "rgba(236, 254, 255, 0.8)" },
-      { cx: 0.5, cy: 0.5, r: 0.5, color: "rgba(187, 247, 208, 0.3)" },
-    ], 3),
+    id: "wp_015-desktop",
+    name: "Wallpaper 015",
+    category: "wallpaper",
+    css: "url('/thumbnails/015-desktop.jpg') center/cover",
+    url: "/thumbnails/015-desktop.jpg",
+    paint: (ctx, w, h) => image(ctx, w, h, "/wallpapers/015-desktop.jpg"),
   },
   {
-    id: "mesh_midnight_mist",
-    name: "Midnight Mist",
-    category: "gradient",
-    css: "radial-gradient(circle at 20% 20%, #312e81, transparent), radial-gradient(circle at 80% 80%, #1e1b4b, transparent), #030712",
-    paint: (ctx, w, h) => meshGradient(ctx, w, h, "#030712", [
-      { cx: 0.2, cy: 0.2, r: 0.8, color: "rgba(49, 46, 129, 0.6)" },
-      { cx: 0.8, cy: 0.8, r: 0.8, color: "rgba(30, 27, 75, 0.6)" },
-      { cx: 0.5, cy: 0.5, r: 0.7, color: "rgba(67, 56, 202, 0.3)" },
-    ], 10),
+    id: "wp_016-desktop",
+    name: "Wallpaper 016",
+    category: "wallpaper",
+    css: "url('/thumbnails/016-desktop.jpg') center/cover",
+    url: "/thumbnails/016-desktop.jpg",
+    paint: (ctx, w, h) => image(ctx, w, h, "/wallpapers/016-desktop.jpg"),
   },
   {
-    id: "mesh_lavender",
-    name: "Lavender",
-    category: "gradient",
-    css: "radial-gradient(circle at 30% 30%, #ede9fe, transparent), radial-gradient(circle at 70% 70%, #f5f3ff, transparent), #fafafa",
-    paint: (ctx, w, h) => meshGradient(ctx, w, h, "#fafafa", [
-      { cx: 0.3, cy: 0.3, r: 0.7, color: "rgba(237, 233, 254, 0.9)" },
-      { cx: 0.7, cy: 0.7, r: 0.7, color: "rgba(245, 243, 255, 0.9)" },
-      { cx: 0.5, cy: 0.5, r: 0.5, color: "rgba(196, 181, 253, 0.3)" },
-    ], 4),
+    id: "wp_017-desktop",
+    name: "Wallpaper 017",
+    category: "wallpaper",
+    css: "url('/thumbnails/017-desktop.jpg') center/cover",
+    url: "/thumbnails/017-desktop.jpg",
+    paint: (ctx, w, h) => image(ctx, w, h, "/wallpapers/017-desktop.jpg"),
+  },
+  {
+    id: "wp_018-desktop",
+    name: "Wallpaper 018",
+    category: "wallpaper",
+    css: "url('/thumbnails/018-desktop.jpg') center/cover",
+    url: "/thumbnails/018-desktop.jpg",
+    paint: (ctx, w, h) => image(ctx, w, h, "/wallpapers/018-desktop.jpg"),
+  },
+  {
+    id: "wp_019-desktop",
+    name: "Wallpaper 019",
+    category: "wallpaper",
+    css: "url('/thumbnails/019-desktop.jpg') center/cover",
+    url: "/thumbnails/019-desktop.jpg",
+    paint: (ctx, w, h) => image(ctx, w, h, "/wallpapers/019-desktop.jpg"),
+  },
+  {
+    id: "wp_020-desktop",
+    name: "Wallpaper 020",
+    category: "wallpaper",
+    css: "url('/thumbnails/020-desktop.jpg') center/cover",
+    url: "/thumbnails/020-desktop.jpg",
+    paint: (ctx, w, h) => image(ctx, w, h, "/wallpapers/020-desktop.jpg"),
+  },
+  {
+    id: "wp_021-desktop",
+    name: "Wallpaper 021",
+    category: "wallpaper",
+    css: "url('/thumbnails/021-desktop.jpg') center/cover",
+    url: "/thumbnails/021-desktop.jpg",
+    paint: (ctx, w, h) => image(ctx, w, h, "/wallpapers/021-desktop.jpg"),
+  },
+  {
+    id: "wp_022-desktop",
+    name: "Wallpaper 022",
+    category: "wallpaper",
+    css: "url('/thumbnails/022-desktop.jpg') center/cover",
+    url: "/thumbnails/022-desktop.jpg",
+    paint: (ctx, w, h) => image(ctx, w, h, "/wallpapers/022-desktop.jpg"),
+  },
+  {
+    id: "wp_023-desktop",
+    name: "Wallpaper 023",
+    category: "wallpaper",
+    css: "url('/thumbnails/023-desktop.jpg') center/cover",
+    url: "/thumbnails/023-desktop.jpg",
+    paint: (ctx, w, h) => image(ctx, w, h, "/wallpapers/023-desktop.jpg"),
+  },
+  {
+    id: "wp_024-desktop",
+    name: "Wallpaper 024",
+    category: "wallpaper",
+    css: "url('/thumbnails/024-desktop.jpg') center/cover",
+    url: "/thumbnails/024-desktop.jpg",
+    paint: (ctx, w, h) => image(ctx, w, h, "/wallpapers/024-desktop.jpg"),
+  },
+  {
+    id: "wp_025-desktop",
+    name: "Wallpaper 025",
+    category: "wallpaper",
+    css: "url('/thumbnails/025-desktop.jpg') center/cover",
+    url: "/thumbnails/025-desktop.jpg",
+    paint: (ctx, w, h) => image(ctx, w, h, "/wallpapers/025-desktop.jpg"),
+  },
+  {
+    id: "wp_026-desktop",
+    name: "Wallpaper 026",
+    category: "wallpaper",
+    css: "url('/thumbnails/026-desktop.jpg') center/cover",
+    url: "/thumbnails/026-desktop.jpg",
+    paint: (ctx, w, h) => image(ctx, w, h, "/wallpapers/026-desktop.jpg"),
+  },
+  {
+    id: "wp_027-desktop",
+    name: "Wallpaper 027",
+    category: "wallpaper",
+    css: "url('/thumbnails/027-desktop.jpg') center/cover",
+    url: "/thumbnails/027-desktop.jpg",
+    paint: (ctx, w, h) => image(ctx, w, h, "/wallpapers/027-desktop.jpg"),
+  },
+  {
+    id: "wp_028-desktop",
+    name: "Wallpaper 028",
+    category: "wallpaper",
+    css: "url('/thumbnails/028-desktop.jpg') center/cover",
+    url: "/thumbnails/028-desktop.jpg",
+    paint: (ctx, w, h) => image(ctx, w, h, "/wallpapers/028-desktop.jpg"),
+  },
+  {
+    id: "wp_029-desktop",
+    name: "Wallpaper 029",
+    category: "wallpaper",
+    css: "url('/thumbnails/029-desktop.jpg') center/cover",
+    url: "/thumbnails/029-desktop.jpg",
+    paint: (ctx, w, h) => image(ctx, w, h, "/wallpapers/029-desktop.jpg"),
+  },
+  {
+    id: "wp_030-desktop",
+    name: "Wallpaper 030",
+    category: "wallpaper",
+    css: "url('/thumbnails/030-desktop.jpg') center/cover",
+    url: "/thumbnails/030-desktop.jpg",
+    paint: (ctx, w, h) => image(ctx, w, h, "/wallpapers/030-desktop.jpg"),
+  },
+  {
+    id: "wp_031-desktop",
+    name: "Wallpaper 031",
+    category: "wallpaper",
+    css: "url('/thumbnails/031-desktop.jpg') center/cover",
+    url: "/thumbnails/031-desktop.jpg",
+    paint: (ctx, w, h) => image(ctx, w, h, "/wallpapers/031-desktop.jpg"),
+  },
+  {
+    id: "wp_032-desktop",
+    name: "Wallpaper 032",
+    category: "wallpaper",
+    css: "url('/thumbnails/032-desktop.jpg') center/cover",
+    url: "/thumbnails/032-desktop.jpg",
+    paint: (ctx, w, h) => image(ctx, w, h, "/wallpapers/032-desktop.jpg"),
+  },
+  {
+    id: "wp_033-desktop",
+    name: "Wallpaper 033",
+    category: "wallpaper",
+    css: "url('/thumbnails/033-desktop.jpg') center/cover",
+    url: "/thumbnails/033-desktop.jpg",
+    paint: (ctx, w, h) => image(ctx, w, h, "/wallpapers/033-desktop.jpg"),
+  },
+  {
+    id: "wp_034-desktop",
+    name: "Wallpaper 034",
+    category: "wallpaper",
+    css: "url('/thumbnails/034-desktop.jpg') center/cover",
+    url: "/thumbnails/034-desktop.jpg",
+    paint: (ctx, w, h) => image(ctx, w, h, "/wallpapers/034-desktop.jpg"),
+  },
+  {
+    id: "wp_035-desktop",
+    name: "Wallpaper 035",
+    category: "wallpaper",
+    css: "url('/thumbnails/035-desktop.jpg') center/cover",
+    url: "/thumbnails/035-desktop.jpg",
+    paint: (ctx, w, h) => image(ctx, w, h, "/wallpapers/035-desktop.jpg"),
+  },
+  {
+    id: "wp_036-desktop",
+    name: "Wallpaper 036",
+    category: "wallpaper",
+    css: "url('/thumbnails/036-desktop.jpg') center/cover",
+    url: "/thumbnails/036-desktop.jpg",
+    paint: (ctx, w, h) => image(ctx, w, h, "/wallpapers/036-desktop.jpg"),
+  },
+  {
+    id: "wp_037-desktop",
+    name: "Wallpaper 037",
+    category: "wallpaper",
+    css: "url('/thumbnails/037-desktop.jpg') center/cover",
+    url: "/thumbnails/037-desktop.jpg",
+    paint: (ctx, w, h) => image(ctx, w, h, "/wallpapers/037-desktop.jpg"),
+  },
+  {
+    id: "wp_038-desktop",
+    name: "Wallpaper 038",
+    category: "wallpaper",
+    css: "url('/thumbnails/038-desktop.jpg') center/cover",
+    url: "/thumbnails/038-desktop.jpg",
+    paint: (ctx, w, h) => image(ctx, w, h, "/wallpapers/038-desktop.jpg"),
+  },
+  {
+    id: "wp_039-desktop",
+    name: "Wallpaper 039",
+    category: "wallpaper",
+    css: "url('/thumbnails/039-desktop.jpg') center/cover",
+    url: "/thumbnails/039-desktop.jpg",
+    paint: (ctx, w, h) => image(ctx, w, h, "/wallpapers/039-desktop.jpg"),
+  },
+  {
+    id: "wp_040-desktop",
+    name: "Wallpaper 040",
+    category: "wallpaper",
+    css: "url('/thumbnails/040-desktop.jpg') center/cover",
+    url: "/thumbnails/040-desktop.jpg",
+    paint: (ctx, w, h) => image(ctx, w, h, "/wallpapers/040-desktop.jpg"),
+  },
+  {
+    id: "wp_041-desktop",
+    name: "Wallpaper 041",
+    category: "wallpaper",
+    css: "url('/thumbnails/041-desktop.jpg') center/cover",
+    url: "/thumbnails/041-desktop.jpg",
+    paint: (ctx, w, h) => image(ctx, w, h, "/wallpapers/041-desktop.jpg"),
+  },
+  {
+    id: "wp_042-desktop",
+    name: "Wallpaper 042",
+    category: "wallpaper",
+    css: "url('/thumbnails/042-desktop.jpg') center/cover",
+    url: "/thumbnails/042-desktop.jpg",
+    paint: (ctx, w, h) => image(ctx, w, h, "/wallpapers/042-desktop.jpg"),
+  },
+  {
+    id: "wp_043-desktop",
+    name: "Wallpaper 043",
+    category: "wallpaper",
+    css: "url('/thumbnails/043-desktop.jpg') center/cover",
+    url: "/thumbnails/043-desktop.jpg",
+    paint: (ctx, w, h) => image(ctx, w, h, "/wallpapers/043-desktop.jpg"),
+  },
+  {
+    id: "wp_044-desktop",
+    name: "Wallpaper 044",
+    category: "wallpaper",
+    css: "url('/thumbnails/044-desktop.jpg') center/cover",
+    url: "/thumbnails/044-desktop.jpg",
+    paint: (ctx, w, h) => image(ctx, w, h, "/wallpapers/044-desktop.jpg"),
+  },
+  {
+    id: "wp_045-desktop",
+    name: "Wallpaper 045",
+    category: "wallpaper",
+    css: "url('/thumbnails/045-desktop.jpg') center/cover",
+    url: "/thumbnails/045-desktop.jpg",
+    paint: (ctx, w, h) => image(ctx, w, h, "/wallpapers/045-desktop.jpg"),
+  },
+  {
+    id: "wp_046-desktop",
+    name: "Wallpaper 046",
+    category: "wallpaper",
+    css: "url('/thumbnails/046-desktop.jpg') center/cover",
+    url: "/thumbnails/046-desktop.jpg",
+    paint: (ctx, w, h) => image(ctx, w, h, "/wallpapers/046-desktop.jpg"),
+  },
+  {
+    id: "wp_047-desktop",
+    name: "Wallpaper 047",
+    category: "wallpaper",
+    css: "url('/thumbnails/047-desktop.jpg') center/cover",
+    url: "/thumbnails/047-desktop.jpg",
+    paint: (ctx, w, h) => image(ctx, w, h, "/wallpapers/047-desktop.jpg"),
+  },
+  {
+    id: "wp_048-desktop",
+    name: "Wallpaper 048",
+    category: "wallpaper",
+    css: "url('/thumbnails/048-desktop.jpg') center/cover",
+    url: "/thumbnails/048-desktop.jpg",
+    paint: (ctx, w, h) => image(ctx, w, h, "/wallpapers/048-desktop.jpg"),
+  },
+  {
+    id: "wp_049-desktop",
+    name: "Wallpaper 049",
+    category: "wallpaper",
+    css: "url('/thumbnails/049-desktop.jpg') center/cover",
+    url: "/thumbnails/049-desktop.jpg",
+    paint: (ctx, w, h) => image(ctx, w, h, "/wallpapers/049-desktop.jpg"),
+  },
+  {
+    id: "wp_050-desktop",
+    name: "Wallpaper 050",
+    category: "wallpaper",
+    css: "url('/thumbnails/050-desktop.jpg') center/cover",
+    url: "/thumbnails/050-desktop.jpg",
+    paint: (ctx, w, h) => image(ctx, w, h, "/wallpapers/050-desktop.jpg"),
+  },
+  {
+    id: "wp_051-desktop",
+    name: "Wallpaper 051",
+    category: "wallpaper",
+    css: "url('/thumbnails/051-desktop.jpg') center/cover",
+    url: "/thumbnails/051-desktop.jpg",
+    paint: (ctx, w, h) => image(ctx, w, h, "/wallpapers/051-desktop.jpg"),
+  },
+  {
+    id: "wp_052-desktop",
+    name: "Wallpaper 052",
+    category: "wallpaper",
+    css: "url('/thumbnails/052-desktop.jpg') center/cover",
+    url: "/thumbnails/052-desktop.jpg",
+    paint: (ctx, w, h) => image(ctx, w, h, "/wallpapers/052-desktop.jpg"),
+  },
+  {
+    id: "wp_053-desktop",
+    name: "Wallpaper 053",
+    category: "wallpaper",
+    css: "url('/thumbnails/053-desktop.jpg') center/cover",
+    url: "/thumbnails/053-desktop.jpg",
+    paint: (ctx, w, h) => image(ctx, w, h, "/wallpapers/053-desktop.jpg"),
+  },
+  {
+    id: "wp_054-desktop",
+    name: "Wallpaper 054",
+    category: "wallpaper",
+    css: "url('/thumbnails/054-desktop.jpg') center/cover",
+    url: "/thumbnails/054-desktop.jpg",
+    paint: (ctx, w, h) => image(ctx, w, h, "/wallpapers/054-desktop.jpg"),
+  },
+  {
+    id: "wp_055-desktop",
+    name: "Wallpaper 055",
+    category: "wallpaper",
+    css: "url('/thumbnails/055-desktop.jpg') center/cover",
+    url: "/thumbnails/055-desktop.jpg",
+    paint: (ctx, w, h) => image(ctx, w, h, "/wallpapers/055-desktop.jpg"),
+  },
+  {
+    id: "wp_056-desktop",
+    name: "Wallpaper 056",
+    category: "wallpaper",
+    css: "url('/thumbnails/056-desktop.jpg') center/cover",
+    url: "/thumbnails/056-desktop.jpg",
+    paint: (ctx, w, h) => image(ctx, w, h, "/wallpapers/056-desktop.jpg"),
+  },
+  {
+    id: "wp_057-desktop",
+    name: "Wallpaper 057",
+    category: "wallpaper",
+    css: "url('/thumbnails/057-desktop.jpg') center/cover",
+    url: "/thumbnails/057-desktop.jpg",
+    paint: (ctx, w, h) => image(ctx, w, h, "/wallpapers/057-desktop.jpg"),
+  },
+  {
+    id: "wp_058-desktop",
+    name: "Wallpaper 058",
+    category: "wallpaper",
+    css: "url('/thumbnails/058-desktop.jpg') center/cover",
+    url: "/thumbnails/058-desktop.jpg",
+    paint: (ctx, w, h) => image(ctx, w, h, "/wallpapers/058-desktop.jpg"),
+  },
+  {
+    id: "wp_059-desktop",
+    name: "Wallpaper 059",
+    category: "wallpaper",
+    css: "url('/thumbnails/059-desktop.jpg') center/cover",
+    url: "/thumbnails/059-desktop.jpg",
+    paint: (ctx, w, h) => image(ctx, w, h, "/wallpapers/059-desktop.jpg"),
+  },
+  {
+    id: "wp_060-desktop",
+    name: "Wallpaper 060",
+    category: "wallpaper",
+    css: "url('/thumbnails/060-desktop.jpg') center/cover",
+    url: "/thumbnails/060-desktop.jpg",
+    paint: (ctx, w, h) => image(ctx, w, h, "/wallpapers/060-desktop.jpg"),
+  },
+  {
+    id: "wp_061-desktop",
+    name: "Wallpaper 061",
+    category: "wallpaper",
+    css: "url('/thumbnails/061-desktop.jpg') center/cover",
+    url: "/thumbnails/061-desktop.jpg",
+    paint: (ctx, w, h) => image(ctx, w, h, "/wallpapers/061-desktop.jpg"),
+  },
+  {
+    id: "wp_062-desktop",
+    name: "Wallpaper 062",
+    category: "wallpaper",
+    css: "url('/thumbnails/062-desktop.jpg') center/cover",
+    url: "/thumbnails/062-desktop.jpg",
+    paint: (ctx, w, h) => image(ctx, w, h, "/wallpapers/062-desktop.jpg"),
+  },
+  {
+    id: "wp_063-desktop",
+    name: "Wallpaper 063",
+    category: "wallpaper",
+    css: "url('/thumbnails/063-desktop.jpg') center/cover",
+    url: "/thumbnails/063-desktop.jpg",
+    paint: (ctx, w, h) => image(ctx, w, h, "/wallpapers/063-desktop.jpg"),
+  },
+  {
+    id: "wp_064-desktop",
+    name: "Wallpaper 064",
+    category: "wallpaper",
+    css: "url('/thumbnails/064-desktop.jpg') center/cover",
+    url: "/thumbnails/064-desktop.jpg",
+    paint: (ctx, w, h) => image(ctx, w, h, "/wallpapers/064-desktop.jpg"),
+  },
+  {
+    id: "wp_065-desktop",
+    name: "Wallpaper 065",
+    category: "wallpaper",
+    css: "url('/thumbnails/065-desktop.jpg') center/cover",
+    url: "/thumbnails/065-desktop.jpg",
+    paint: (ctx, w, h) => image(ctx, w, h, "/wallpapers/065-desktop.jpg"),
+  },
+  {
+    id: "wp_066-desktop",
+    name: "Wallpaper 066",
+    category: "wallpaper",
+    css: "url('/thumbnails/066-desktop.jpg') center/cover",
+    url: "/thumbnails/066-desktop.jpg",
+    paint: (ctx, w, h) => image(ctx, w, h, "/wallpapers/066-desktop.jpg"),
+  },
+  {
+    id: "wp_067-desktop",
+    name: "Wallpaper 067",
+    category: "wallpaper",
+    css: "url('/thumbnails/067-desktop.jpg') center/cover",
+    url: "/thumbnails/067-desktop.jpg",
+    paint: (ctx, w, h) => image(ctx, w, h, "/wallpapers/067-desktop.jpg"),
+  },
+  {
+    id: "wp_068-desktop",
+    name: "Wallpaper 068",
+    category: "wallpaper",
+    css: "url('/thumbnails/068-desktop.jpg') center/cover",
+    url: "/thumbnails/068-desktop.jpg",
+    paint: (ctx, w, h) => image(ctx, w, h, "/wallpapers/068-desktop.jpg"),
+  },
+  {
+    id: "wp_069-desktop",
+    name: "Wallpaper 069",
+    category: "wallpaper",
+    css: "url('/thumbnails/069-desktop.jpg') center/cover",
+    url: "/thumbnails/069-desktop.jpg",
+    paint: (ctx, w, h) => image(ctx, w, h, "/wallpapers/069-desktop.jpg"),
+  },
+  {
+    id: "wp_070-desktop",
+    name: "Wallpaper 070",
+    category: "wallpaper",
+    css: "url('/thumbnails/070-desktop.jpg') center/cover",
+    url: "/thumbnails/070-desktop.jpg",
+    paint: (ctx, w, h) => image(ctx, w, h, "/wallpapers/070-desktop.jpg"),
+  },
+  {
+    id: "wp_071-desktop",
+    name: "Wallpaper 071",
+    category: "wallpaper",
+    css: "url('/thumbnails/071-desktop.jpg') center/cover",
+    url: "/thumbnails/071-desktop.jpg",
+    paint: (ctx, w, h) => image(ctx, w, h, "/wallpapers/071-desktop.jpg"),
+  },
+  {
+    id: "wp_072-desktop",
+    name: "Wallpaper 072",
+    category: "wallpaper",
+    css: "url('/thumbnails/072-desktop.jpg') center/cover",
+    url: "/thumbnails/072-desktop.jpg",
+    paint: (ctx, w, h) => image(ctx, w, h, "/wallpapers/072-desktop.jpg"),
+  },
+  {
+    id: "wp_073-desktop",
+    name: "Wallpaper 073",
+    category: "wallpaper",
+    css: "url('/thumbnails/073-desktop.jpg') center/cover",
+    url: "/thumbnails/073-desktop.jpg",
+    paint: (ctx, w, h) => image(ctx, w, h, "/wallpapers/073-desktop.jpg"),
+  },
+  {
+    id: "wp_074-desktop",
+    name: "Wallpaper 074",
+    category: "wallpaper",
+    css: "url('/thumbnails/074-desktop.jpg') center/cover",
+    url: "/thumbnails/074-desktop.jpg",
+    paint: (ctx, w, h) => image(ctx, w, h, "/wallpapers/074-desktop.jpg"),
+  },
+  {
+    id: "wp_081-desktop",
+    name: "Wallpaper 081",
+    category: "wallpaper",
+    css: "url('/thumbnails/081-desktop.jpg') center/cover",
+    url: "/thumbnails/081-desktop.jpg",
+    paint: (ctx, w, h) => image(ctx, w, h, "/wallpapers/081-desktop.jpg"),
+  },
+  {
+    id: "wp_082-desktop",
+    name: "Wallpaper 082",
+    category: "wallpaper",
+    css: "url('/thumbnails/082-desktop.jpg') center/cover",
+    url: "/thumbnails/082-desktop.jpg",
+    paint: (ctx, w, h) => image(ctx, w, h, "/wallpapers/082-desktop.jpg"),
+  },
+  {
+    id: "wp_083-desktop",
+    name: "Wallpaper 083",
+    category: "wallpaper",
+    css: "url('/thumbnails/083-desktop.jpg') center/cover",
+    url: "/thumbnails/083-desktop.jpg",
+    paint: (ctx, w, h) => image(ctx, w, h, "/wallpapers/083-desktop.jpg"),
   },
 ];
 

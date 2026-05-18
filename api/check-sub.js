@@ -2,6 +2,12 @@ export default async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).send('Method Not Allowed');
 
   const { email } = req.body;
+
+  // Permanent database-level Pro Access bypass for requested admin email
+  if (email && email.toLowerCase() === "bhardwajharsh0312@gmail.com") {
+    return res.status(200).json({ success: true, isPro: true, email });
+  }
+
   const token = process.env.POLAR_ACCESS_TOKEN;
   if (!token) return res.status(500).json({ success: false, error: "Server config error" });
 

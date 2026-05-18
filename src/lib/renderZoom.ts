@@ -57,11 +57,15 @@ export async function renderAutoZoom(
     trimEnd?: number;
     aspectRatio?: "16:9" | "9:16" | "1:1";
     feel?: "glass" | "velvet" | "silk" | "snap";
+    speed?: number;
+    backgroundMusicUrl?: string;
+    backgroundMusicOffset?: number;
     onProgress?: (p: RenderProgress) => void;
   },
 ): Promise<RenderOutput> {
   const onProgress = opts.onProgress ?? (() => {});
   const format: RenderFormat = opts.format ?? "mp4";
+  const speed = opts.speed ?? 1;
   onProgress({ stage: "preparing", percent: 0 });
 
   const qualityKey = (opts.quality ?? 720) as 360 | 480 | 720 | 1080;
@@ -101,6 +105,22 @@ export async function renderAutoZoom(
     await tmpCtx.close();
   } catch (e) {
     console.warn("Audio decode failed, exporting video-only:", e);
+  }
+
+  // ── Decode background music if provided ─────────────────────────────────────
+  let bgMusicBuffer: AudioBuffer | null = null;
+  if (opts.backgroundMusicUrl) {
+    try {
+      const res = await fetch(opts.backgroundMusicUrl);
+      const arrBuf = await res.arrayBuffer();
+      const AC = window.AudioContext ||
+        (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
+      const tmpCtx = new AC();
+      bgMusicBuffer = await tmpCtx.decodeAudioData(arrBuf);
+      await tmpCtx.close();
+    } catch (e) {
+      console.warn("Failed to load background music:", e);
+    }
   }
 
   // ── Load video ────────────────────────────────────────────────────────────
@@ -282,13 +302,27 @@ export async function renderAutoZoom(
         const startFrame = Math.floor(seg.start * sampleRate);
         const endFrame = Math.min(totalFrames, Math.floor(seg.end * sampleRate));
         
-        for (let f = startFrame; f < endFrame; f += chunkFrames) {
-          const frames = Math.min(chunkFrames, endFrame - f);
+        let f = startFrame;
+        while (f < endFrame) {
+          const frames = Math.min(chunkFrames, Math.floor((endFrame - f) / speed));
+          if (frames <= 0) break;
           const slice = new Float32Array(frames * channelCount);
           for (let ch = 0; ch < channelCount; ch++) {
             const data = audioBuffer.getChannelData(ch);
             for (let i = 0; i < frames; i++) {
-              slice[i * channelCount + ch] = data[f + i];
+              const srcIdx = Math.floor(f + i * speed);
+              const voiceSample = srcIdx < data.length ? data[srcIdx] : 0;
+              
+              let bgSample = 0;
+              if (bgMusicBuffer && ch < bgMusicBuffer.numberOfChannels) {
+                const bgData = bgMusicBuffer.getChannelData(ch);
+                const sampleTimeS = (opts.backgroundMusicOffset ?? 0) + (logicalTimeUs / 1_000_000) + (i / sampleRate);
+                const bgFrameIndex = Math.floor(sampleTimeS * bgMusicBuffer.sampleRate) % bgMusicBuffer.length;
+                bgSample = bgData[bgFrameIndex] * 0.12; // 12% background music volume
+              }
+              
+              const mixed = voiceSample + bgSample;
+              slice[i * channelCount + ch] = Math.max(-1, Math.min(1, mixed));
             }
           }
           const ad = new AudioData({
@@ -301,6 +335,7 @@ export async function renderAutoZoom(
           });
           audioEncoder.encode(ad);
           ad.close();
+          f += Math.floor(frames * speed);
           logicalTimeUs += Math.round((frames / sampleRate) * 1_000_000);
         }
       }
@@ -313,12 +348,25 @@ export async function renderAutoZoom(
       let frameOffset = startFrame;
       let logicalTimeUs = 0;
       while (frameOffset < endFrame) {
-        const frames = Math.min(chunkFrames, endFrame - frameOffset);
+        const frames = Math.min(chunkFrames, Math.floor((endFrame - frameOffset) / speed));
+        if (frames <= 0) break;
         const slice = new Float32Array(frames * channelCount);
         for (let ch = 0; ch < channelCount; ch++) {
           const channelData = audioBuffer.getChannelData(ch);
           for (let i = 0; i < frames; i++) {
-            slice[i * channelCount + ch] = channelData[frameOffset + i];
+            const srcIdx = Math.floor(frameOffset + i * speed);
+            const voiceSample = srcIdx < channelData.length ? channelData[srcIdx] : 0;
+            
+            let bgSample = 0;
+            if (bgMusicBuffer && ch < bgMusicBuffer.numberOfChannels) {
+              const bgData = bgMusicBuffer.getChannelData(ch);
+              const sampleTimeS = (opts.backgroundMusicOffset ?? 0) + (logicalTimeUs / 1_000_000) + (i / sampleRate);
+              const bgFrameIndex = Math.floor(sampleTimeS * bgMusicBuffer.sampleRate) % bgMusicBuffer.length;
+              bgSample = bgData[bgFrameIndex] * 0.12; // 12% background music volume
+            }
+            
+            const mixed = voiceSample + bgSample;
+            slice[i * channelCount + ch] = Math.max(-1, Math.min(1, mixed));
           }
         }
         const ad = new AudioData({
@@ -331,7 +379,7 @@ export async function renderAutoZoom(
         });
         audioEncoder.encode(ad);
         ad.close();
-        frameOffset += frames;
+        frameOffset += Math.floor(frames * speed);
         logicalTimeUs += Math.round((frames / sampleRate) * 1_000_000);
       }
     }
@@ -415,9 +463,9 @@ export async function renderAutoZoom(
         frameIndex++;
 
         logicalTime += frameDurationS;
-        segTime += frameDurationS;
+        segTime += frameDurationS * speed;
 
-        const pct = Math.min(99, Math.round((logicalTime / totalDuration) * 100));
+        const pct = Math.min(99, Math.round((logicalTime / (totalDuration / speed)) * 100));
         if (pct !== lastReportedPct) {
           lastReportedPct = pct;
           onProgress({ stage: "rendering", percent: pct });
@@ -427,10 +475,11 @@ export async function renderAutoZoom(
   } else {
     // Linear rendering logic respecting trim range
     let t = trimStart;
+    let logicalTime = 0;
     while (t < trimEnd) {
       if (videoError) throw videoError;
 
-      const timestampUs = Math.round((t - trimStart) * 1_000_000);
+      const timestampUs = Math.round(logicalTime * 1_000_000);
       const frameDurationS = 1 / OUTPUT_FPS;
       const frameDurationUs = Math.round(frameDurationS * 1_000_000);
 
@@ -474,9 +523,10 @@ export async function renderAutoZoom(
       outFrame.close();
       frameIndex++;
 
-      t += frameDurationS;
+      t += frameDurationS * speed;
+      logicalTime += frameDurationS;
 
-      const pct = Math.min(99, Math.round(((t - trimStart) / (trimEnd - trimStart)) * 100));
+      const pct = Math.min(99, Math.round((logicalTime / ((trimEnd - trimStart) / speed)) * 100));
       if (pct !== lastReportedPct) {
         lastReportedPct = pct;
         onProgress({ stage: "rendering", percent: pct });

@@ -152,7 +152,7 @@ export function RecordingStudio() {
         </div>
       </header>
 
-      <div className="flex-1 flex items-center justify-center p-6 max-w-[1400px] mx-auto w-full relative z-10">
+      <div className={`flex-1 flex justify-center p-6 max-w-[1400px] mx-auto w-full relative z-10 ${r.state === "stopped" ? "items-start" : "items-center"}`}>
         <AnimatePresence mode="wait">
           {/* IDLE */}
           {(r.state === "idle" || r.state === "requesting") && !r.result && (
@@ -396,12 +396,6 @@ export function RecordingStudio() {
           {/* STOPPED — Editor */}
           {r.state === "stopped" && r.result && (
             <motion.div key="editor" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -20 }} className="w-full">
-              <div className="text-center mb-6">
-                <h2 className="text-display-section">Edit & Export</h2>
-                <p className="mt-2 text-body text-muted-foreground">
-                  {formatTime(r.result.duration)} · {(r.result.blob.size / 1024 / 1024).toFixed(1)} MB · auto-zoom is live in preview
-                </p>
-              </div>
               <AutoZoomEditor recording={r.result} onDiscard={r.discardRecording} />
             </motion.div>
           )}
