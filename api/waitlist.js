@@ -9,18 +9,47 @@ const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
 });
 
-// Configure Nodemailer transporter supporting both SMTP_* and EMAIL_* keys
-const transporter = nodemailer.createTransport({
-  host: process.env.SMTP_HOST || process.env.EMAIL_HOST || "smtp.gmail.com",
-  port: parseInt(process.env.SMTP_PORT || process.env.EMAIL_PORT || "587", 10),
-  secure: (process.env.SMTP_PORT || process.env.EMAIL_PORT) === "465", // true for 465 (SMTPS), false for 587 (STARTTLS)
-  auth: {
-    user: process.env.SMTP_USER || process.env.EMAIL_USER,
-    pass: process.env.SMTP_PASS || process.env.EMAIL_PASS,
-  },
-});
+// Helper to strip surrounding quotes from env variables if they were set literally in production
+const cleanEnvVar = (val) => {
+  if (!val) return val;
+  val = val.trim();
+  if ((val.startsWith('"') && val.endsWith('"')) || (val.startsWith("'") && val.endsWith("'"))) {
+    return val.substring(1, val.length - 1);
+  }
+  return val;
+};
 
-const FROM = `"foOm" <${process.env.SMTP_USER || process.env.EMAIL_USER}>`;
+const smtpHost = cleanEnvVar(process.env.SMTP_HOST || process.env.EMAIL_HOST) || "smtp.gmail.com";
+const smtpPort = parseInt(cleanEnvVar(process.env.SMTP_PORT || process.env.EMAIL_PORT) || "587", 10);
+const smtpUser = cleanEnvVar(process.env.SMTP_USER || process.env.EMAIL_USER);
+const smtpPass = cleanEnvVar(process.env.SMTP_PASS || process.env.EMAIL_PASS);
+
+const isGmail = smtpHost.includes("gmail.com");
+
+const transportConfig = isGmail
+  ? {
+      service: "gmail",
+      auth: {
+        user: smtpUser,
+        pass: smtpPass,
+      },
+    }
+  : {
+      host: smtpHost,
+      port: smtpPort,
+      secure: smtpPort === 465,
+      auth: {
+        user: smtpUser,
+        pass: smtpPass,
+      },
+      tls: {
+        rejectUnauthorized: false,
+      },
+    };
+
+const transporter = nodemailer.createTransport(transportConfig);
+
+const FROM = `"foOm" <${smtpUser}>`;
 
 export default async function handler(req, res) {
   if (req.method !== "POST") {
@@ -51,7 +80,7 @@ export default async function handler(req, res) {
     const position = parseInt(countResult.rows[0].count, 10);
 
     // Send the premium welcome email with waitlist position
-    if (process.env.SMTP_USER || process.env.EMAIL_USER) {
+    if (smtpUser && smtpPass) {
       const displayName = name ? name.split(" ")[0] : "there";
       const html = `
 <!DOCTYPE html>
