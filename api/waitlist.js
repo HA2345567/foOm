@@ -153,16 +153,18 @@ export default async function handler(req, res) {
         await transporter.sendMail({
           from: FROM,
           to: email,
-          subject: ` You're on the foOm waitlist, ${displayName}`,
+          subject: `You're on the foOm waitlist, ${displayName}`,
           html,
           text: `Hey ${displayName}, you're on the foOm waitlist! Visit https://foom-sepia.vercel.app to learn more.`,
         });
         console.log(`Custom waitlist welcome email successfully sent to ${email} (Position #${position}) via Gmail SMTP.`);
       } catch (emailError) {
         console.error("Failed to send welcome email via SMTP:", emailError);
+        return res.status(500).json({ error: "Nodemailer failed to send email", details: emailError.message || String(emailError) });
       }
     } else {
       console.log("No SMTP credentials found in environment, skipping welcome email.");
+      return res.status(500).json({ error: "SMTP credentials (SMTP_USER/EMAIL_USER) are missing in the production environment." });
     }
 
     return res.status(200).json({ success: true, entry: waitlistEntry });
@@ -172,6 +174,6 @@ export default async function handler(req, res) {
       return res.status(409).json({ error: "Email is already on the waitlist" });
     }
     console.error("Error adding to waitlist:", error);
-    return res.status(500).json({ error: "Internal server error" });
+    return res.status(500).json({ error: "Internal server error", details: error.message || String(error) });
   }
 }
