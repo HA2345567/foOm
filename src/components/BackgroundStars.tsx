@@ -1,4 +1,3 @@
-import { motion } from "framer-motion";
 import { useMemo } from "react";
 
 interface Star {
@@ -55,8 +54,8 @@ export function BackgroundStars({
         top,
         left,
         size: Math.random() > 0.8 ? 2 : 1,
-        duration: 2 + Math.random() * 3, // Faster twinkle
-        delay: Math.random() * 5,
+        duration: 2 + Math.random() * 3, // Twinkle speed
+        delay: Math.random() * -5, // Negative delay to start immediately in mid-animation
         isHigh: Math.random() > 0.85,
       };
     });
@@ -64,27 +63,34 @@ export function BackgroundStars({
 
   return (
     <div className="absolute inset-0 pointer-events-none overflow-hidden">
+      <style>{`
+        @keyframes twinkle-star {
+          0%, 100% {
+            opacity: var(--min-opacity);
+            transform: scale(var(--min-scale));
+          }
+          50% {
+            opacity: var(--max-opacity);
+            transform: scale(var(--max-scale));
+          }
+        }
+      `}</style>
       {stars.map((star) => (
-        <motion.div
+        <div
           key={star.id}
-          initial={{ opacity: star.isHigh ? highMinOpacity : minOpacity, scale: star.isHigh ? 1.2 : 1 }}
-          animate={{ 
-            opacity: star.isHigh ? [highMinOpacity, highMaxOpacity, highMinOpacity] : [minOpacity, maxOpacity, minOpacity],
-            scale: star.isHigh ? [1, 1.4, 1] : [0.9, 1.1, 0.9]
-          }}
-          transition={{ 
-            duration: star.duration, 
-            repeat: Infinity, 
-            delay: star.delay,
-            ease: "easeInOut"
-          }}
           className={`absolute rounded-full bg-white ${star.isHigh ? 'shadow-[0_0_10px_rgba(255,255,255,0.3)]' : ''}`}
           style={{
             top: star.top,
             left: star.left,
             width: `${star.size}px`,
             height: `${star.size}px`,
-          }}
+            animation: `twinkle-star ${star.duration}s ease-in-out infinite`,
+            animationDelay: `${star.delay}s`,
+            "--min-opacity": star.isHigh ? highMinOpacity : minOpacity,
+            "--max-opacity": star.isHigh ? highMaxOpacity : maxOpacity,
+            "--min-scale": star.isHigh ? 1 : 0.9,
+            "--max-scale": star.isHigh ? 1.4 : 1.1,
+          } as React.CSSProperties}
         />
       ))}
     </div>

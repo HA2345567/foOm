@@ -256,7 +256,6 @@ export function useScreenRecording() {
         video: {
           width: { ideal: 1920 },
           height: { ideal: 1080 },
-          aspectRatio: { ideal: 1.7777777778 },
           frameRate: { ideal: 30, max: 60 },
           displaySurface: displaySurfaceMap[sourceType],
           cursor: "never",
@@ -293,7 +292,7 @@ export function useScreenRecording() {
           audioCtx = new AudioCtx();
           audioCtxRef.current = audioCtx;
           const dest = audioCtx.createMediaStreamDestination();
-          
+
           if (screenAudioTracks.length > 0) {
             const sysSrc = audioCtx.createMediaStreamSource(new MediaStream(screenAudioTracks));
             const sysGain = audioCtx.createGain();
@@ -350,7 +349,7 @@ export function useScreenRecording() {
         setResult(recordingResult);
         saveRecording(recordingResult);
         setState("stopped");
-        if (document.pictureInPictureElement) document.exitPictureInPicture().catch(() => {});
+        if (document.pictureInPictureElement) document.exitPictureInPicture().catch(() => { });
         webcamStream?.getTracks().forEach(t => t.stop());
         setWebcamStream(null);
         setWebcamEnabled(false);

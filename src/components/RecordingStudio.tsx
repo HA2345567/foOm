@@ -59,19 +59,24 @@ export function RecordingStudio() {
 
   useEffect(() => {
     // 1. Listen for Polar Embedded Checkout events
-    const handlePolarSuccess = async (event: any) => {
-      console.log("Polar checkout success event:", event.detail);
-      const { checkout } = event.detail;
+    const handlePolarSuccess = async (event: Event) => {
+      const customEvent = event as CustomEvent<{ checkout?: { id: string } }>;
+      console.log("Polar checkout success event:", customEvent.detail);
+      const checkout = customEvent.detail?.checkout;
       if (checkout && checkout.id) {
-        const result = await (verifyPolarCheckout as any)({ data: checkout.id });
-        if (result.success && result.isPro) {
-          setProStatus(true, result.email);
-          setStatus(getUserStatus());
+        try {
+          const result = await verifyPolarCheckout(checkout.id);
+          if (result.success && result.isPro) {
+            setProStatus(true, result.email);
+            setStatus(getUserStatus());
+          }
+        } catch (err) {
+          console.error("Failed to verify Polar checkout:", err);
         }
       }
     };
 
-    window.addEventListener("polar:checkout:success" as any, handlePolarSuccess);
+    window.addEventListener("polar:checkout:success", handlePolarSuccess);
 
     // 2. Handle return from redirect (fallback)
     const checkPayment = async () => {
@@ -79,12 +84,16 @@ export function RecordingStudio() {
       const checkoutId = params.get("checkout_id");
 
       if (checkoutId) {
-        const result = await (verifyPolarCheckout as any)({ data: checkoutId });
-        if (result.success && result.isPro) {
-          setProStatus(true, result.email);
-          setStatus(getUserStatus());
-          // Clean up URL
-          window.history.replaceState({}, "", window.location.pathname);
+        try {
+          const result = await verifyPolarCheckout(checkoutId);
+          if (result.success && result.isPro) {
+            setProStatus(true, result.email);
+            setStatus(getUserStatus());
+            // Clean up URL
+            window.history.replaceState({}, "", window.location.pathname);
+          }
+        } catch (err) {
+          console.error("Failed to verify redirect checkout:", err);
         }
       } else if (params.get("payment") === "success") {
         // Legacy/Simulated path
@@ -105,7 +114,7 @@ export function RecordingStudio() {
     */
 
     return () => {
-      window.removeEventListener("polar:checkout:success" as any, handlePolarSuccess);
+      window.removeEventListener("polar:checkout:success", handlePolarSuccess);
     };
   }, []);
 

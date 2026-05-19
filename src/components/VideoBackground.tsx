@@ -1,5 +1,4 @@
 import React, { useEffect, useRef } from 'react';
-import Hls from 'hls.js';
 import { BackgroundStars } from './BackgroundStars';
 
 interface VideoBackgroundProps {
@@ -10,10 +9,19 @@ export function VideoBackground({ src }: VideoBackgroundProps) {
   const videoRef = useRef<HTMLVideoElement>(null);
 
   useEffect(() => {
+    // Completely bypass loading video background on mobile devices to save battery and performance
+    if (typeof window !== 'undefined' && window.innerWidth < 768) {
+      return;
+    }
+
     const video = videoRef.current;
     if (!video) return;
 
-    let hls: Hls | null = null;
+    // Convert Mux HLS url to direct native MP4 url for lightweight, hardware-accelerated playback
+    const isMux = src.includes("stream.mux.com");
+    const playUrl = isMux ? src.replace(/\.m3u8$/, "/medium.mp4") : src;
+
+    video.src = playUrl;
 
     const playVideo = () => {
       video.play().catch(err => {
@@ -21,40 +29,28 @@ export function VideoBackground({ src }: VideoBackgroundProps) {
       });
     };
 
-    if (video.canPlayType('application/vnd.apple.mpegurl')) {
-      video.src = src;
-      video.addEventListener('loadedmetadata', playVideo);
-    } else if (Hls.isSupported()) {
-      hls = new Hls({
-        maxMaxBufferLength: 30,
-        enableWorker: true,
-        autoStartLoad: true,
-      });
-      
-      hls.loadSource(src);
-      hls.attachMedia(video);
-      
-      hls.on(Hls.Events.MANIFEST_PARSED, () => {
-        playVideo();
-      });
+    video.addEventListener('loadedmetadata', playVideo);
+    
+    // Trigger play if readyState suggests video is already loaded
+    if (video.readyState >= 1) {
+      playVideo();
     }
 
     return () => {
-      if (hls) hls.destroy();
       video.removeEventListener('loadedmetadata', playVideo);
     };
   }, [src]);
 
   return (
     <div className="absolute inset-0 z-0 overflow-hidden pointer-events-none bg-black">
-      {/* 1. The Video Layer - Centered better to ensure the vortex is visible */}
+      {/* 1. The Video Layer - Centered better to ensure the vortex is visible (hidden on mobile) */}
       <video
         ref={videoRef}
         autoPlay
         muted
         loop
         playsInline
-        className="absolute inset-0 w-full h-full object-cover opacity-100 scale-125 origin-top translate-y-[5%]"
+        className="hidden md:block absolute inset-0 w-full h-full object-cover opacity-100 scale-125 origin-top translate-y-[5%]"
         style={{ filter: 'contrast(1.2) brightness(1.3)' }}
       />
 

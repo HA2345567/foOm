@@ -20,7 +20,7 @@ import { detectSilence, type AudioSegment } from "../lib/audioAnalysis";
 declare global {
   interface Window {
     onSpotifyWebPlaybackSDKReady?: () => void;
-    Spotify: any;
+    Spotify: unknown;
   }
 }
 
@@ -93,7 +93,12 @@ export function AutoZoomEditor({ recording, onDiscard }: Props) {
   const [renderError, setRenderError] = useState<string | null>(null);
   const [quality, setQuality] = useState<360 | 480 | 720 | 1080>(() => {
     const saved = localStorage.getItem("foom_quality");
-    if (saved) return parseInt(saved) as any;
+    if (saved) {
+      const parsed = parseInt(saved);
+      if (parsed === 360 || parsed === 480 || parsed === 720 || parsed === 1080) {
+        return parsed;
+      }
+    }
     return 720;
   });
   const [format, setFormat] = useState<RenderFormat>(() => {
@@ -413,19 +418,29 @@ export function AutoZoomEditor({ recording, onDiscard }: Props) {
     setCurrentTime(t);
   };
 
+  /**
+   * Helper function to programmatically trigger a download of a Blob file.
+   * Creates an object URL, clicks a hidden anchor element, and schedules revocation.
+   * @param blob - The file Blob to download.
+   * @param filename - The target filename including the extension.
+   */
   const triggerDownload = (blob: Blob, filename: string) => {
-    const downloadBlob = new Blob([blob], { type: "application/octet-stream" });
-    const url = URL.createObjectURL(downloadBlob);
-    const a = document.createElement("a");
-    a.style.display = "none";
-    a.href = url;
-    a.download = filename;
-    document.body.appendChild(a);
-    a.click();
-    setTimeout(() => {
-      document.body.removeChild(a);
-      URL.revokeObjectURL(url);
-    }, 1000);
+    try {
+      const url = URL.createObjectURL(blob); // use blob directly
+      const a = document.createElement("a");
+      a.style.display = "none";
+      a.href = url;
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      setTimeout(() => {
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+      }, 3000); // 3s gives the browser time to start the download
+    } catch (err) {
+      console.error("Download failed:", err);
+      alert("Download failed. Please try again.");
+    }
   };
 
   const handleExport = async () => {
@@ -763,7 +778,7 @@ export function AutoZoomEditor({ recording, onDiscard }: Props) {
               <h3 className="text-[10px] uppercase tracking-widest text-muted-foreground font-bold mb-3 px-1">
                 {selectedCategory === 'image' ? 'Professional Scenes' : `All ${selectedCategory}s`}
               </h3>
-              <div className="grid grid-cols-8 sm:grid-cols-10 md:grid-cols-12 gap-2 p-4 bg-card/30 rounded-2xl border border-border">
+              <div className="grid grid-cols-4 sm:grid-cols-6 md:grid-cols-8 lg:grid-cols-10 xl:grid-cols-12 gap-2 p-4 bg-card/30 rounded-2xl border border-border">
                 {BACKGROUNDS.filter(bg => bg.category === selectedCategory && !RAYCAST_BG_IDS.includes(bg.id)).map((bg) => (
                   <BackgroundButton key={bg.id} bg={bg} active={background.id === bg.id} onClick={() => setBackground(bg)} />
                 ))}
@@ -912,14 +927,14 @@ export function AutoZoomEditor({ recording, onDiscard }: Props) {
           <div className="grid grid-cols-2 gap-2">
             <div className="space-y-2">
               <p className="text-[9px] font-bold text-muted-foreground uppercase ml-1">Format</p>
-              <select value={format} onChange={(e) => setFormat(e.target.value as any)} className="w-full p-2.5 rounded-xl border border-border bg-card text-[11px] font-bold outline-none text-foreground">
+              <select value={format} onChange={(e) => setFormat(e.target.value as RenderFormat)} className="w-full p-2.5 rounded-xl border border-border bg-card text-[11px] font-bold outline-none text-foreground">
                 <option value="mp4">MP4 (H.264)</option>
                 <option value="webm">WebM (VP9)</option>
               </select>
             </div>
             <div className="space-y-2">
               <p className="text-[9px] font-bold text-muted-foreground uppercase ml-1">Quality</p>
-              <select value={quality} onChange={(e) => setQuality(parseInt(e.target.value) as any)} className="w-full p-2.5 rounded-xl border border-border bg-card text-[11px] font-bold outline-none text-foreground">
+              <select value={quality} onChange={(e) => setQuality(parseInt(e.target.value) as 360 | 480 | 720 | 1080)} className="w-full p-2.5 rounded-xl border border-border bg-card text-[11px] font-bold outline-none text-foreground">
                 <option value="1080">1080p</option>
                 <option value="720">720p</option>
                 <option value="480">480p</option>
@@ -939,8 +954,12 @@ export function AutoZoomEditor({ recording, onDiscard }: Props) {
 
           {rendered && !renderState && (
             <button onClick={() => {
-              const name = `${aiTitle.replace(/[^a-z0-9]/gi, '_').toLowerCase() || 'foom'}-${Date.now()}.${rendered.format}`;
-              triggerDownload(rendered.blob, name);
+              if (!rendered) return;
+              const safeName = (aiTitle || "foom")
+                .replace(/[^a-z0-9]/gi, "_")
+                .toLowerCase()
+                .slice(0, 50);
+              triggerDownload(rendered.blob, `${safeName}-${Date.now()}.${rendered.format}`);
             }}
               className="w-full py-4 rounded-2xl bg-primary text-primary-foreground text-sm font-bold shadow-xl shadow-primary/20 hover:scale-[1.02] active:scale-[0.98] transition-all flex items-center justify-center gap-2">
               <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" /><polyline points="7 10 12 15 17 10" /><line x1="12" x2="12" y1="15" y2="3" /></svg>
@@ -955,10 +974,55 @@ export function AutoZoomEditor({ recording, onDiscard }: Props) {
 
           {!renderState && (
             <button
-              onClick={() => {
-                const ext = recording.mimeType?.includes("mp4") ? "mp4" : "webm";
-                const name = `raw-${Date.now()}.${ext}`;
-                triggerDownload(recording.blob, name);
+              onClick={async () => {
+                if (recording.mimeType?.includes("mp4")) {
+                  try {
+                    const a = document.createElement("a");
+                    a.style.display = "none";
+                    a.href = recording.url;
+                    a.download = `raw-${Date.now()}.mp4`;
+                    document.body.appendChild(a);
+                    a.click();
+                    document.body.removeChild(a);
+                  } catch (err) {
+                    console.error("Raw download failed:", err);
+                  }
+                  return;
+                }
+
+                setRenderError(null);
+                setRenderState({ stage: "preparing", percent: 0 });
+                try {
+                  const out = await renderAutoZoom(recording, {
+                    format: "mp4",
+                    quality: 720,
+                    background: {
+                      id: "solid-black",
+                      name: "Black",
+                      category: "color",
+                      css: "#000000",
+                      paint: (ctx, w, h) => {
+                        ctx.fillStyle = "#000000";
+                        ctx.fillRect(0, 0, w, h);
+                      }
+                    },
+                    frame: { padding: 0, radius: 0, shadow: 0 },
+                    clicksOverride: [], // Disable auto-zooms
+                    removeSilence: false,
+                    trimStart: 0,
+                    trimEnd: recording.duration,
+                    aspectRatio: "auto",
+                    onProgress: (p) => setRenderState(p),
+                  });
+                  const name = `raw-${Date.now()}.mp4`;
+                  triggerDownload(out.blob, name);
+                } catch (e) {
+                  console.error("Raw MP4 transcode failed, falling back to WebM:", e);
+                  const name = `raw-${Date.now()}.webm`;
+                  triggerDownload(recording.blob, name);
+                } finally {
+                  setRenderState(null);
+                }
               }}
               className="w-full py-4 rounded-2xl bg-secondary text-secondary-foreground text-sm font-bold shadow-xl hover:scale-[1.02] active:scale-[0.98] transition-all flex items-center justify-center gap-2"
             >

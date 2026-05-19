@@ -29,8 +29,8 @@ try {
 // Dynamically import the handler so that env vars are set before Prisma client is imported
 const { default: handler } = await import('../api/waitlist.js');
 
-// Generate a random email so it doesn't fail on unique constraint if run multiple times
-const testEmail = "curiousharsh03@gmail.com";
+// Generate a dynamic email using Gmail '+' tagging so it bypasses unique constraints
+const testEmail = `curiousharsh03+test${Date.now()}@gmail.com`;
 
 // Mock Request & Response
 const req = {

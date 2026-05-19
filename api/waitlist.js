@@ -40,7 +40,7 @@ export default async function handler(req, res) {
     // Insert into the PostgreSQL Waitlist table directly using pg
     const query = 'INSERT INTO "Waitlist" (id, email, "createdAt") VALUES ($1, $2, $3) RETURNING *';
     const values = [id, email, now];
-    
+
     const result = await pool.query(query, values);
     const waitlistEntry = result.rows[0];
 
@@ -52,10 +52,6 @@ export default async function handler(req, res) {
     if (process.env.SMTP_USER || process.env.EMAIL_USER) {
       try {
         const displayName = name ? name.split(" ")[0] : "there";
-        const host = req.headers?.host || "foom-sepia.vercel.app";
-        const protocol = host.includes("localhost") || host.includes("127.0.0.1") ? "http" : "https";
-        const logoUrl = `${protocol}://${host}/logo.svg`;
-        
         const html = `
 <!DOCTYPE html>
 <html lang="en">
@@ -72,10 +68,6 @@ export default async function handler(req, res) {
     <div style="display: inline-block; padding: 12px 28px; background: #0A0A0D; border-radius: 16px; border: 1px solid #1F2430;">
       <table cellpadding="0" cellspacing="0" style="border-collapse: collapse; margin: 0 auto;">
         <tr>
-          <td style="vertical-align: middle; padding-right: 12px;">
-            <!-- Stylized F logo loaded dynamically to render perfectly in Gmail/other mail clients -->
-            <img src="${logoUrl}" width="32" height="32" style="display: block; border: 0; width: 32px; height: 32px;" alt="" />
-          </td>
           <td style="vertical-align: middle;">
             <!-- foOm brand name in crisp bold white matching the screenshot -->
             <span style="font-size: 26px; font-weight: 800; letter-spacing: -1px; color: #F8FAFC; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; line-height: 1;">
@@ -95,13 +87,16 @@ export default async function handler(req, res) {
     <strong>Your Waitlist Position:</strong> #${position}
   </p>
 
-  <p>With foOm, you create polished product sweeps directly inside your browser sandbox in 3 easy steps:</p>
+  <p>Here's everything you can do with foOm right in your browser:</p>
 
-  <ol style="padding-left:20px;margin:16px 0;">
-    <li style="margin-bottom:12px;"><strong>Start Recording:</strong> Open the sandbox, pick your target window or tab, and hit start. No heavy background software installation required.</li>
-    <li style="margin-bottom:12px;"><strong>AI Auto-Zoom:</strong> Move your cursor naturally. Our AI-driven focal tracking automatically handles organic camera pans and mathematically eased sweeps.</li>
-    <li style="margin-bottom:12px;"><strong>Ready-to-Share Export:</strong> As soon as you click stop, your high-definition video is compiled, processed, and ready to download instantly.</li>
-  </ol>
+  <ul style="padding-left:20px;margin:16px 0;line-height:1.8;">
+    <li style="margin-bottom:10px;"><strong>Smart Auto-Zoom:</strong> Automatically zooms into your clicks, typing, and UI interactions with cinematic, physics-eased camera pans.</li>
+    <li style="margin-bottom:10px;"><strong>Silence & Pause Removal:</strong> Automatically detects and removes dead pauses to keep your presentation pacing tight and engaging.</li>
+    <li style="margin-bottom:10px;"><strong>Auto Subtitles:</strong> Speech-to-text powered by Whisper running fully locally in your browser. Edit, style, and bake them into your video.</li>
+    <li style="margin-bottom:10px;"><strong>Cursor Intelligence:</strong> Highlights intentional clicks, filters out accidental mouse drift, and adds premium spotlight visual guides.</li>
+    <li style="margin-bottom:10px;"><strong>Webcam Overlay:</strong> Add your face in a fully customizable camera bubble (circle, rounded, or square) positioned anywhere on screen.</li>
+    <li style="margin-bottom:10px;"><strong>Studio Audio & Music:</strong> Clean up background noise automatically and mix in royalty-free background tracks to complete the vibe.</li>
+  </ul>
 
 
 
@@ -127,11 +122,13 @@ export default async function handler(req, res) {
         await transporter.sendMail({
           from: FROM,
           to: email,
-          subject: `🚀 You're on the foOm waitlist, ${displayName}`,
+          subject: ` You're on the foOm waitlist, ${displayName}`,
           html,
           text: `Hey ${displayName}, you're on the foOm waitlist! Visit https://foom-sepia.vercel.app to learn more.`,
         });
-        console.log(`Custom waitlist welcome email successfully sent to ${email} (Position #${position}) via Gmail SMTP.`);
+        console.log(
+          `Custom waitlist welcome email successfully sent to ${email} (Position #${position}) via Gmail SMTP.`,
+        );
       } catch (emailError) {
         console.error("Failed to send welcome email via SMTP:", emailError);
       }

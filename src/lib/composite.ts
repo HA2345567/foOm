@@ -126,7 +126,7 @@ export function drawComposite(
     // Stacked layout: camera top, screen bottom, aligned horizontally
     // Ideal for mobile 9:16 portrait style content
     const containerW = Math.min(availableW * 0.95, availableH * 0.46 * videoAspect);
-    
+
     targetW = containerW;
     targetH = targetW / videoAspect;
 
@@ -227,7 +227,7 @@ export function drawComposite(
 
     const cw = opts.camera.width || (opts.camera as any).videoWidth || 320;
     const ch = opts.camera.height || (opts.camera as any).videoHeight || 240;
-    
+
     // Dynamic cropping based on target aspect ratio
     const camAspect = camW / camH;
     let csW, csH;
@@ -304,7 +304,7 @@ export function drawComposite(
 
   // 7) Designer Cursor
   if (opts.showCursor && opts.mouseMoves && showScreen) {
-    drawDesignerCursor(ctx, opts.mouseMoves, opts.currentTime ?? 0, targetX, targetY, targetW, targetH, kf);
+    drawDesignerCursor(ctx, opts.mouseMoves, opts.currentTime ?? 0, targetX, targetY, targetW, targetH, kf, srcW, srcH);
   }
 
   // 8) PIP Camera (Overlay corner bubble mode only)
@@ -313,7 +313,7 @@ export function drawComposite(
     const pipSize = outW * (opts.cameraSize ?? 0.15);
     const cx = opts.cameraX ?? 0.85;
     const cy = opts.cameraY ?? 0.85;
-    
+
     let px = cx * outW - pipSize / 2;
     let py = cy * outH - pipSize / 2;
 
@@ -350,7 +350,7 @@ export function drawComposite(
     ctx.scale(-1, 1); // Mirror
     ctx.drawImage(opts.camera, csx, csy, cSize, cSize, -pipSize / 2, -pipSize / 2, pipSize, pipSize);
     ctx.restore();
-    
+
     ctx.restore();
     ctx.save();
     ctx.strokeStyle = "rgba(255,255,255,0.2)";
@@ -376,7 +376,9 @@ function drawDesignerCursor(
   panelY: number,
   panelW: number,
   panelH: number,
-  kf: ZoomKeyframe
+  kf: ZoomKeyframe,
+  srcW: number,
+  srcH: number
 ) {
   let x, y;
 
@@ -408,15 +410,23 @@ function drawDesignerCursor(
     y = kf.y;
   }
 
-  const zoomX = (x - kf.x) * kf.scale + 0.5;
-  const zoomY = (y - kf.y) * kf.scale + 0.5;
+  // 2. Map coordinates relative to the actual clamped video viewport crop bounds:
+  const sw = srcW / kf.scale;
+  const sh = srcH / kf.scale;
+  let sx = kf.x * srcW - sw / 2;
+  let sy = kf.y * srcH - sh / 2;
+  sx = Math.max(0, Math.min(srcW - sw, sx));
+  sy = Math.max(0, Math.min(srcH - sh, sy));
 
-  const screenX = panelX + zoomX * panelW;
-  const screenY = panelY + zoomY * panelH;
+  const relativeX = (x * srcW - sx) / sw;
+  const relativeY = (y * srcH - sy) / sh;
+
+  const screenX = panelX + relativeX * panelW;
+  const screenY = panelY + relativeY * panelH;
 
   ctx.save();
   ctx.translate(screenX, screenY);
-  
+
   // Spotlight
   const aura = ctx.createRadialGradient(0, 0, 0, 0, 0, 30);
   aura.addColorStop(0, "rgba(255, 255, 255, 0.25)");
@@ -427,11 +437,11 @@ function drawDesignerCursor(
   ctx.fill();
 
   // Vector Body
-  ctx.scale(2.2, 2.2); 
+  ctx.scale(2.2, 2.2);
   ctx.shadowColor = "rgba(0,0,0,0.6)";
   ctx.shadowBlur = 12;
   ctx.shadowOffsetY = 5;
-  
+
   ctx.beginPath();
   ctx.moveTo(0, 0);
   ctx.lineTo(0, 18);
@@ -441,16 +451,16 @@ function drawDesignerCursor(
   ctx.lineTo(7, 13);
   ctx.lineTo(13, 13);
   ctx.closePath();
-  
+
   ctx.fillStyle = "black";
   ctx.fill();
-  
+
   ctx.strokeStyle = "white";
   ctx.lineWidth = 1.4;
   ctx.stroke();
 
   // Active Tip
-  ctx.fillStyle = "#3b82f6"; 
+  ctx.fillStyle = "#3b82f6";
   ctx.beginPath();
   ctx.arc(0, 0, 1.5, 0, Math.PI * 2);
   ctx.fill();
