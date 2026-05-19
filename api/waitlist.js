@@ -1,6 +1,7 @@
 import pg from "pg";
 import crypto from "crypto";
 import nodemailer from "nodemailer";
+import { waitUntil } from "@vercel/functions";
 
 const { Pool } = pg;
 
@@ -9,8 +10,9 @@ const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
 });
 
-// Configure Nodemailer transporter supporting both SMTP_* and EMAIL_* keys
+// Configure Nodemailer transporter supporting both SMTP_* and EMAIL_* keys with connection pooling
 const transporter = nodemailer.createTransport({
+  pool: true, // Enable connection pooling for faster reused connections
   host: process.env.SMTP_HOST || process.env.EMAIL_HOST || "smtp.gmail.com",
   port: parseInt(process.env.SMTP_PORT || process.env.EMAIL_PORT || "587", 10),
   secure: (process.env.SMTP_PORT || process.env.EMAIL_PORT) === "465", // true for 465 (SMTPS), false for 587 (STARTTLS)
@@ -18,6 +20,8 @@ const transporter = nodemailer.createTransport({
     user: process.env.SMTP_USER || process.env.EMAIL_USER,
     pass: process.env.SMTP_PASS || process.env.EMAIL_PASS,
   },
+  maxConnections: 5,
+  maxMessages: 100,
 });
 
 const FROM = `"foOm" <${process.env.SMTP_USER || process.env.EMAIL_USER}>`;
@@ -41,18 +45,19 @@ export default async function handler(req, res) {
     const query = 'INSERT INTO "Waitlist" (id, email, "createdAt") VALUES ($1, $2, $3) RETURNING *';
     const values = [id, email, now];
 
-    const result = await pool.query(query, values);
-    const waitlistEntry = result.rows[0];
+    // Query Neon database concurrently to save round-trip time
+    const [result, countResult] = await Promise.all([
+      pool.query(query, values),
+      pool.query('SELECT COUNT(*) FROM "Waitlist";')
+    ]);
 
-    // Calculate real-time waitlist position from Neon Postgres
-    const countResult = await pool.query('SELECT COUNT(*) FROM "Waitlist";');
+    const waitlistEntry = result.rows[0];
     const position = parseInt(countResult.rows[0].count, 10);
 
     // Send the premium welcome email with waitlist position
     if (process.env.SMTP_USER || process.env.EMAIL_USER) {
-      try {
-        const displayName = name ? name.split(" ")[0] : "there";
-        const html = `
+      const displayName = name ? name.split(" ")[0] : "there";
+      const html = `
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -119,19 +124,19 @@ export default async function handler(req, res) {
 </html>
         `;
 
-        await transporter.sendMail({
+      waitUntil(
+        transporter.sendMail({
           from: FROM,
           to: email,
           subject: ` You're on the foOm waitlist, ${displayName}`,
           html,
           text: `Hey ${displayName}, you're on the foOm waitlist! Visit https://foom-sepia.vercel.app to learn more.`,
-        });
-        console.log(
-          `Custom waitlist welcome email successfully sent to ${email} (Position #${position}) via Gmail SMTP.`,
-        );
-      } catch (emailError) {
-        console.error("Failed to send welcome email via SMTP:", emailError);
-      }
+        }).then(() => {
+          console.log(`Custom waitlist welcome email successfully sent to ${email} (Position #${position}) via Gmail SMTP.`);
+        }).catch((emailError) => {
+          console.error("Failed to send welcome email via SMTP in background:", emailError);
+        })
+      );
     } else {
       console.log("No SMTP credentials found in environment, skipping welcome email.");
     }

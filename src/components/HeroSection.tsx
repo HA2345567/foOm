@@ -1,11 +1,10 @@
-
 import { useState } from "react";
 import { motion } from "framer-motion";
 import { VideoBackground } from "./VideoBackground";
 import StarBorder from "./StarBorder";
 import { toast } from "sonner";
 
-export function HeroSection(){
+export function HeroSection() {
   const [email, setEmail] = useState("");
   const [loading, setLoading] = useState(false);
   const [isJoined, setIsJoined] = useState(false);
@@ -30,7 +29,7 @@ export function HeroSection(){
         });
         setEmail("");
         setIsJoined(true);
-        
+
         // Revert the green confirmation box back to the input form after 5 seconds
         setTimeout(() => {
           setIsJoined(false);
@@ -49,12 +48,14 @@ export function HeroSection(){
     }
   };
   return (
-    <section id="waitlist" className="relative h-screen w-full flex items-center justify-center overflow-hidden bg-black">
+    <section
+      id="waitlist"
+      className="relative h-screen w-full flex items-center justify-center overflow-hidden bg-black"
+    >
       {/* Cinematic Background Video - The Space Vortex */}
       <VideoBackground src="https://stream.mux.com/Aa02T7oM1wH5Mk5EEVDYhbZ1ChcdhRsS2m1NYyx4Ua1g.m3u8" />
 
       <div className="relative z-20 mx-auto max-w-4xl px-6 text-center pt-32">
-
         {/* High-Contrast Cinematic Headline */}
         <motion.h1
           initial={{ opacity: 0, y: 20 }}
@@ -74,7 +75,8 @@ export function HeroSection(){
           transition={{ duration: 0.6, delay: 0.2 }}
           className="mt-8 text-body-large max-w-2xl mx-auto"
         >
-          foOm automatically applies smart zoom, focus, and cinematic editing to your screen recordings. No downloads. No editing. Just hit record.
+          foOm automatically applies smart zoom, focus, and cinematic editing to your screen
+          recordings. No downloads. No editing. Just hit record.
         </motion.p>
 
         {/* Senior Minimalist CTA / Success State */}
@@ -120,15 +122,13 @@ export function HeroSection(){
             </div>
             <div>
               <p className="text-emerald-400 font-bold text-lg">You are confirmed!</p>
-              <p className="text-emerald-400/80 text-sm mt-1">We've sent a welcome email highlighting your features.</p>
+              <p className="text-emerald-400/80 text-sm mt-1">
+                We've sent a welcome email highlighting your features.
+              </p>
             </div>
           </motion.div>
         )}
-
       </div>
-
-      {/* Decorative Bottom Vignette to ground the section */}
-      <div className="absolute inset-x-0 bottom-0 h-64 bg-gradient-to-t from-black via-black/80 to-transparent z-10" />
     </section>
   );
 }

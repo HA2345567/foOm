@@ -5,11 +5,30 @@ import StarBorder from "./StarBorder";
 export function CtaSection() {
   return (
     <section className="py-24 md:py-40 px-6 bg-background relative overflow-hidden">
+      {/* Background Cube Image */}
+      <div 
+        className="absolute inset-0 pointer-events-none select-none z-0 opacity-40 mix-blend-screen"
+      >
+        <motion.img 
+          src="/cube_prod_preview.webp" 
+          alt="Background Preview" 
+          className="w-full h-full object-cover"
+          animate={{
+            y: [0, -8, 0],
+          }}
+          transition={{
+            duration: 10,
+            repeat: Infinity,
+            ease: "easeInOut",
+          }}
+        />
+      </div>
+
       {/* Decorative architectural grid */}
-      <div className="absolute inset-0 opacity-[0.02] pointer-events-none" 
-        style={{ backgroundImage: 'linear-gradient(#fff 1px, transparent 1px), linear-gradient(90deg, #fff 1px, transparent 1px)', backgroundSize: '64px 64px' }} 
+      <div className="absolute inset-0 opacity-[0.02] pointer-events-none"
+        style={{ backgroundImage: 'linear-gradient(#fff 1px, transparent 1px), linear-gradient(90deg, #fff 1px, transparent 1px)', backgroundSize: '64px 64px' }}
       />
-      
+
       <div className="mx-auto max-w-4xl text-center relative z-10">
         <motion.h2
           initial={{ opacity: 0, y: 20 }}
@@ -17,11 +36,11 @@ export function CtaSection() {
           viewport={{ once: true }}
           className="text-display-section"
         >
-          Ready to make your 
+          Ready to make your
           <br />
           <span className="text-muted-foreground">demos look professional?</span>
         </motion.h2>
-        
+
         <motion.p
           initial={{ opacity: 0, y: 20 }}
           whileInView={{ opacity: 1, y: 0 }}
@@ -31,7 +50,7 @@ export function CtaSection() {
         >
           Join 2,000+ founders and engineers using foOm to ship better product updates.
         </motion.p>
-        
+
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           whileInView={{ opacity: 1, y: 0 }}

@@ -6,84 +6,80 @@ interface VideoBackgroundProps {
   src: string;
 }
 
-export function VideoBackground({ src }: VideoBackgroundProps) {
+export function VideoBackground({
+  src,
+}: VideoBackgroundProps) {
   const videoRef = useRef<HTMLVideoElement>(null);
 
   useEffect(() => {
-    // Completely bypass loading video background on mobile devices to save battery and performance
-    if (typeof window !== "undefined" && window.innerWidth < 768) {
-      return;
-    }
-
     const video = videoRef.current;
     if (!video) return;
 
     let hls: Hls | null = null;
 
-    const playVideo = () => {
-      video.play().catch((err) => {
-        console.warn("Video autoplay failed:", err);
-      });
+    const startVideo = async () => {
+      try {
+        await video.play();
+      } catch (err) {
+        console.error("Autoplay failed:", err);
+      }
     };
 
     if (video.canPlayType("application/vnd.apple.mpegurl")) {
       video.src = src;
-      video.addEventListener("loadedmetadata", playVideo);
+
+      video.addEventListener("loadedmetadata", startVideo);
     } else if (Hls.isSupported()) {
       hls = new Hls({
-        maxMaxBufferLength: 30,
         enableWorker: true,
         autoStartLoad: true,
+        abrEwmaDefaultEstimate: 10000000, // Prime estimator with 10 Mbps for high quality
       });
 
       hls.loadSource(src);
       hls.attachMedia(video);
 
       hls.on(Hls.Events.MANIFEST_PARSED, () => {
-        playVideo();
+        // Force the highest quality level for the background video
+        if (hls && hls.levels && hls.levels.length > 0) {
+          hls.currentLevel = hls.levels.length - 1;
+        }
+        startVideo();
+      });
+
+      hls.on(Hls.Events.ERROR, (_, data) => {
+        console.error("HLS ERROR:", data);
       });
     }
 
-    // Trigger play if readyState suggests video is already loaded
-    if (video.readyState >= 1) {
-      playVideo();
-    }
-
     return () => {
-      if (hls) hls.destroy();
-      video.removeEventListener("loadedmetadata", playVideo);
+      hls?.destroy();
+      video.pause();
+      video.removeAttribute("src");
+      video.load();
     };
   }, [src]);
 
   return (
-    <div className="absolute inset-0 z-0 overflow-hidden pointer-events-none bg-black">
-      {/* 1. The Video Layer - Centered better to ensure the vortex is visible (hidden on mobile) */}
+    <div className="absolute inset-0 overflow-hidden bg-black">
       <video
         ref={videoRef}
         autoPlay
         muted
         loop
         playsInline
-        className="hidden md:block absolute inset-0 w-full h-full object-cover opacity-100 scale-125 origin-top translate-y-[5%]"
-        style={{ filter: "contrast(1.2) brightness(1.3)" }}
+        preload="auto"
+        className="absolute inset-0 w-full h-full"
+        style={{
+          objectFit: "cover",
+          objectPosition: "center",
+          filter: "contrast(1.1) brightness(1.1)",
+        }}
       />
 
-      {/* 2. Refined Vignette (Lighter at top, deep at bottom) */}
-      <div className="absolute inset-0 z-10 bg-[radial-gradient(circle_at_50%_10%,transparent_0%,rgba(0,0,0,0.2)_50%,rgba(0,0,0,0.9)_90%,#000_100%)]" />
-
-      {/* 3. Integrated Stars */}
       <div className="absolute inset-0 z-20">
         <BackgroundStars count={40} />
       </div>
-
-      {/* 4. Fine Noise Grain */}
-      <div
-        className="absolute inset-0 z-30 opacity-[0.04] pointer-events-none mix-blend-soft-light"
-        style={{
-          backgroundImage:
-            "url(\"data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.65' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)'/%3E%3C/svg%3E\")",
-        }}
-      />
     </div>
   );
 }

@@ -6,11 +6,7 @@ import { LoginModal } from "./LoginModal";
 import { Logo } from "./Logo";
 import StarBorder from "./StarBorder";
 
-const navLinks = [
-  { label: "Features", href: "#features" },
-  { label: "How it works", href: "#how-it-works" },
-  // { label: "Pricing", href: "#pricing" },
-];
+const navLinks: { label: string; href: string }[] = [];
 
 export function Navbar() {
   const [mobileOpen, setMobileOpen] = useState(false);
@@ -18,7 +14,7 @@ export function Navbar() {
   const [status, setStatus] = useState(getUserStatus());
 
   return (
-    <nav className="fixed top-0 left-0 right-0 z-50 bg-black/60 backdrop-blur-xl">
+    <nav className="fixed top-0 left-0 right-0 z-50 bg-transparent">
       <div className="mx-auto max-w-7xl px-6 flex items-center justify-between h-16">
         {/* Logo */}
         <Link to="/" className="flex items-center gap-3 group">
@@ -78,12 +74,15 @@ export function Navbar() {
           onClick={() => setMobileOpen(!mobileOpen)}
           aria-label="Menu"
         >
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
-            {mobileOpen ? (
-              <path d="M6 6l12 12M6 18L18 6" />
-            ) : (
-              <path d="M4 8h16M4 16h16" />
-            )}
+          <svg
+            width="20"
+            height="20"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2.5"
+          >
+            {mobileOpen ? <path d="M6 6l12 12M6 18L18 6" /> : <path d="M4 8h16M4 16h16" />}
           </svg>
         </button>
       </div>
@@ -132,4 +131,3 @@ export function Navbar() {
     </nav>
   );
 }
-
