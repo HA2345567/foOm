@@ -935,7 +935,7 @@ export function AutoZoomEditor({ recording, onDiscard }: Props) {
             {renderState ? "Processing…" : rendered ? "Regenerate" : "Export Video"}
           </button>
 
-          <div className="grid grid-cols-2 gap-3 pt-2">
+          {!renderState && (
             <button
               onClick={() => {
                 const ext = recording.mimeType?.includes("mp4") ? "mp4" : "webm";
@@ -946,14 +946,17 @@ export function AutoZoomEditor({ recording, onDiscard }: Props) {
                 a.click();
                 document.body.removeChild(a);
               }}
-              className="py-3 rounded-xl border border-white/5 bg-white/5 text-muted-foreground text-[11px] font-bold hover:text-white hover:bg-white/10 hover:border-white/10 transition-all duration-300 flex items-center justify-center gap-2 group"
+              className="w-full py-4 rounded-2xl bg-secondary text-secondary-foreground text-sm font-bold shadow-xl hover:scale-[1.02] active:scale-[0.98] transition-all flex items-center justify-center gap-2"
             >
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" className="group-hover:-translate-y-0.5 transition-transform"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" /><polyline points="7 10 12 15 17 10" /><line x1="12" x2="12" y1="15" y2="3" /></svg>
-              Download Raw
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" /><polyline points="7 10 12 15 17 10" /><line x1="12" x2="12" y1="15" y2="3" /></svg>
+              Download Raw Video
             </button>
+          )}
+
+          <div className="pt-2">
             <button
               onClick={onDiscard}
-              className="py-3 rounded-xl border border-destructive/10 bg-destructive/5 text-destructive/80 text-[11px] font-bold hover:bg-destructive hover:text-white hover:border-destructive transition-all duration-300 flex items-center justify-center gap-2 group"
+              className="w-full py-3 rounded-xl border border-destructive/10 bg-destructive/5 text-destructive/80 text-[11px] font-bold hover:bg-destructive hover:text-white hover:border-destructive transition-all duration-300 flex items-center justify-center gap-2 group"
             >
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" className="group-hover:rotate-12 transition-transform"><path d="M3 6h18m-2 0v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6m3 0V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2" /></svg>
               Discard Video
@@ -1038,8 +1041,8 @@ export function AutoZoomEditor({ recording, onDiscard }: Props) {
                           setMusicOffset(0);
                         }}
                         className={`flex items-center gap-2 p-1.5 rounded-xl border text-left transition-all ${isSelected
-                            ? "bg-[#1DB954]/10 border-[#1DB954] text-white"
-                            : "bg-white/[0.02] border-white/5 hover:border-white/20 text-muted-foreground hover:text-white"
+                          ? "bg-[#1DB954]/10 border-[#1DB954] text-white"
+                          : "bg-white/[0.02] border-white/5 hover:border-white/20 text-muted-foreground hover:text-white"
                           }`}
                       >
                         <img src={track.albumArt} className="w-6 h-6 rounded-md object-cover border border-white/5 shrink-0" alt="album art" />

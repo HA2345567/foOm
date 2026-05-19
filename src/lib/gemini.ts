@@ -136,28 +136,50 @@ export async function analyzeRecordingAI(blob: Blob): Promise<{
 
 async function captureFrames(url: string, duration: number, count: number) {
   const video = document.createElement("video");
-  video.src = url;
-  video.muted = true;
-  video.crossOrigin = "anonymous";
-  await new Promise((r) => (video.onloadedmetadata = r));
+  video.style.position = "fixed";
+  video.style.pointerEvents = "none";
+  video.style.top = "-9999px";
+  video.style.left = "-9999px";
+  video.style.width = "1px";
+  video.style.height = "1px";
+  video.style.opacity = "0";
+  document.body.appendChild(video);
 
-  const canvas = document.createElement("canvas");
-  const ctx = canvas.getContext("2d")!;
-  // Small enough for Gemini but clear enough for UI
-  canvas.width = 640;
-  canvas.height = 360;
+  try {
+    video.src = url;
+    video.muted = true;
+    video.crossOrigin = "anonymous";
+    await new Promise((r) => (video.onloadedmetadata = r));
 
-  const frames: { t: number; base64: string }[] = [];
+    const canvas = document.createElement("canvas");
+    const ctx = canvas.getContext("2d")!;
+    // Small enough for Gemini but clear enough for UI
+    canvas.width = 640;
+    canvas.height = 360;
 
-  for (let i = 0; i < count; i++) {
-    const t = (i / (count - 1)) * duration;
-    video.currentTime = t;
-    await new Promise((r) => (video.onseeked = r));
-    ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-    frames.push({ t, base64: canvas.toDataURL("image/jpeg", 0.7) });
+    const frames: { t: number; base64: string }[] = [];
+
+    for (let i = 0; i < count; i++) {
+      const t = (i / (count - 1)) * duration;
+      video.currentTime = t;
+      await new Promise((r) => (video.onseeked = r));
+      ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+      frames.push({ t, base64: canvas.toDataURL("image/jpeg", 0.7) });
+      // Yield to keep browser responsive
+      await new Promise((resolve) => setTimeout(resolve, 0));
+    }
+
+    return frames;
+  } finally {
+    try {
+      video.pause();
+      video.src = "";
+      video.load();
+      video.remove();
+    } catch (e) {
+      console.warn("Failed to clean up captureFrames video element", e);
+    }
   }
-
-  return frames;
 }
 
 /**
@@ -166,24 +188,32 @@ async function captureFrames(url: string, duration: number, count: number) {
  */
 async function extractAudioFromVideo(videoBlob: Blob): Promise<Blob> {
   const audioCtx = new AudioContext({ sampleRate: 16000 });
-  const arrayBuffer = await videoBlob.arrayBuffer();
-  
-  let audioBuffer: AudioBuffer;
   try {
-    audioBuffer = await audioCtx.decodeAudioData(arrayBuffer);
-  } catch (e) {
-    console.warn("No audio track found or decode failed. Sending original blob.", e);
-    return videoBlob;
-  }
+    const arrayBuffer = await videoBlob.arrayBuffer();
 
-  const offlineCtx = new OfflineAudioContext(1, audioBuffer.length, audioBuffer.sampleRate);
-  const source = offlineCtx.createBufferSource();
-  source.buffer = audioBuffer;
-  source.connect(offlineCtx.destination);
-  source.start();
-  
-  const renderedBuffer = await offlineCtx.startRendering();
-  return bufferToWav(renderedBuffer);
+    let audioBuffer: AudioBuffer;
+    try {
+      audioBuffer = await audioCtx.decodeAudioData(arrayBuffer);
+    } catch (e) {
+      console.warn("No audio track found or decode failed. Sending original blob.", e);
+      return videoBlob;
+    }
+
+    const offlineCtx = new OfflineAudioContext(1, audioBuffer.length, audioBuffer.sampleRate);
+    const source = offlineCtx.createBufferSource();
+    source.buffer = audioBuffer;
+    source.connect(offlineCtx.destination);
+    source.start();
+
+    const renderedBuffer = await offlineCtx.startRendering();
+    return bufferToWav(renderedBuffer);
+  } finally {
+    try {
+      await audioCtx.close();
+    } catch (e) {
+      console.warn("Failed to close AudioContext in extractAudioFromVideo", e);
+    }
+  }
 }
 
 function bufferToWav(abuffer: AudioBuffer): Blob {
