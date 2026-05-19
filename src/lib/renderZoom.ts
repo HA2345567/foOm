@@ -35,6 +35,29 @@ const OUTPUT_FPS = 30;
 const KEYFRAME_INTERVAL_S = 2;
 const AUDIO_BPS = 128_000;
 
+async function seekVideo(video: HTMLVideoElement, targetTime: number): Promise<void> {
+  const needsSeek = Math.abs(video.currentTime - targetTime) > 0.04;
+  video.currentTime = targetTime;
+  if (!needsSeek) return;
+
+  await new Promise<void>((resolve) => {
+    let resolved = false;
+    const onSeek = () => {
+      if (resolved) return;
+      resolved = true;
+      video.removeEventListener("seeked", onSeek);
+      resolve();
+    };
+    video.addEventListener("seeked", onSeek);
+    setTimeout(() => {
+      if (resolved) return;
+      resolved = true;
+      video.removeEventListener("seeked", onSeek);
+      resolve();
+    }, 100);
+  });
+}
+
 export async function renderAutoZoom(
   recording: RecordingResult,
   opts: {
@@ -414,27 +437,11 @@ export async function renderAutoZoom(
         const frameDurationUs = Math.round(frameDurationS * 1_000_000);
 
         // SMART SEEK: Skip the expensive 'await seeked' for small sequential jumps.
-        const needsSeek = Math.abs(video.currentTime - segTime) > 0.04;
-        video.currentTime = segTime;
-        if (needsSeek) {
-          await new Promise<void>((r) => {
-            const onSeek = () => { video.removeEventListener("seeked", onSeek); r(); };
-            video.addEventListener("seeked", onSeek);
-            setTimeout(r, 60); // Safety timeout
-          });
-        }
+        await seekVideo(video, segTime);
 
         const kf = interpolateZoom(keyframes, segTime);
         if (cameraVideo) {
-          const camNeedsSeek = Math.abs(cameraVideo.currentTime - segTime) > 0.04;
-          cameraVideo.currentTime = segTime;
-          if (camNeedsSeek) {
-            await new Promise<void>((r) => {
-              const onSeek = () => { cameraVideo!.removeEventListener("seeked", onSeek); r(); };
-              cameraVideo!.addEventListener("seeked", onSeek);
-              setTimeout(r, 60); 
-            });
-          }
+          await seekVideo(cameraVideo, segTime);
         }
 
         drawComposite(ctx as unknown as CanvasRenderingContext2D, video, kf, {
@@ -484,19 +491,11 @@ export async function renderAutoZoom(
       const frameDurationS = 1 / OUTPUT_FPS;
       const frameDurationUs = Math.round(frameDurationS * 1_000_000);
 
-      video.currentTime = t;
-      await new Promise<void>((r) => {
-        const onSeek = () => { video.removeEventListener("seeked", onSeek); r(); };
-        video.addEventListener("seeked", onSeek);
-      });
+      await seekVideo(video, t);
 
       const kf = interpolateZoom(keyframes, t);
       if (cameraVideo) {
-        cameraVideo.currentTime = t;
-        await new Promise<void>((r) => {
-          const onSeek = () => { cameraVideo!.removeEventListener("seeked", onSeek); r(); };
-          cameraVideo!.addEventListener("seeked", onSeek);
-        });
+        await seekVideo(cameraVideo, t);
       }
 
       drawComposite(ctx as unknown as CanvasRenderingContext2D, video, kf, {
