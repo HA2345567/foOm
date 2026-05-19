@@ -124,19 +124,24 @@ export default async function handler(req, res) {
 </html>
         `;
 
-      waitUntil(
-        transporter.sendMail({
-          from: FROM,
-          to: email,
-          subject: ` You're on the foOm waitlist, ${displayName}`,
-          html,
-          text: `Hey ${displayName}, you're on the foOm waitlist! Visit https://foom-sepia.vercel.app to learn more.`,
-        }).then(() => {
-          console.log(`Custom waitlist welcome email successfully sent to ${email} (Position #${position}) via Gmail SMTP.`);
-        }).catch((emailError) => {
-          console.error("Failed to send welcome email via SMTP in background:", emailError);
-        })
-      );
+      const emailPromise = transporter.sendMail({
+        from: FROM,
+        to: email,
+        subject: ` You're on the foOm waitlist, ${displayName}`,
+        html,
+        text: `Hey ${displayName}, you're on the foOm waitlist! Visit https://foom-sepia.vercel.app to learn more.`,
+      }).then(() => {
+        console.log(`Custom waitlist welcome email successfully sent to ${email} (Position #${position}) via Gmail SMTP.`);
+      }).catch((emailError) => {
+        console.error("Failed to send welcome email via SMTP in background:", emailError);
+      });
+
+      try {
+        waitUntil(emailPromise);
+      } catch (e) {
+        // Fallback for local development or non-Vercel environments
+        console.log("waitUntil was bypassed (non-Vercel environment). Email will resolve in background event loop.");
+      }
     } else {
       console.log("No SMTP credentials found in environment, skipping welcome email.");
     }

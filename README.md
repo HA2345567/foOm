@@ -36,6 +36,7 @@ The core innovation is a **spring-physics zoom engine** that continuously tracks
 | **Browser-Native** | Runs entirely in the browser. No install, no Electron, no extensions required. |
 | **MP4 Export** | High-fidelity MP4 export powered by FFmpeg WASM with the full zoom keyframe curve baked in via `zoompan` filters. |
 | **Polar Payments** | Embedded Pro checkout via [Polar.sh](https://polar.sh) with server-side subscription verification. |
+| **Priority Waitlist** | Interactive waitlist capture with concurrent queue-count calculation and backgrounded email dispatch context (`waitUntil`) for instant UI responses. |
 
 ---
 
@@ -112,8 +113,8 @@ src/
 | **AI** | Google Gemini 1.5 Flash (`@google/generative-ai`) |
 | **Video Processing** | FFmpeg WASM (`@ffmpeg/ffmpeg`) + `mp4-muxer` + `webm-muxer` |
 | **Payments** | Polar.sh (`@polar-sh/checkout`) |
-| **Database** | Prisma (Cloudflare D1) |
-| **Deployment** | Cloudflare Pages + Cloudflare Workers |
+| **Database** | Prisma (PostgreSQL / Neon) |
+| **Deployment** | Vercel |
 | **Runtime** | Bun |
 
 ---
@@ -124,6 +125,8 @@ src/
 
 - [Node.js](https://nodejs.org) ≥ 20 or [Bun](https://bun.sh) ≥ 1.1
 - A [Google AI Studio](https://aistudio.google.com) API key (for Gemini features)
+- A PostgreSQL database (e.g. [Neon](https://neon.tech))
+- SMTP Credentials (e.g. Gmail App Password) or a [Resend](https://resend.com) API Key for email delivery
 
 ### 1. Clone & Install
 
@@ -148,6 +151,20 @@ VITE_GEMINI_API_KEY=your_gemini_api_key_here
 
 # Required — Polar.sh for Pro subscription payments
 VITE_POLAR_CHECKOUT_URL=https://polar.sh/checkout/...
+POLAR_ACCESS_TOKEN=your_polar_access_token_here
+
+# Required — PostgreSQL database connection string (e.g. Neon)
+DATABASE_URL=postgresql://user:pass@host/db?sslmode=require
+
+# Optional — Resend API Key for sending waitlist confirmations (Alternative to SMTP)
+RESEND_API_KEY=your_resend_api_key_here
+
+# Optional — SMTP/Gmail credentials for sending waitlist confirmation emails
+EMAIL_HOST=smtp.gmail.com
+EMAIL_PORT=587
+EMAIL_SECURE=false
+EMAIL_USER=your_email@gmail.com
+EMAIL_PASS=your_email_app_password
 ```
 
 ### 3. Run Locally
@@ -182,6 +199,14 @@ bun run format       # Prettier
 |----------|----------|-------------|
 | `VITE_GEMINI_API_KEY` | Yes | Google Gemini API key for AI frame analysis and audio transcription |
 | `VITE_POLAR_CHECKOUT_URL` | Yes | Polar.sh checkout link for Pro plan upgrades |
+| `POLAR_ACCESS_TOKEN` | Yes | Polar.sh OAuth Access Token for subscription verification |
+| `DATABASE_URL` | Yes | PostgreSQL connection string for saving waitlist registrations |
+| `EMAIL_HOST` | No | SMTP/Email provider host (e.g. `smtp.gmail.com`) for sending welcome emails |
+| `EMAIL_PORT` | No | SMTP/Email provider port (e.g. `587`) |
+| `EMAIL_SECURE` | No | Whether connection is secure/SSL (e.g. `true` or `false`) |
+| `EMAIL_USER` | No | SMTP username/sender email address |
+| `EMAIL_PASS` | No | SMTP app password or credentials |
+| `RESEND_API_KEY` | No | Resend API key (if using Resend instead of SMTP for email) |
 
 ---
 
