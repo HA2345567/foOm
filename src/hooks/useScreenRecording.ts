@@ -429,9 +429,10 @@ export function useScreenRecording() {
 
   const downloadRecording = useCallback(() => {
     if (!result) return;
+    const ext = result.mimeType?.includes("mp4") ? "mp4" : "webm";
     const a = document.createElement("a");
     a.href = result.url;
-    a.download = `foom-${Date.now()}.webm`;
+    a.download = `foom-${Date.now()}.${ext}`;
     document.body.appendChild(a); a.click(); document.body.removeChild(a);
   }, [result]);
 

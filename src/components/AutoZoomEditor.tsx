@@ -938,10 +938,13 @@ export function AutoZoomEditor({ recording, onDiscard }: Props) {
           <div className="grid grid-cols-2 gap-3 pt-2">
             <button
               onClick={() => {
+                const ext = recording.mimeType?.includes("mp4") ? "mp4" : "webm";
                 const a = document.createElement("a");
                 a.href = recording.url;
-                a.download = `raw-${Date.now()}.mp4`;
+                a.download = `raw-${Date.now()}.${ext}`;
+                document.body.appendChild(a);
                 a.click();
+                document.body.removeChild(a);
               }}
               className="py-3 rounded-xl border border-white/5 bg-white/5 text-muted-foreground text-[11px] font-bold hover:text-white hover:bg-white/10 hover:border-white/10 transition-all duration-300 flex items-center justify-center gap-2 group"
             >
