@@ -46,7 +46,7 @@ export function PaywallModal({ onClose }: Props) {
                 {[
                   "Unlimited High-Quality Recordings",
                   "No ZoOmly Watermark",
-                  "AI Subtitles & Smart Editing",
+                  "Auto Subtitles & Smart Editing",
                   "Professional 1080p Export"
                 ].map((f) => (
                   <li key={f} className="flex items-center gap-3 text-xs text-white/70">

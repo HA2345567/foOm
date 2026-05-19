@@ -13,7 +13,7 @@ const steps = [
   },
   {
     number: "03",
-    title: "AI Does the Rest",
+    title: "Auto-Zoom Does the Rest",
     description: "Our engine applies smart zoom and cuts dead time automatically.",
   },
   {

@@ -96,11 +96,13 @@ export function RecordingStudio() {
 
     checkPayment();
 
-    // 3. Initial limit check
+    // 3. Initial limit check (temporarily disabled)
+    /*
     const check = checkCanRecord();
     if (!check.canRecord) {
       setShowPaywall(true);
     }
+    */
 
     return () => {
       window.removeEventListener("polar:checkout:success" as any, handlePolarSuccess);
@@ -108,11 +110,14 @@ export function RecordingStudio() {
   }, []);
 
   const handleStartRecording = () => {
+    // Recording limit temporarily disabled
+    /*
     const check = checkCanRecord();
     if (!check.canRecord) {
       setShowPaywall(true);
       return;
     }
+    */
 
     // Increment count when we start a recording
     incrementRecordingCount();

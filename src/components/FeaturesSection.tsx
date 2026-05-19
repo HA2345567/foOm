@@ -11,7 +11,7 @@ const features = [
         <path d="M11 8v6M8 11h6" />
       </svg>
     ),
-    title: "AI Auto-Zoom",
+    title: "Smart Auto-Zoom",
     description:
       "Automatically zooms into clicks, typing, and UI interactions. Smart enough to stay wide during fast movement.",
   },

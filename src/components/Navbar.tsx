@@ -4,11 +4,12 @@ import { motion, AnimatePresence } from "framer-motion";
 import { getUserStatus } from "../lib/subscription";
 import { LoginModal } from "./LoginModal";
 import { Logo } from "./Logo";
+import StarBorder from "./StarBorder";
 
 const navLinks = [
   { label: "Features", href: "#features" },
   { label: "How it works", href: "#how-it-works" },
-  { label: "Pricing", href: "#pricing" },
+  // { label: "Pricing", href: "#pricing" },
 ];
 
 export function Navbar() {
@@ -44,6 +45,7 @@ export function Navbar() {
 
         {/* CTA */}
         <div className="hidden md:flex items-center gap-6">
+          {/* We are in waitlist-only launch mode, so we hide login and pro status
           {status.isPro ? (
             <div className="flex items-center gap-2 px-3 py-1 rounded-full bg-primary/10 border border-primary/20">
               <div className="w-1.5 h-1.5 rounded-full bg-primary" />
@@ -57,12 +59,17 @@ export function Navbar() {
               Log in
             </button>
           )}
-          <Link
-            to="/record"
-            className="px-5 py-2 rounded-full bg-[#f5f5f7] text-black text-[14px] font-bold shadow-button hover:bg-white transition-all active:scale-95"
+          */}
+          <StarBorder
+            as="a"
+            href="#waitlist"
+            className="transition-all active:scale-95 hover:scale-105"
+            innerClassName="px-5 py-2 text-[14px]"
+            color="white"
+            speed="5s"
           >
-            Start Recording
-          </Link>
+            <span className="font-bold">Join Waitlist</span>
+          </StarBorder>
         </div>
 
         {/* Mobile hamburger */}
@@ -101,13 +108,17 @@ export function Navbar() {
                   {link.label}
                 </a>
               ))}
-              <Link
-                to="/record"
-                className="block w-full px-4 py-3.5 rounded-full bg-[#f5f5f7] text-black text-[15px] font-bold text-center"
+              <StarBorder
+                as="a"
+                href="#waitlist"
+                className="w-full"
+                innerClassName="px-4 py-3.5 text-[15px]"
+                color="white"
+                speed="5s"
                 onClick={() => setMobileOpen(false)}
               >
-                Start Recording
-              </Link>
+                <span className="font-bold">Join Waitlist</span>
+              </StarBorder>
             </div>
           </motion.div>
         )}

@@ -1,5 +1,6 @@
 import { motion } from "framer-motion";
 import { Link } from "@tanstack/react-router";
+import StarBorder from "./StarBorder";
 
 export function CtaSection() {
   return (
@@ -38,18 +39,26 @@ export function CtaSection() {
           transition={{ delay: 0.2 }}
           className="mt-12 flex flex-col sm:flex-row items-center justify-center gap-6"
         >
-          <Link
-            to="/record"
-            className="px-12 py-5 rounded-xl bg-white text-black font-bold text-base shadow-button hover:opacity-90 transition-all hover:scale-[1.03] active:scale-[0.97]"
+          <StarBorder
+            as="a"
+            href="#waitlist"
+            className="w-full sm:w-auto shrink-0 transition-all hover:scale-105 active:scale-95"
+            innerClassName="px-12 py-5"
+            color="white"
+            speed="5s"
           >
-            Start Recording — Free
-          </Link>
+            <span className="font-bold text-sm tracking-tight uppercase">
+              Join waitlist
+            </span>
+          </StarBorder>
+          {/*
           <Link
             to="/record"
             className="text-sm font-semibold text-muted-foreground hover:text-white transition-colors"
           >
             Schedule a demo →
           </Link>
+          */}
         </motion.div>
       </div>
     </section>

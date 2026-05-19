@@ -14,6 +14,7 @@ export interface CompositeOptions {
   outH: number;
   /** PIP camera element */
   camera?: HTMLVideoElement | HTMLCanvasElement;
+  cameraLayout?: "corner" | "split-left" | "split-right" | "side-by-side" | "full-screen" | "stacked";
   /** PIP position normalized 0..1 (default 0.9, 0.9) */
   cameraX?: number;
   cameraY?: number;
@@ -45,27 +46,128 @@ export function drawComposite(
   // 1) Background fill
   background.paint(ctx, outW, outH);
 
-  // 2) Inset target rect (video panel after padding)
+  // 2) Parse Camera Layout
+  const layout = (opts.camera && opts.cameraLayout) ? opts.cameraLayout : "corner";
+
   const padX = outW * frame.padding;
   const padY = outH * frame.padding;
   const availableW = outW - padX * 2;
   const availableH = outH - padY * 2;
-  
+  const gap = outW * 0.035; // gutter space between panels
+
+  let targetX = 0, targetY = 0, targetW = 0, targetH = 0;
+  let camX = 0, camY = 0, camW = 0, camH = 0;
+  let showScreen = true;
+  let showCameraPanel = false;
+
   const videoAspect = srcW / srcH;
-  const targetAspect = availableW / availableH;
-  
-  let targetW, targetH;
-  if (videoAspect > targetAspect) {
-    targetW = availableW;
-    targetH = availableW / videoAspect;
+
+  if (layout === "full-screen") {
+    showScreen = false;
+    showCameraPanel = true;
+
+    // Center webcam cinematic landscape card
+    camW = Math.min(availableW * 0.82, availableH * 1.33);
+    camH = camW / 1.33;
+    camX = padX + (availableW - camW) / 2;
+    camY = padY + (availableH - camH) / 2;
+  } else if (layout === "split-left" && opts.camera) {
+    showCameraPanel = true;
+
+    // Camera on Left (vertical 4:5 portrait crop), Screen on Right
+    camW = availableW * 0.28;
+    targetW = availableW * 0.72 - gap;
+
+    targetH = Math.min(availableH, targetW / videoAspect);
+    camH = targetH; // Match the screen height perfectly
+
+    targetY = padY + (availableH - targetH) / 2;
+    camY = targetY;
+
+    camX = padX;
+    targetX = camX + camW + gap;
+  } else if (layout === "split-right" && opts.camera) {
+    showCameraPanel = true;
+
+    // Screen on Left, Camera on Right (vertical 4:5 portrait crop)
+    targetW = availableW * 0.72 - gap;
+    camW = availableW * 0.28;
+
+    targetH = Math.min(availableH, targetW / videoAspect);
+    camH = targetH; // Match the screen height perfectly
+
+    targetY = padY + (availableH - targetH) / 2;
+    camY = targetY;
+
+    targetX = padX;
+    camX = targetX + targetW + gap;
+  } else if (layout === "side-by-side" && opts.camera) {
+    showCameraPanel = true;
+
+    // Camera and Screen floating side by side centered
+    camW = availableW * 0.28;
+    targetW = availableW * 0.65 - gap;
+
+    targetH = Math.min(availableH * 0.85, targetW / videoAspect);
+    camH = targetH;
+
+    targetY = padY + (availableH - targetH) / 2;
+    camY = targetY;
+
+    // Center the group horizontally
+    const totalGroupW = camW + targetW + gap;
+    const groupStart = padX + (availableW - totalGroupW) / 2;
+
+    camX = groupStart;
+    targetX = camX + camW + gap;
+  } else if (layout === "stacked" && opts.camera) {
+    showCameraPanel = true;
+
+    // Stacked layout: camera top, screen bottom, aligned horizontally
+    // Ideal for mobile 9:16 portrait style content
+    const containerW = Math.min(availableW * 0.95, availableH * 0.46 * videoAspect);
+    
+    targetW = containerW;
+    targetH = targetW / videoAspect;
+
+    camW = containerW;
+    camH = camW * 0.52; // Landscape 16:9-ish aspect ratio webcam crop
+
+    // Prevent vertical overflow by downscaling if needed
+    let totalGroupH = camH + targetH + gap;
+    if (totalGroupH > availableH) {
+      const scale = availableH / totalGroupH;
+      targetW *= scale;
+      targetH *= scale;
+      camW *= scale;
+      camH *= scale;
+    }
+
+    const scaledGroupH = camH + targetH + gap;
+    const groupStart = padY + (availableH - scaledGroupH) / 2;
+
+    camY = groupStart;
+    targetY = camY + camH + gap;
+
+    camX = padX + (availableW - camW) / 2;
+    targetX = padX + (availableW - targetW) / 2;
   } else {
-    targetH = availableH;
-    targetW = availableH * videoAspect;
+    // Default: "corner" layout
+    showScreen = true;
+    showCameraPanel = false;
+
+    const targetAspect = availableW / availableH;
+    if (videoAspect > targetAspect) {
+      targetW = availableW;
+      targetH = availableW / videoAspect;
+    } else {
+      targetH = availableH;
+      targetW = availableH * videoAspect;
+    }
+    targetX = padX + (availableW - targetW) / 2;
+    targetY = padY + (availableH - targetH) / 2;
   }
-  
-  const targetX = padX + (availableW - targetW) / 2;
-  const targetY = padY + (availableH - targetH) / 2;
-  
+
   // 3) Source rect from zoom keyframe (crop window inside source)
   const sw = srcW / kf.scale;
   const sh = srcH / kf.scale;
@@ -74,30 +176,89 @@ export function drawComposite(
   sx = Math.max(0, Math.min(srcW - sw, sx));
   sy = Math.max(0, Math.min(srcH - sh, sy));
 
-  // Scale UI values (radius, shadow) relative to a baseline width of 1280px
   const scaleRatio = outW / 1280;
   const scaledRadius = frame.radius * scaleRatio;
   const scaledShadow = frame.shadow * scaleRatio;
 
-  // 4) Rounded clip + shadow
-  ctx.save();
-  if (scaledShadow > 0) {
-    ctx.shadowColor = "rgba(0,0,0,0.45)";
-    ctx.shadowBlur = scaledShadow;
-    ctx.shadowOffsetY = scaledShadow * 0.4;
+  // 4) Draw Screen Recording (if active)
+  if (showScreen) {
+    ctx.save();
+    if (scaledShadow > 0) {
+      ctx.shadowColor = "rgba(0,0,0,0.45)";
+      ctx.shadowBlur = scaledShadow;
+      ctx.shadowOffsetY = scaledShadow * 0.4;
+    }
+    ctx.fillStyle = "#000";
+    roundedRectPath(ctx, targetX, targetY, targetW, targetH, scaledRadius);
+    ctx.fill();
+    ctx.restore();
+
+    ctx.save();
+    roundedRectPath(ctx, targetX, targetY, targetW, targetH, scaledRadius);
+    ctx.clip();
+    ctx.drawImage(video, sx, sy, sw, sh, targetX, targetY, targetW, targetH);
+    ctx.restore();
+
+    // Subtle glassy outer border
+    ctx.save();
+    ctx.strokeStyle = "rgba(255,255,255,0.08)";
+    ctx.lineWidth = 1 * scaleRatio;
+    roundedRectPath(ctx, targetX, targetY, targetW, targetH, scaledRadius);
+    ctx.stroke();
+    ctx.restore();
   }
-  ctx.fillStyle = "#000";
-  roundedRectPath(ctx, targetX, targetY, targetW, targetH, scaledRadius);
-  ctx.fill();
-  ctx.restore();
 
-  ctx.save();
-  roundedRectPath(ctx, targetX, targetY, targetW, targetH, scaledRadius);
-  ctx.clip();
-  ctx.drawImage(video, sx, sy, sw, sh, targetX, targetY, targetW, targetH);
-  ctx.restore();
+  // 5) Draw Split/Side-by-Side/Full Screen Camera Panel (if active)
+  if (showCameraPanel && opts.camera) {
+    ctx.save();
+    if (scaledShadow > 0) {
+      ctx.shadowColor = "rgba(0,0,0,0.45)";
+      ctx.shadowBlur = scaledShadow;
+      ctx.shadowOffsetY = scaledShadow * 0.4;
+    }
+    ctx.fillStyle = "#000";
+    roundedRectPath(ctx, camX, camY, camW, camH, scaledRadius);
+    ctx.fill();
+    ctx.restore();
 
-  // 5) Subtitles
+    ctx.save();
+    roundedRectPath(ctx, camX, camY, camW, camH, scaledRadius);
+    ctx.clip();
+
+    const cw = opts.camera.width || (opts.camera as any).videoWidth || 320;
+    const ch = opts.camera.height || (opts.camera as any).videoHeight || 240;
+    
+    // Dynamic cropping based on target aspect ratio
+    const camAspect = camW / camH;
+    let csW, csH;
+    if (cw / ch > camAspect) {
+      csH = ch / (opts.cameraZoom ?? 1.0);
+      csW = csH * camAspect;
+    } else {
+      csW = cw / (opts.cameraZoom ?? 1.0);
+      csH = csW / camAspect;
+    }
+    const csx = (cw - csW) / 2;
+    const csy = (ch - csH) / 2;
+
+    // Render Mirrored Camera for comfortable presentation view
+    ctx.save();
+    ctx.translate(camX + camW / 2, camY + camH / 2);
+    ctx.scale(-1, 1); // Mirror
+    ctx.drawImage(opts.camera, csx, csy, csW, csH, -camW / 2, -camH / 2, camW, camH);
+    ctx.restore();
+    ctx.restore();
+
+    // Subtle glassy outer border
+    ctx.save();
+    ctx.strokeStyle = "rgba(255,255,255,0.12)";
+    ctx.lineWidth = 1 * scaleRatio;
+    roundedRectPath(ctx, camX, camY, camW, camH, scaledRadius);
+    ctx.stroke();
+    ctx.restore();
+  }
+
+  // 6) Subtitles
   if (opts.subtitles && opts.currentTime !== undefined) {
     const sub = opts.subtitles.find(
       (s) => opts.currentTime! >= s.start && opts.currentTime! <= s.end,
@@ -111,7 +272,7 @@ export function drawComposite(
       const textW = ctx.measureText(sub.text).width;
 
       const subX = outW / 2;
-      const subY = targetY + targetH - fontSize * 1.5;
+      const subY = (showScreen ? targetY + targetH : camY + camH) - fontSize * 1.5;
 
       // Pill background
       ctx.fillStyle = "rgba(0,0,0,0.8)";
@@ -141,13 +302,13 @@ export function drawComposite(
     }
   }
 
-  // 6) Designer Cursor
-  if (opts.showCursor && opts.mouseMoves) {
+  // 7) Designer Cursor
+  if (opts.showCursor && opts.mouseMoves && showScreen) {
     drawDesignerCursor(ctx, opts.mouseMoves, opts.currentTime ?? 0, targetX, targetY, targetW, targetH, kf);
   }
 
-  // 7) PIP Camera
-  if (opts.camera) {
+  // 8) PIP Camera (Overlay corner bubble mode only)
+  if (layout === "corner" && opts.camera) {
     ctx.save();
     const pipSize = outW * (opts.cameraSize ?? 0.15);
     const cx = opts.cameraX ?? 0.85;
@@ -183,7 +344,12 @@ export function drawComposite(
     const csx = (cw - cSize) / 2;
     const csy = (ch - cSize) / 2;
 
-    ctx.drawImage(opts.camera, csx, csy, cSize, cSize, px, py, pipSize, pipSize);
+    // Render Mirrored Camera for comfortable presentation view
+    ctx.save();
+    ctx.translate(px + pipSize / 2, py + pipSize / 2);
+    ctx.scale(-1, 1); // Mirror
+    ctx.drawImage(opts.camera, csx, csy, cSize, cSize, -pipSize / 2, -pipSize / 2, pipSize, pipSize);
+    ctx.restore();
     
     ctx.restore();
     ctx.save();

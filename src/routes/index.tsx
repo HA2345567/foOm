@@ -12,16 +12,16 @@ export const Route = createFileRoute("/")({
   component: Index,
   head: () => ({
     meta: [
-      { title: "foOm — AI Screen Recorder That Makes Demos Look Pro" },
+      { title: "foOm — Beautiful Screen Recorder with Cinematic Auto-Zoom" },
       {
         name: "description",
         content:
-          "Record your screen in the browser. AI auto-zoom, silence removal, and subtitles make every demo look cinematic. No downloads required.",
+          "Record your screen in the browser. Cinematic auto-zoom, silence removal, and focus tracking make every demo look pro. No downloads required.",
       },
-      { property: "og:title", content: "foOm — AI Screen Recorder" },
+      { property: "og:title", content: "foOm — Cinematic Screen Recorder" },
       {
         property: "og:description",
-        content: "Record your screen. AI makes it look pro. No downloads, no editing.",
+        content: "Beautiful screen recordings with cinematic auto-zoom. No downloads, no editing.",
       },
     ],
   }),
@@ -35,7 +35,7 @@ function Index() {
       <DemoSection />
       <FeaturesSection />
       <HowItWorks />
-      <PricingSection />
+      {/* <PricingSection /> */}
       <CtaSection />
       <Footer />
     </div>

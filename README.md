@@ -2,9 +2,9 @@
   <video src="https://github.com/HA2345567/foOm/raw/main/public/foom-vedio.mp4" width="100%" autoplay loop muted playsinline style="border-radius: 12px; box-shadow: 0 20px 50px rgba(0,0,0,0.3); margin-bottom: 24px;"></video>
 </div>
 
-# foOm — AI-Powered Cinematic Screen Recorder
+# foOm — Cinematic Screen Recorder with Auto-Zoom
 
-> Record your screen. AI makes it look pro. No downloads. No editing. Just hit record.
+> Beautiful screen recordings with cinematic auto-zoom. No downloads. No editing. Just hit record.
 
 [![React](https://img.shields.io/badge/React-19-61DAFB?logo=react&logoColor=white)](https://react.dev)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.8-3178C6?logo=typescript&logoColor=white)](https://www.typescriptlang.org)

@@ -469,6 +469,7 @@ export async function renderAutoZoom(
         if (pct !== lastReportedPct) {
           lastReportedPct = pct;
           onProgress({ stage: "rendering", percent: pct });
+          await new Promise<void>((resolve) => setTimeout(resolve, 0));
         }
       }
     }
@@ -530,6 +531,7 @@ export async function renderAutoZoom(
       if (pct !== lastReportedPct) {
         lastReportedPct = pct;
         onProgress({ stage: "rendering", percent: pct });
+        await new Promise<void>((resolve) => setTimeout(resolve, 0));
       }
     }
   }

@@ -21,7 +21,7 @@ export function LoginModal({ onClose, onSuccess }: Props) {
     setError("");
 
     try {
-      const result = await (checkSubscriptionByEmail as any)({ data: email });
+      const result = await checkSubscriptionByEmail(email);
       if (result.success && result.isPro) {
         setProStatus(true, email);
         setStatus("success");

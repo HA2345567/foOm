@@ -11,16 +11,32 @@ interface Star {
   isHigh: boolean;
 }
 
-export function BackgroundStars({ count = 50 }: { count?: number }) {
+export function BackgroundStars({ 
+  count = 50,
+  edgeProbability = 0.9,
+  maxMargin = 8,
+  minOpacity = 0.05,
+  maxOpacity = 0.3,
+  highMinOpacity = 0.2,
+  highMaxOpacity = 0.8,
+}: { 
+  count?: number;
+  edgeProbability?: number;
+  maxMargin?: number;
+  minOpacity?: number;
+  maxOpacity?: number;
+  highMinOpacity?: number;
+  highMaxOpacity?: number;
+}) {
   const stars = useMemo(() => {
     return [...Array(count)].map((_, i) => {
       // Logic to force stars into the borders
-      const isEdgeStar = Math.random() > 0.1; // 90% chance to be an edge star
+      const isEdgeStar = Math.random() < edgeProbability; // 90% chance by default to be an edge star
       let top, left;
       
       if (isEdgeStar) {
         const side = Math.floor(Math.random() * 4);
-        const margin = Math.random() * 8; // Within 8% of the edge (extremely tight)
+        const margin = Math.random() * maxMargin; // Within maxMargin% of the edge
         
         switch (side) {
           case 0: top = `${margin}%`; left = `${Math.random() * 100}%`; break; // Top
@@ -44,16 +60,16 @@ export function BackgroundStars({ count = 50 }: { count?: number }) {
         isHigh: Math.random() > 0.85,
       };
     });
-  }, [count]);
+  }, [count, edgeProbability, maxMargin]);
 
   return (
     <div className="absolute inset-0 pointer-events-none overflow-hidden">
       {stars.map((star) => (
         <motion.div
           key={star.id}
-          initial={{ opacity: star.isHigh ? 0.3 : 0.05, scale: star.isHigh ? 1.2 : 1 }}
+          initial={{ opacity: star.isHigh ? highMinOpacity : minOpacity, scale: star.isHigh ? 1.2 : 1 }}
           animate={{ 
-            opacity: star.isHigh ? [0.2, 0.8, 0.2] : [0.05, 0.3, 0.05],
+            opacity: star.isHigh ? [highMinOpacity, highMaxOpacity, highMinOpacity] : [minOpacity, maxOpacity, minOpacity],
             scale: star.isHigh ? [1, 1.4, 1] : [0.9, 1.1, 0.9]
           }}
           transition={{ 

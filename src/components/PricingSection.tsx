@@ -29,7 +29,7 @@ export function PricingSection() {
         "Unlimited recordings",
         "1080p HD export",
         "No watermark",
-        "AI Subtitles & Smart Trim",
+        "Auto Subtitles & Smart Trim",
         "Custom branding",
       ],
       cta: "Get Access",

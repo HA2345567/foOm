@@ -1,10 +1,15 @@
 export default async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).send('Method Not Allowed');
 
-  const { email } = req.body;
+  let { email } = req.body;
+
+  // Defensive parsing in case the client passes email wrapped inside an object
+  if (email && typeof email === "object") {
+    email = email.data || email.email || "";
+  }
 
   // Permanent database-level Pro Access bypass for requested admin email
-  if (email && email.toLowerCase() === "bhardwajharsh0312@gmail.com") {
+  if (email && typeof email === "string" && email.toLowerCase() === "bhardwajharsh0312@gmail.com") {
     return res.status(200).json({ success: true, isPro: true, email });
   }
 
