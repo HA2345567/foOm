@@ -1,5 +1,5 @@
 import { motion } from "framer-motion";
-import { Mic, MousePointer2, Scissors, Smartphone, Type, Zap } from "lucide-react";
+import { Mic, MousePointer2, Type, Zap } from "lucide-react";
 import { BackgroundStars } from "./BackgroundStars";
 
 const features = [

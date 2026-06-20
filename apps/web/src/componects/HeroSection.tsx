@@ -1,5 +1,4 @@
 import { motion } from "framer-motion";
-import { VideoBackground } from "./VideoBackground";
 import StarBorder from "./StarBorder";
 import { WindowsIcon } from "./WindowsIcon";
 import { BackgroundStars } from "./BackgroundStars";

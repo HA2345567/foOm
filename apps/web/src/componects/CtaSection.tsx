@@ -1,5 +1,4 @@
 import { motion } from "framer-motion";
-import { Link } from "@tanstack/react-router";
 import StarBorder from "./StarBorder";
 import { WindowsIcon } from "./WindowsIcon";
 import cubePreview from "../assets/cube_prod_preview.webp";
@@ -75,14 +74,6 @@ export function CtaSection() {
               Download for Windows
             </span>
           </StarBorder>
-          {/*
-          <Link
-            to="/record"
-            className="text-sm font-semibold text-muted-foreground hover:text-white transition-colors"
-          >
-            Schedule a demo →
-          </Link>
-          */}
         </motion.div>
       </div>
     </section>

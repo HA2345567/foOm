@@ -38,6 +38,7 @@ export interface UserPreferences {
 }
 
 export const DEFAULT_PREFS: UserPreferences = {
+  trayLayout: "horizontal",
   padding: DEFAULT_EDITOR_LAYOUT_SETTINGS.padding,
   aspectRatio: DEFAULT_EDITOR_LAYOUT_SETTINGS.aspectRatio,
   exportQuality: DEFAULT_EXPORT_SETTINGS.quality,
@@ -69,6 +70,10 @@ export function loadUserPreferences(): UserPreferences {
   if (!raw || typeof raw !== "object") return { ...DEFAULT_PREFS };
 
   return {
+    trayLayout:
+      raw.trayLayout === "horizontal" || raw.trayLayout === "vertical"
+        ? (raw.trayLayout as "horizontal" | "vertical")
+        : DEFAULT_PREFS.trayLayout,
     padding:
       typeof raw.padding === "number" &&
       Number.isFinite(raw.padding) &&
