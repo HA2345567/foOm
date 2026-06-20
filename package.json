@@ -8,7 +8,7 @@
   ],
   "scripts": {
     "dev": "bun --filter foom dev",
-    "build": "bun --filter foom build",
+    "build": "bun --filter foom-web build",
     "preview": "bun --filter foom preview",
     "dev:desktop": "bun --filter foom dev",
     "build:desktop-ui": "bun --filter foom build",
