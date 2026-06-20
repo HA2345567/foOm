@@ -1,0 +1,30 @@
+{
+  "name": "foom-web",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "bun x vite",
+    "build": "bun x vite build",
+    "preview": "bun x vite preview"
+  },
+  "dependencies": {
+    "@polar-sh/checkout": "^0.2.0",
+    "@tanstack/react-router": "^1.168.0",
+    "framer-motion": "^12.38.0",
+    "hls.js": "^1.6.16",
+    "lucide-react": "^0.575.0",
+    "react": "^19.2.0",
+    "react-dom": "^19.2.0",
+    "sonner": "^2.0.7"
+  },
+  "devDependencies": {
+    "@tailwindcss/vite": "^4.2.1",
+    "@types/node": "^22.16.5",
+    "@types/react": "^19.2.0",
+    "@types/react-dom": "^19.2.0",
+    "@vitejs/plugin-react": "^5.0.4",
+    "tailwindcss": "^4.2.1",
+    "typescript": "^5.8.3",
+    "vite": "^7.3.1"
+  }
+}

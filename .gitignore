@@ -41,3 +41,5 @@ Cargo.lock
 .cargo/
 .codex/
 .tanstack/
+apps/desktop/tauri-shell/src-tauri/binaries/
+

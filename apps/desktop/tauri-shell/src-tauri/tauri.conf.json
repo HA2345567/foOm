@@ -1,0 +1,65 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "productName": "foOm",
+  "version": "0.1.0",
+  "identifier": "com.foom.desktop",
+  "build": {
+    "frontendDist": "../../ui-react/dist",
+    "devUrl": "http://localhost:5174",
+    "beforeDevCommand": "",
+    "beforeBuildCommand": "cd ../ui-react && bun x vite build"
+  },
+  "app": {
+    "windows": [
+      {
+        "label": "main",
+        "title": "foOm",
+        "width": 1280,
+        "height": 800,
+        "minWidth": 900,
+        "minHeight": 600,
+        "resizable": true,
+        "fullscreen": false,
+        "decorations": true,
+        "transparent": false,
+        "center": true,
+        "visible": false
+      }
+    ],
+    "security": {
+      "csp": null,
+      "assetProtocol": {
+        "enable": true,
+        "scope": ["$LOCALAPPDATA/foom/**/*", "$VIDEO/foom/**/*"]
+      }
+    }
+  },
+  "bundle": {
+    "externalBin": [
+      "binaries/ffmpeg"
+    ],
+    "active": true,
+    "targets": "nsis",
+    "icon": [
+      "icons/32x32.png",
+      "icons/128x128.png",
+      "icons/128x128@2x.png",
+      "icons/icon.icns",
+      "icons/icon.ico"
+    ],
+    "publisher": "Harsh Bhardwaj",
+    "copyright": "Copyright 2026 Harsh Bhardwaj. All rights reserved.",
+    "shortDescription": "Cinematic Screen Recorder with Auto-Zoom",
+    "longDescription": "foOm is a cinematic screen recorder with AI-powered auto-zoom. Record beautiful, professional-looking videos without any editing.",
+    "windows": {
+      "nsis": {
+        "installMode": "currentUser",
+        "languages": ["English"],
+        "displayLanguageSelector": false
+      }
+    },
+    "android": {
+      "debugApplicationIdSuffix": ".debug"
+    }
+  }
+}

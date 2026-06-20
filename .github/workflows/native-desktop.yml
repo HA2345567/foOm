@@ -1,0 +1,36 @@
+name: Native Desktop
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+
+jobs:
+  windows-native-check:
+    runs-on: windows-2022
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Bun
+        uses: oven-sh/setup-bun@v2
+
+      - name: Set up Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Install JavaScript dependencies
+        run: bun install
+
+      - name: Build desktop UI
+        working-directory: apps/desktop/ui-react
+        run: bun run build
+
+      - name: Initialize MSVC environment and check native workspace
+        shell: cmd
+        run: |
+          "%ProgramFiles(x86)%\Microsoft Visual Studio\Installer\vswhere.exe" -latest -products * -requires Microsoft.VisualStudio.Component.VC.Tools.x86.x64 Microsoft.VisualStudio.Component.Windows10SDK -property installationPath > vs_path.txt
+          set /p VSINSTALLDIR=<vs_path.txt
+          call "%VSINSTALLDIR%\Common7\Tools\VsDevCmd.bat" -arch=x64 -host_arch=x64
+          cargo check --workspace
