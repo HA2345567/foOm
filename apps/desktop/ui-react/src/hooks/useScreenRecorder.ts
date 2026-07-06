@@ -506,13 +506,13 @@ export function useScreenRecorder(): UseScreenRecorderReturn {
       setElapsedSeconds(0);
       accumulatedDurationMs.current = 0;
       segmentStartedAt.current = null;
-      window.foomNative?.setRecordingState(false);
+      window.foomNative?.setRecordingState?.(false);
 
       void (async () => {
         try {
           const screenBlob = await activeScreenRecorder.recordedBlobPromise;
           if (discardRecordingId.current === activeRecordingId) {
-            window.foomNative?.discardCursorTelemetry(activeRecordingId);
+            window.foomNative?.discardCursorTelemetry?.(activeRecordingId);
             // Bring the floating HUD toolbar back after a cancelled recording
             void window.foomNative?.hudOverlayShow?.();
             return;
@@ -1528,8 +1528,11 @@ export function useScreenRecorder(): UseScreenRecorderReturn {
 
       width = Math.floor(width / CODEC_ALIGNMENT) * CODEC_ALIGNMENT;
       height = Math.floor(height / CODEC_ALIGNMENT) * CODEC_ALIGNMENT;
-
-      const videoBitsPerSecond = computeBitrate(width, height);
+      let videoBitsPerSecond = computeBitrate(width, height);
+      if (window.foomNative?.isBrowserPreview) {
+        // Lower the bitrate in browser mode to prevent software encoding lag and CPU overhead
+        videoBitsPerSecond = Math.min(videoBitsPerSecond, 6_000_000);
+      }
       const mimeType = selectMimeType();
 
       const hasAudio = stream.current.getAudioTracks().length > 0;
@@ -1564,7 +1567,9 @@ export function useScreenRecorder(): UseScreenRecorderReturn {
       if (webcamStream.current) {
         webcamRecorder.current = createRecorderHandle(webcamStream.current, {
           mimeType,
-          videoBitsPerSecond: Math.min(videoBitsPerSecond, BITRATE_BASE),
+          videoBitsPerSecond: window.foomNative?.isBrowserPreview
+            ? 2_000_000
+            : Math.min(videoBitsPerSecond, BITRATE_BASE),
         });
       }
 

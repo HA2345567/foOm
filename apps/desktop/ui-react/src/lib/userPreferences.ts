@@ -6,7 +6,6 @@ import {
 } from "@/components/video-editor/editorDefaults";
 import type { ExportFormat, ExportQuality } from "@/lib/exporter";
 import type { AspectRatio } from "@/utils/aspectRatioUtils";
-import { videoDir } from "@tauri-apps/api/path";
 
 const PREFS_KEY = "foom_user_preferences";
 
@@ -33,6 +32,8 @@ export interface UserPreferences {
   exportFormat: ExportFormat;
   /** Folder used for the most recent successful export, if any */
   exportFolder: string | null;
+  /** Folder used for the most recent project load/save */
+  projectFolder: string | null;
   /** Default wallpaper */
   wallpaper: string;
 }
@@ -44,6 +45,7 @@ export const DEFAULT_PREFS: UserPreferences = {
   exportQuality: DEFAULT_EXPORT_SETTINGS.quality,
   exportFormat: DEFAULT_EXPORT_SETTINGS.format,
   exportFolder: null,
+  projectFolder: null,
   wallpaper: DEFAULT_EDITOR_LAYOUT_SETTINGS.wallpaper,
 };
 
@@ -102,6 +104,10 @@ export function loadUserPreferences(): UserPreferences {
       typeof raw.exportFolder === "string" && raw.exportFolder.length > 0
         ? raw.exportFolder
         : DEFAULT_PREFS.exportFolder,
+    projectFolder:
+      typeof raw.projectFolder === "string" && raw.projectFolder.length > 0
+        ? raw.projectFolder
+        : DEFAULT_PREFS.projectFolder,
     wallpaper:
       typeof raw.wallpaper === "string" && raw.wallpaper.length > 0
         ? raw.wallpaper
@@ -145,6 +151,7 @@ export async function getExportFolder(): Promise<string | undefined> {
 
   try {
     if ("__TAURI_INTERNALS__" in window || "__TAURI__" in window) {
+      const { videoDir } = await import("@tauri-apps/api/path");
       const videoPath = await videoDir();
       if (videoPath) return videoPath;
     }
@@ -152,6 +159,15 @@ export async function getExportFolder(): Promise<string | undefined> {
     console.warn("Failed to get default video dir", e);
   }
 
+  return undefined;
+}
+
+/**
+ * Returns the remembered project folder as `string | undefined`.
+ */
+export function getProjectFolder(): string | undefined {
+  const saved = loadUserPreferences().projectFolder;
+  if (saved) return saved;
   return undefined;
 }
 

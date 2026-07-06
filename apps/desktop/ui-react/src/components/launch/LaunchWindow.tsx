@@ -713,9 +713,7 @@ export function LaunchWindow() {
         onPointerDown={() => setHudMouseEventsEnabled(true)}
         onMouseEnter={() => setHudMouseEventsEnabled(true)}
         onMouseLeave={() => {
-          if (!isLanguageMenuOpen) {
-            setHudMouseEventsEnabled(false);
-          }
+          setHudMouseEventsEnabled(false);
         }}
       >
         {/* Drag handle */}
@@ -921,73 +919,7 @@ export function LaunchWindow() {
         <div
           className={`${trayLayout === "vertical" ? hudSidebarVerticalClasses : hudSidebarClasses} ${styles.electronNoDrag}`}
         >
-          <div className={`${styles.languageMenuContainer} ${styles.electronNoDrag}`}>
-            <button
-              ref={languageTriggerRef}
-              type="button"
-              aria-label={t("language")}
-              aria-expanded={isLanguageMenuOpen}
-              aria-haspopup="menu"
-              onClick={() => setIsLanguageMenuOpen((open) => !open)}
-              title={activeLanguageLabel}
-              className={`flex h-8 items-center rounded-lg border border-white/10 bg-white/[0.045] text-white/85 shadow-none transition-colors hover:bg-white/10 ${
-                trayLayout === "vertical" ? "w-8 justify-center px-0" : "gap-1.5 px-2"
-              } ${styles.electronNoDrag}`}
-            >
-              <Languages size={13} className="text-white/70" />
-              <span
-                className={`${trayLayout === "vertical" ? "sr-only" : "max-w-[54px]"} truncate text-[10px] font-semibold text-white/75`}
-              >
-                {activeLanguageLabel}
-              </span>
-            </button>
-          </div>
 
-          {isLanguageMenuOpen
-            ? createPortal(
-                <div
-                  ref={setLanguageMenuPanelEl}
-                  data-hud-interactive="true"
-                  role="menu"
-                  className={`${styles.languageMenuPanel} ${styles.languageMenuScroll} ${styles.electronNoDrag}`}
-                  style={
-                    {
-                      WebkitAppRegion: "no-drag",
-                      pointerEvents: "auto",
-                      right: `${languageMenuStyle.right}px`,
-                      top: `${languageMenuStyle.top}px`,
-                      maxHeight: `${languageMenuStyle.maxHeight}px`,
-                    } as React.CSSProperties
-                  }
-                  onPointerDown={(event) => event.stopPropagation()}
-                  onPointerEnter={() => setHudMouseEventsEnabled(true)}
-                  onPointerMove={() => setHudMouseEventsEnabled(true)}
-                  onWheel={(event) => {
-                    setHudMouseEventsEnabled(true);
-                    event.stopPropagation();
-                  }}
-                >
-                  {availableLocales.map((loc) => (
-                    <button
-                      key={loc}
-                      type="button"
-                      role="menuitemradio"
-                      aria-checked={loc === locale}
-                      onClick={() => {
-                        setLocale(loc);
-                        resolveSystemLocaleSuggestion();
-                        setIsLanguageMenuOpen(false);
-                      }}
-                      className={`${styles.languageMenuItem} ${loc === locale ? styles.languageMenuItemActive : ""}`}
-                    >
-                      <span className="truncate">{getLocaleName(loc)}</span>
-                      {loc === locale ? <Check size={11} className="text-white/85" /> : null}
-                    </button>
-                  ))}
-                </div>,
-                document.body,
-              )
-            : null}
 
           {/* Window controls */}
           <div

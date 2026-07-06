@@ -1,4 +1,4 @@
-import { Trash2 } from "lucide-react";
+import { Trash2, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Slider } from "@/components/ui/slider";
 import { useScopedT } from "@/contexts/I18nContext";
@@ -20,6 +20,7 @@ interface BlurSettingsPanelProps {
   onBlurDataChange: (blurData: BlurData) => void;
   onBlurDataCommit?: () => void;
   onDelete: () => void;
+  onClose?: () => void;
 }
 
 export function BlurSettingsPanel({
@@ -27,6 +28,7 @@ export function BlurSettingsPanel({
   onBlurDataChange,
   onBlurDataCommit,
   onDelete,
+  onClose,
 }: BlurSettingsPanelProps) {
   const t = useScopedT("settings");
 
@@ -42,13 +44,26 @@ export function BlurSettingsPanel({
   return (
     <div className="min-w-0 p-4 flex flex-col h-full overflow-y-auto custom-scrollbar">
       <div className="mb-3">
-        <div className="mb-4">
-          <span className="text-[10px] font-semibold uppercase tracking-[0.18em] text-slate-500">
-            {t("annotation.blurTypeMosaic")}
-          </span>
-          <div className="mt-1 text-xl font-semibold text-slate-100">
-            {t("annotation.typeBlur")}
+        <div className="mb-4 flex items-center justify-between">
+          <div>
+            <span className="text-[10px] font-semibold uppercase tracking-[0.18em] text-slate-500">
+              {t("annotation.blurTypeMosaic")}
+            </span>
+            <div className="mt-1 text-xl font-semibold text-slate-100">
+              {t("annotation.typeBlur")}
+            </div>
           </div>
+          {onClose && (
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={onClose}
+              className="flex items-center gap-1 text-[11px] font-medium text-slate-400 hover:text-slate-200 hover:bg-white/5 h-7 px-2 border border-white/10 rounded-md cursor-pointer shrink-0"
+            >
+              <X className="w-3.5 h-3.5" />
+              Close settings
+            </Button>
+          )}
         </div>
 
         <div className="grid grid-cols-2 gap-2">

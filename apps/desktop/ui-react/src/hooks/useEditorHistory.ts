@@ -37,6 +37,11 @@ export interface EditorState {
   webcamMaskShape: WebcamMaskShape;
   webcamSizePreset: WebcamSizePreset;
   webcamPosition: WebcamPosition | null;
+  autoZoomEnabled: boolean;
+  autoFocusAll: boolean;
+  showTrimWaveform: boolean;
+  webcamMirrored: boolean;
+  webcamReactiveZoom: boolean;
 }
 
 export const INITIAL_EDITOR_STATE: EditorState = {
@@ -56,6 +61,11 @@ export const INITIAL_EDITOR_STATE: EditorState = {
   webcamMaskShape: DEFAULT_WEBCAM_SETTINGS.maskShape,
   webcamSizePreset: DEFAULT_WEBCAM_SETTINGS.sizePreset,
   webcamPosition: DEFAULT_WEBCAM_SETTINGS.position,
+  autoZoomEnabled: true,
+  autoFocusAll: false,
+  showTrimWaveform: true,
+  webcamMirrored: false,
+  webcamReactiveZoom: false,
 };
 
 type StateUpdate = Partial<EditorState> | ((prev: EditorState) => Partial<EditorState>);
@@ -128,6 +138,11 @@ export function useEditorHistory(initial: EditorState = INITIAL_EDITOR_STATE) {
     dirtyRef.current = false;
   }, []);
 
+  const resetState = useCallback((initialState: EditorState = INITIAL_EDITOR_STATE) => {
+    setHistory({ past: [], present: initialState, future: [] });
+    dirtyRef.current = false;
+  }, []);
+
   return {
     state: history.present,
     pushState,
@@ -135,6 +150,7 @@ export function useEditorHistory(initial: EditorState = INITIAL_EDITOR_STATE) {
     commitState,
     undo,
     redo,
+    resetState,
     canUndo: history.past.length > 0,
     canRedo: history.future.length > 0,
   };

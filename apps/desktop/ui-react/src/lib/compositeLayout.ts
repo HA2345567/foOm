@@ -538,3 +538,7 @@ function centerRectInBounds(params: { bounds: RenderRect; size: Size; maxSize: S
     height: resolvedHeight,
   };
 }
+
+export function reactiveWebcamScale(scale: number): number {
+  return 1 / Math.max(1, scale);
+}

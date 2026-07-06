@@ -165,7 +165,7 @@ export type NativeBridgeRequest =
   | {
       domain: "project";
       action: "loadProjectFile";
-      payload?: EmptyPayload;
+      payload?: { defaultPath?: string };
       requestId?: string;
     }
   | {

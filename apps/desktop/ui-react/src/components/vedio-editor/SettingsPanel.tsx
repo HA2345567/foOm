@@ -249,6 +249,7 @@ interface SettingsPanelProps {
   onZoomPreviewEnd?: () => void;
   selectedZoomFocusMode?: ZoomFocusMode | null;
   onZoomFocusModeChange?: (mode: ZoomFocusMode) => void;
+  focusModeLocked?: boolean;
   selectedZoomFocus?: ZoomFocus | null;
   onZoomFocusCoordinateChange?: (focus: ZoomFocus) => void;
   onZoomFocusCoordinateCommit?: () => void;
@@ -284,6 +285,8 @@ interface SettingsPanelProps {
   onExportFormatChange?: (format: ExportFormat) => void;
   noiseReductionEnabled?: boolean;
   onNoiseReductionEnabledChange?: (enabled: boolean) => void;
+  showTrimWaveform?: boolean;
+  onTrimWaveformChange?: (show: boolean) => void;
   noiseReductionAmount?: number;
   onNoiseReductionAmountChange?: (amount: number) => void;
   gifFrameRate?: GifFrameRate;
@@ -329,6 +332,10 @@ interface SettingsPanelProps {
   webcamPosition?: WebcamPosition | null;
   onWebcamPositionChange?: (position: WebcamPosition | null) => void;
   onWebcamPositionCommit?: () => void;
+  webcamMirrored?: boolean;
+  onWebcamMirroredChange?: (mirrored: boolean) => void;
+  webcamReactiveZoom?: boolean;
+  onWebcamReactiveZoomChange?: (reactive: boolean) => void;
   onSaveDiagnostic?: () => Promise<void>;
   showCursor?: boolean;
   onShowCursorChange?: (show: boolean) => void;
@@ -349,6 +356,11 @@ interface SettingsPanelProps {
   onAddZoom?: () => void;
   onAddCaption?: () => void;
   onAddBlur?: () => void;
+  onSelectZoom?: (id: string | null) => void;
+  onSelectTrim?: (id: string | null) => void;
+  onSelectSpeed?: (id: string | null) => void;
+  onSelectAnnotation?: (id: string | null) => void;
+  onSelectBlur?: (id: string | null) => void;
 }
 
 export default SettingsPanel;
@@ -432,6 +444,7 @@ export function SettingsPanel({
   onZoomPreviewEnd,
   selectedZoomFocusMode,
   onZoomFocusModeChange,
+  focusModeLocked = false,
   selectedZoomFocus,
   onZoomFocusCoordinateChange,
   onZoomFocusCoordinateCommit,
@@ -466,6 +479,8 @@ export function SettingsPanel({
   onExportFormatChange,
   noiseReductionEnabled = DEFAULT_EXPORT_SETTINGS.noiseReduction.enabled,
   onNoiseReductionEnabledChange,
+  showTrimWaveform = true,
+  onTrimWaveformChange,
   noiseReductionAmount = DEFAULT_EXPORT_SETTINGS.noiseReduction.amount,
   onNoiseReductionAmountChange,
   gifFrameRate = DEFAULT_GIF_SETTINGS.frameRate,
@@ -507,12 +522,16 @@ export function SettingsPanel({
   webcamPosition = DEFAULT_WEBCAM_SETTINGS.position,
   onWebcamPositionChange,
   onWebcamPositionCommit,
+  webcamMirrored = false,
+  onWebcamMirroredChange,
+  webcamReactiveZoom = false,
+  onWebcamReactiveZoomChange,
   onSaveDiagnostic,
   showCursor = DEFAULT_CURSOR_SETTINGS.show,
   onShowCursorChange,
   cursorSize = DEFAULT_CURSOR_SETTINGS.size,
   onCursorSizeChange,
-  cursorStyle = DEFAULT_CURSOR_SETTINGS.style,
+  cursorStyle = "arrow",
   onCursorStyleChange,
   cursorSmoothing = DEFAULT_CURSOR_SETTINGS.smoothing,
   onCursorSmoothingChange,
@@ -527,6 +546,11 @@ export function SettingsPanel({
   onAddZoom,
   onAddCaption,
   onAddBlur,
+  onSelectZoom,
+  onSelectTrim,
+  onSelectSpeed,
+  onSelectAnnotation,
+  onSelectBlur,
 }: SettingsPanelProps) {
   const t = useScopedT("settings");
   const [activePanelMode, setActivePanelMode] = useState<SettingsPanelMode>("background");
@@ -748,15 +772,17 @@ export function SettingsPanel({
     { id: "captions", label: "Captions", icon: Captions },
     { id: "audio", label: "Audio", icon: AudioLines, disabled: !videoElement },
   ];
-  const exportPanelMode = {
-    id: "export" as const,
-    label: exportFormat === "gif" ? "Export GIF" : "Export Video",
-    icon: Share2,
-  };
-  const activeModeLabel =
-    [...panelModes, exportPanelMode, { id: "zoom", label: "Zoom" }].find(
+   const activeModeLabel =
+    [...panelModes, { id: "zoom", label: "Zoom" }].find(
       (mode) => mode.id === activePanelMode,
     )?.label ?? "Canvas";
+  const handleCloseInspector = () => {
+    onSelectZoom?.(null);
+    onSelectTrim?.(null);
+    onSelectSpeed?.(null);
+    onSelectAnnotation?.(null);
+    onSelectBlur?.(null);
+  };
   const handleDeleteClick = () => {
     if (selectedZoomId && onZoomDelete) {
       onZoomDelete(selectedZoomId);
@@ -845,6 +871,7 @@ export function SettingsPanel({
               onAnnotationDuplicate ? () => onAnnotationDuplicate(selectedAnnotation.id) : undefined
             }
             onDelete={() => onAnnotationDelete(selectedAnnotation.id)}
+            onClose={() => onSelectAnnotation?.(null)}
           />
         </div>
       </div>
@@ -860,6 +887,7 @@ export function SettingsPanel({
             onBlurDataChange={(blurData) => onBlurDataChange(selectedBlur.id, blurData)}
             onBlurDataCommit={onBlurDataCommit}
             onDelete={() => onBlurDelete(selectedBlur.id)}
+            onClose={() => onSelectBlur?.(null)}
           />
         </div>
       </div>
@@ -896,30 +924,26 @@ export function SettingsPanel({
               </button>
             );
           })}
-          <button
-            data-testid={getTestId("export-panel-button")}
-            type="button"
-            title={exportPanelMode.label}
-            onClick={() => {
-              setActivePanelMode(exportPanelMode.id);
-              onExportPanelOpen?.();
-            }}
-            className={cn(
-              "mt-auto flex h-8 w-8 items-center justify-center rounded-lg border transition-all duration-200 cursor-pointer",
-              activePanelMode === "export" && !hasTimelineSelection
-                ? "border-white/12 bg-white text-[#09090b] shadow-[0_8px_22px_rgba(0,0,0,0.36)]"
-                : "border-transparent text-slate-500 hover:border-white/12 hover:bg-white/[0.07] hover:text-slate-100",
-            )}
-          >
-            <Share2 className="h-4 w-4" />
-          </button>
+
         </div>
         <div className="flex-1 overflow-y-auto overflow-x-hidden custom-scrollbar p-4 pb-4">
           <div className="mb-4 flex items-center justify-between px-1">
             <span className="text-[14px] font-display font-semibold tracking-wide text-slate-50">
               {activeModeLabel}
             </span>
-            <KeyboardShortcutsHelp />
+            {hasTimelineSelection || selectedAnnotationId || selectedBlurId ? (
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={handleCloseInspector}
+                className="flex items-center gap-1 text-[11px] font-medium text-slate-400 hover:text-slate-200 hover:bg-white/5 h-7 px-2 border border-white/10 rounded-md cursor-pointer shrink-0"
+              >
+                <X className="w-3.5 h-3.5" />
+                Close settings
+              </Button>
+            ) : (
+              <KeyboardShortcutsHelp />
+            )}
           </div>
           {zoomEnabled && (
             <div className="space-y-3 mb-4">
@@ -1041,6 +1065,7 @@ export function SettingsPanel({
                         <Button
                           key={mode}
                           type="button"
+                          disabled={focusModeLocked}
                           onClick={() => onZoomFocusModeChange?.(mode)}
                           className={cn(
                             "h-6 w-full rounded-md border px-1 text-center transition-all duration-150 ease-out cursor-pointer",
@@ -1484,6 +1509,41 @@ export function SettingsPanel({
                       </button>
                     </div>
                   )}
+                  {webcamLayoutPreset !== "no-webcam" && (
+                    <div className="foom-inspector-card space-y-3.5">
+                      <div className="flex items-center justify-between py-1">
+                        <div>
+                          <span className="text-[10px] font-semibold uppercase tracking-wider text-slate-400 block">
+                            Mirror Webcam
+                          </span>
+                          <p className="mt-1 text-[11px] text-slate-500">
+                            Flip the webcam video horizontally.
+                          </p>
+                        </div>
+                        <Switch
+                          checked={webcamMirrored}
+                          onCheckedChange={onWebcamMirroredChange}
+                          className="data-[state=checked]:bg-[#D4D4D8] scale-90 cursor-pointer"
+                        />
+                      </div>
+
+                      <div className="flex items-center justify-between py-1 border-t border-white/[0.04] pt-3">
+                        <div>
+                          <span className="text-[10px] font-semibold uppercase tracking-wider text-slate-400 block">
+                            Reactive Zoom
+                          </span>
+                          <p className="mt-1 text-[11px] text-slate-500">
+                            Auto-scale/position webcam to zoom focuses.
+                          </p>
+                        </div>
+                        <Switch
+                          checked={webcamReactiveZoom}
+                          onCheckedChange={onWebcamReactiveZoomChange}
+                          className="data-[state=checked]:bg-[#D4D4D8] scale-90 cursor-pointer"
+                        />
+                      </div>
+                    </div>
+                  )}
                 </div>
               )}
 
@@ -1840,6 +1900,21 @@ export function SettingsPanel({
 
               {activePanelMode === "audio" && (
                 <div className="space-y-3">
+                  <div className="foom-inspector-card flex items-center justify-between gap-3">
+                    <div>
+                      <span className="text-[10px] font-semibold uppercase tracking-wider text-slate-400 block">
+                        Timeline Waveform
+                      </span>
+                      <p className="mt-1 text-[11px] text-slate-500">
+                        Show audio waveform visualization in the timeline track.
+                      </p>
+                    </div>
+                    <Switch
+                      checked={showTrimWaveform}
+                      onCheckedChange={onTrimWaveformChange}
+                      className="data-[state=checked]:bg-[#D4D4D8]"
+                    />
+                  </div>
                   <div className="foom-inspector-card space-y-3.5">
                     <div className="flex items-center justify-between gap-3">
                       <div>
@@ -1957,7 +2032,6 @@ export function SettingsPanel({
                         </TabsTrigger>
                       </TabsList>
 
-                      <div className="overflow-y-auto overflow-x-hidden custom-scrollbar">
                         <TabsContent value="wallpaper" className="mt-0">
                           <div className="grid grid-cols-4 gap-2.5">
                             {WALLPAPER_PATHS.map((canonicalPath, i) => {
@@ -2075,7 +2149,6 @@ export function SettingsPanel({
                             })}
                           </div>
                         </TabsContent>
-                      </div>
                     </Tabs>
                   </div>
                 </div>
@@ -2208,166 +2281,7 @@ export function SettingsPanel({
         </>
       )}
 
-      <div className="flex-shrink-0 p-3 border-t border-white/[0.07] bg-black/25">
-        {activePanelMode === "export" && !hasTimelineSelection && (
-          <>
-            <div className="flex items-center gap-2 mb-3">
-              <button
-                data-testid={getTestId("mp4-format-button")}
-                onClick={() => onExportFormatChange?.("mp4")}
-                className={cn(
-                  "flex-1 flex items-center justify-center gap-1.5 py-2 rounded-lg border transition-all text-xs font-medium",
-                  exportFormat === "mp4"
-                    ? "bg-[#D4D4D8]/10 border-[#D4D4D8]/50 text-white"
-                    : "bg-white/5 border-white/10 text-slate-400 hover:bg-white/10 hover:text-slate-200",
-                )}
-              >
-                <Film className="w-3.5 h-3.5" />
-                {t("exportFormat.mp4")}
-              </button>
-              <button
-                data-testid={getTestId("gif-format-button")}
-                onClick={() => onExportFormatChange?.("gif")}
-                className={cn(
-                  "flex-1 flex items-center justify-center gap-1.5 py-2 rounded-lg border transition-all text-xs font-medium",
-                  exportFormat === "gif"
-                    ? "bg-[#D4D4D8]/10 border-[#D4D4D8]/50 text-white"
-                    : "bg-white/5 border-white/10 text-slate-400 hover:bg-white/10 hover:text-slate-200",
-                )}
-              >
-                <Image className="w-3.5 h-3.5" />
-                {t("exportFormat.gif")}
-              </button>
-            </div>
 
-            {exportFormat === "mp4" && (
-              <div className="mb-3 space-y-2">
-                <div className="text-[10px] font-semibold uppercase tracking-wider text-slate-400 mb-1">
-                  {t("exportQuality.title")}
-                </div>
-                <div className="grid grid-cols-2 gap-2">
-                  {(["low", "medium", "good", "ultra", "source"] as ExportQuality[]).map(
-                    (quality) => {
-                      const dimensions = getMp4ExportDimensions(quality);
-                      const isSelected = exportQuality === quality;
-                      return (
-                        <button
-                          key={quality}
-                          type="button"
-                          onClick={() => onExportQualityChange?.(quality)}
-                          className={cn(
-                            "flex flex-col items-center justify-center py-2 px-2.5 rounded-lg border transition-all text-center",
-                            isSelected
-                              ? "bg-[#D4D4D8]/10 border-[#D4D4D8]/50 text-white"
-                              : "bg-white/5 border-white/10 text-slate-400 hover:bg-white/10 hover:text-slate-200",
-                          )}
-                        >
-                          <span className="text-xs font-semibold uppercase tracking-wider">
-                            {MP4_EXPORT_QUALITY_LABELS[quality]}
-                          </span>
-                          <span className="text-[9px] opacity-75 font-mono">
-                            {dimensions.width} x {dimensions.height}
-                          </span>
-                        </button>
-                      );
-                    },
-                  )}
-                </div>
-              </div>
-            )}
-
-            {exportFormat === "gif" && (
-              <div className="mb-3 space-y-3">
-                <div className="space-y-1.5">
-                  <div className="text-[10px] font-semibold uppercase tracking-wider text-slate-400">
-                    Output Size
-                  </div>
-                  <div className="flex bg-white/5 border border-white/5 p-0.5 grid grid-cols-3 h-7 rounded-lg">
-                    {Object.entries(GIF_SIZE_PRESETS).map(([key, _preset]) => (
-                      <button
-                        key={key}
-                        type="button"
-                        data-testid={getTestId(`gif-size-button-${key}`)}
-                        onClick={() => onGifSizePresetChange?.(key as GifSizePreset)}
-                        className={cn(
-                          "rounded-md transition-all text-[10px] font-medium",
-                          gifSizePreset === key
-                            ? "bg-[#D4D4D8] text-[#09090b]"
-                            : "text-slate-400 hover:text-slate-200",
-                        )}
-                      >
-                        {key === "original"
-                          ? "Orig"
-                          : key.charAt(0).toUpperCase() + key.slice(1, 3)}
-                      </button>
-                    ))}
-                  </div>
-                  <div className="text-[10px] text-slate-500 font-mono">
-                    {gifOutputDimensions?.width} × {gifOutputDimensions?.height}px
-                  </div>
-                </div>
-
-                <div className="space-y-1.5">
-                  <div className="text-[10px] font-semibold uppercase tracking-wider text-slate-400">
-                    Frame Rate
-                  </div>
-                  <div className="flex bg-white/5 border border-white/5 p-0.5 grid grid-cols-3 h-7 rounded-lg">
-                    {GIF_FRAME_RATES.map((rate) => (
-                      <button
-                        key={rate.value}
-                        type="button"
-                        onClick={() => onGifFrameRateChange?.(rate.value)}
-                        className={cn(
-                          "rounded-md transition-all text-[10px] font-medium",
-                          gifFrameRate === rate.value
-                            ? "bg-[#D4D4D8] text-[#09090b]"
-                            : "text-slate-400 hover:text-slate-200",
-                        )}
-                      >
-                        {rate.label}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-
-                <div className="flex items-center justify-between py-1 border-t border-white/5 pt-2">
-                  <div>
-                    <label className="text-xs font-semibold text-slate-200">Loop Animation</label>
-                    <p className="text-[10px] text-slate-500">GIF will play continuously</p>
-                  </div>
-                  <Switch
-                    checked={gifLoop}
-                    onCheckedChange={onGifLoopChange}
-                    className="data-[state=checked]:bg-[#D4D4D8] scale-90"
-                  />
-                </div>
-              </div>
-            )}
-
-            {unsavedExport && (
-              <Button
-                type="button"
-                size="lg"
-                onClick={onSaveUnsavedExport}
-                className="w-full mb-2 py-5 text-sm font-semibold flex items-center justify-center gap-2 bg-indigo-500 text-white rounded-xl shadow-lg shadow-indigo-500/20 hover:bg-indigo-500/90 hover:scale-[1.02] active:scale-[0.98] transition-all duration-200"
-              >
-                <Download className="w-4 h-4" />
-                {t("export.chooseSaveLocation")}
-              </Button>
-            )}
-            <Button
-              data-testid={getTestId("export-button")}
-              type="button"
-              size="lg"
-              onClick={onExport}
-              className="w-full py-5 text-sm font-semibold flex items-center justify-center gap-2 bg-[#D4D4D8] text-[#09090b] rounded-xl shadow-lg shadow-[#D4D4D8]/20 hover:bg-[#E4E4E7] hover:scale-[1.01] active:scale-[0.99] transition-all duration-200"
-            >
-              <Download className="w-4 h-4" />
-              {exportFormat === "gif" ? t("export.gifButton") : t("export.videoButton")}
-            </Button>
-          </>
-        )}
-      </div>
     </div>
   );
 }

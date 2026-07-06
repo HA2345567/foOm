@@ -38,3 +38,28 @@ describe("tauriCompat browser preview source selection", () => {
     expect(openerDispatch).toHaveBeenCalledWith(expect.any(CustomEvent));
   });
 });
+
+describe("tauriCompat deleteRecording", () => {
+  afterEach(() => {
+    localStorage.clear();
+    Reflect.deleteProperty(window, "foomNative");
+    Reflect.deleteProperty(window, "electronAPI");
+  });
+
+  it("clears localStorage recording session keys", async () => {
+    localStorage.setItem("foom-current-video-path", "indexeddb://test");
+    localStorage.setItem("foom-current-recording-session", JSON.stringify({ screenVideoPath: "indexeddb://test" }));
+    localStorage.setItem("foom-current-project-file", "{}");
+    localStorage.setItem("foom-current-project-path", "path/to/project");
+
+    const { installTauriCompatBridge } = await import("./tauriCompat");
+    installTauriCompatBridge();
+
+    await window.foomNative.deleteRecording("test");
+
+    expect(localStorage.getItem("foom-current-video-path")).toBeNull();
+    expect(localStorage.getItem("foom-current-recording-session")).toBeNull();
+    expect(localStorage.getItem("foom-current-project-file")).toBeNull();
+    expect(localStorage.getItem("foom-current-project-path")).toBeNull();
+  });
+});

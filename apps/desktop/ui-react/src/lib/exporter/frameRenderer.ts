@@ -39,6 +39,12 @@ import {
 import { clampFocusToScale } from "@/components/video-editor/videoPlayback/focusUtils";
 import { findDominantRegion } from "@/components/video-editor/videoPlayback/zoomRegionUtils";
 import {
+  createZoomSpringState,
+  resetZoomSpring,
+  stepZoomSpring,
+  type ZoomSpringState,
+} from "@/components/video-editor/videoPlayback/zoomSpring";
+import {
   applyZoomTransform,
   computeFocusFromTransform,
   computeZoomTransform,
@@ -160,6 +166,7 @@ export class FrameRenderer {
   private layoutCache: LayoutCache | null = null;
   private currentVideoTime = 0;
   private motionBlurState: MotionBlurState = createMotionBlurState();
+  private zoomSpringState: ZoomSpringState = createZoomSpringState();
   private nativeCursorSmoothingState = createNativeCursorSmoothingState();
   private nativeCursorMotionBlurState = createNativeCursorMotionBlurState();
   private smoothedAutoFocus: { cx: number; cy: number } | null = null;
@@ -928,18 +935,24 @@ export class FrameRenderer {
       focusY: state.focusY,
     });
 
-    const appliedScale =
-      Math.abs(projectedTransform.scale - prevScale) < ZOOM_SCALE_DEADZONE
-        ? projectedTransform.scale
-        : projectedTransform.scale;
-    const appliedX =
-      Math.abs(projectedTransform.x - prevX) < ZOOM_TRANSLATION_DEADZONE_PX
-        ? projectedTransform.x
-        : projectedTransform.x;
-    const appliedY =
-      Math.abs(projectedTransform.y - prevY) < ZOOM_TRANSLATION_DEADZONE_PX
-        ? projectedTransform.y
-        : projectedTransform.y;
+    const animationDeltaMs =
+      this.prevAnimationTimeMs != null ? timeMs - this.prevAnimationTimeMs : 0;
+    const forceSnap = animationDeltaMs <= 0 || this.prevAnimationTimeMs === null;
+    if (forceSnap || !this.zoomSpringState.scale.initialized) {
+      resetZoomSpring(this.zoomSpringState, projectedTransform);
+    } else {
+      stepZoomSpring(this.zoomSpringState, projectedTransform, animationDeltaMs);
+    }
+
+    const smoothedTransform = {
+      scale: this.zoomSpringState.scale.value,
+      x: this.zoomSpringState.x.value,
+      y: this.zoomSpringState.y.value,
+    };
+
+    const appliedScale = smoothedTransform.scale;
+    const appliedX = smoothedTransform.x;
+    const appliedY = smoothedTransform.y;
 
     state.x = appliedX;
     state.y = appliedY;

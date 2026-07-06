@@ -49,9 +49,12 @@ interface GifExporterConfig {
   webcamMaskShape?: import("@/components/video-editor/types").WebcamMaskShape;
   webcamSizePreset?: WebcamSizePreset;
   webcamPosition?: { cx: number; cy: number } | null;
+  webcamMirrored?: boolean;
+  webcamReactiveZoom?: boolean;
   cursorRecordingData?: CursorRecordingData | null;
   cursorScale?: number;
   cursorStyle?: CursorStyle;
+  cursorTheme?: string;
   cursorSmoothing?: number;
   cursorMotionBlur?: number;
   cursorClickBounce?: number;

@@ -29,6 +29,96 @@ function arrayBufferToDataUrl(buffer: ArrayBuffer, mimeType: string) {
   return `data:${mimeType};base64,${btoa(binary)}`;
 }
 
+function openDatabase(): Promise<IDBDatabase> {
+  return new Promise((resolve, reject) => {
+    if (typeof indexedDB === "undefined") {
+      reject(new Error("IndexedDB is not supported"));
+      return;
+    }
+    const request = indexedDB.open("foom-browser-db", 1);
+    request.onupgradeneeded = () => {
+      const db = request.result;
+      if (!db.objectStoreNames.contains("videos")) {
+        db.createObjectStore("videos");
+      }
+    };
+    request.onsuccess = () => resolve(request.result);
+    request.onerror = () => reject(request.error);
+  });
+}
+
+function saveVideoToIndexedDb(key: string, data: ArrayBuffer): Promise<string> {
+  return openDatabase().then((db) => {
+    return new Promise<string>((resolve, reject) => {
+      const transaction = db.transaction("videos", "readwrite");
+      const store = transaction.objectStore("videos");
+      const blob = new Blob([data], { type: "video/webm" });
+      const request = store.put(blob, key);
+      request.onsuccess = () => {
+        resolve(`indexeddb://${key}`);
+      };
+      request.onerror = () => reject(request.error);
+    });
+  });
+}
+
+function loadVideoFromIndexedDb(key: string): Promise<string | null> {
+  return openDatabase()
+    .then((db) => {
+      return new Promise<string | null>((resolve, reject) => {
+        const transaction = db.transaction("videos", "readonly");
+        const store = transaction.objectStore("videos");
+        const request = store.get(key);
+        request.onsuccess = () => {
+          const blob = request.result;
+          if (blob instanceof Blob) {
+            resolve(URL.createObjectURL(blob));
+          } else {
+            resolve(null);
+          }
+        };
+        request.onerror = () => reject(request.error);
+      });
+    })
+    .catch(() => null);
+}
+
+function loadVideoFromIndexedDbRaw(key: string): Promise<Blob | null> {
+  return openDatabase()
+    .then((db) => {
+      return new Promise<Blob | null>((resolve, reject) => {
+        const transaction = db.transaction("videos", "readonly");
+        const store = transaction.objectStore("videos");
+        const request = store.get(key);
+        request.onsuccess = () => {
+          const blob = request.result;
+          if (blob instanceof Blob) {
+            resolve(blob);
+          } else {
+            resolve(null);
+          }
+        };
+        request.onerror = () => reject(request.error);
+      });
+    })
+    .catch(() => null);
+}
+
+function deleteVideoFromIndexedDb(key: string): Promise<void> {
+  return openDatabase()
+    .then((db) => {
+      return new Promise<void>((resolve, reject) => {
+        const transaction = db.transaction("videos", "readwrite");
+        const store = transaction.objectStore("videos");
+        const request = store.delete(key);
+        request.onsuccess = () => resolve();
+        request.onerror = () => reject(request.error);
+      });
+    })
+    .catch(() => {});
+}
+
+
 function downloadBrowserFile(data: BlobPart, fileName: string, mimeType: string) {
   const blob = new Blob([data], { type: mimeType });
   const url = URL.createObjectURL(blob);
@@ -271,6 +361,12 @@ function nativeDocumentToCursorSamples(document: NativeDocument | null | undefin
 function pathsEqual(p1?: string, p2?: string): boolean {
   if (!p1 || !p2) {
     return p1 === p2;
+  }
+  if (
+    (p1.startsWith("indexeddb://") && p2.startsWith("blob:")) ||
+    (p2.startsWith("indexeddb://") && p1.startsWith("blob:"))
+  ) {
+    return true;
   }
   const n1 = fromFileUrl(p1).replace(/\\/g, "/").toLowerCase();
   const n2 = fromFileUrl(p2).replace(/\\/g, "/").toLowerCase();
@@ -535,6 +631,9 @@ interface NativeBridgeRequestInput {
 }
 
 function toFileUrl(filePath: string): string {
+  if (/^(blob:|data:|https?:|file:|indexeddb:)/i.test(filePath)) {
+    return filePath;
+  }
   const normalized = filePath.replace(/\\/g, "/");
   if (normalized.match(/^[a-zA-Z]:/)) {
     return `file:///${normalized}`;
@@ -571,13 +670,17 @@ if (typeof window !== "undefined") {
   // Dynamically import when script loads
   import("@tauri-apps/api/core")
     .then((m) => {
-      tauriConvertFileSrc = m.convertFileSrc;
+      if (m) {
+        tauriConvertFileSrc = m.convertFileSrc || (m as any).default?.convertFileSrc;
+      }
     })
     .catch(() => {});
   import("@tauri-apps/api/path")
     .then((m) => {
-      tauriVideoDir = m.videoDir;
-      tauriJoin = m.join;
+      if (m) {
+        tauriVideoDir = m.videoDir || (m as any).default?.videoDir;
+        tauriJoin = m.join || (m as any).default?.join;
+      }
     })
     .catch(() => {});
 }
@@ -591,9 +694,35 @@ export function installTauriCompatBridge() {
     isBrowserPreview: true,
     assetBaseUrl: "/",
     convertFileSrc: (path: string) => {
-      if (tauriConvertFileSrc) {
+      if (tauriRuntime && tauriConvertFileSrc) {
         const cleanPath = path.startsWith("file://") ? fromFileUrl(path) : path;
-        return tauriConvertFileSrc(cleanPath);
+        try {
+          return tauriConvertFileSrc(cleanPath);
+        } catch (e) {
+          console.warn("tauriConvertFileSrc error:", e);
+        }
+      }
+      return /^(blob:|data:|https?:|file:)/i.test(path) ? path : toFileUrl(path);
+    },
+    resolveVideoPath: async (path: string) => {
+      if (!path) return "";
+      if (path.startsWith("indexeddb://")) {
+        const key = path.replace("indexeddb://", "");
+        try {
+          const objectUrl = await loadVideoFromIndexedDb(key);
+          return objectUrl || "";
+        } catch (e) {
+          console.error("Failed to load video from IndexedDB in resolveVideoPath:", e);
+          return "";
+        }
+      }
+      if (tauriRuntime && tauriConvertFileSrc) {
+        const cleanPath = path.startsWith("file://") ? fromFileUrl(path) : path;
+        try {
+          return tauriConvertFileSrc(cleanPath);
+        } catch (e) {
+          console.warn("tauriConvertFileSrc error in resolveVideoPath:", e);
+        }
       }
       return /^(blob:|data:|https?:|file:)/i.test(path) ? path : toFileUrl(path);
     },
@@ -908,7 +1037,38 @@ export function installTauriCompatBridge() {
     },
     getCurrentRecordingSession: async () => {
       const raw = localStorage.getItem(currentRecordingSessionKey);
-      return ok({ session: raw ? JSON.parse(raw) : null });
+      if (!raw) {
+        return ok({ session: null });
+      }
+      try {
+        const session = JSON.parse(raw);
+        if (session && typeof session === "object") {
+          if (
+            typeof session.screenVideoPath === "string" &&
+            session.screenVideoPath.startsWith("indexeddb://")
+          ) {
+            const key = session.screenVideoPath.replace("indexeddb://", "");
+            const objectUrl = await loadVideoFromIndexedDb(key);
+            if (objectUrl) {
+              session.screenVideoPath = objectUrl;
+            }
+          }
+          if (
+            typeof session.webcamVideoPath === "string" &&
+            session.webcamVideoPath.startsWith("indexeddb://")
+          ) {
+            const key = session.webcamVideoPath.replace("indexeddb://", "");
+            const objectUrl = await loadVideoFromIndexedDb(key);
+            if (objectUrl) {
+              session.webcamVideoPath = objectUrl;
+            }
+          }
+        }
+        return ok({ session });
+      } catch (err) {
+        console.error("Error loading session:", err);
+        return ok({ session: null });
+      }
     },
     setCurrentRecordingSession: async (session: unknown) => {
       localStorage.setItem(currentRecordingSessionKey, JSON.stringify(session));
@@ -922,6 +1082,7 @@ export function installTauriCompatBridge() {
     onRequestSaveBeforeClose: () => noop,
     onRequestCloseConfirm: () => noop,
     sendCloseConfirmResponse: noop,
+    onMenuNewProject: (callback: () => void) => listenToTauriEvent("menu-new-project", callback),
     onMenuLoadProject: (callback: () => void) => listenToTauriEvent("menu-load-project", callback),
     onMenuSaveProject: (callback: () => void) => listenToTauriEvent("menu-save-project", callback),
     onMenuSaveProjectAs: (callback: () => void) =>
@@ -930,7 +1091,35 @@ export function installTauriCompatBridge() {
       listenToTauriEventWithPayload("source-selected", callback),
     onCountdownOverlayValue: (callback: (value: number) => void) =>
       listenToTauriEventWithPayload("countdown-value", callback),
+    deleteRecording: async (id: string) => {
+      localStorage.removeItem(currentVideoPathKey);
+      localStorage.removeItem(currentRecordingSessionKey);
+      localStorage.removeItem(currentProjectFileKey);
+      localStorage.removeItem(currentProjectPathKey);
+
+      if (tauriRuntime) {
+        try {
+          await invokeTauri("delete_recording", { id });
+          return ok();
+        } catch (error) {
+          const message = error instanceof Error ? error.message : String(error);
+          return { success: false, error: message, message };
+        }
+      } else {
+        try {
+          const key = id.startsWith("indexeddb://") ? id.replace("indexeddb://", "") : id;
+          await deleteVideoFromIndexedDb(key);
+          await deleteVideoFromIndexedDb(`${key}-webcam`);
+          await deleteVideoFromIndexedDb(`screen-${key}`);
+          await deleteVideoFromIndexedDb(`webcam-${key}`);
+          return ok();
+        } catch (error) {
+          return { success: false, error: String(error) };
+        }
+      }
+    },
     startNewRecording: async () => {
+
       if (tauriRuntime) {
         try {
           const { WebviewWindow } = await import("@tauri-apps/api/webviewWindow");
@@ -1017,7 +1206,41 @@ export function installTauriCompatBridge() {
           return { success: false, error: String(error) };
         }
       }
-      return unavailable("Video file picker requires the desktop shell.");
+      // Browser fallback: open a standard file input and store selected file to IndexedDB
+      return new Promise((resolve) => {
+        const input = document.createElement("input");
+        input.type = "file";
+        input.accept = "video/*";
+        input.style.display = "none";
+        document.body.appendChild(input);
+        
+        input.onchange = async () => {
+          const file = input.files?.[0];
+          if (file) {
+            try {
+              const buffer = await file.arrayBuffer();
+              const key = `screen-${Date.now()}`;
+              const videoPath = await saveVideoToIndexedDb(key, buffer);
+              localStorage.setItem(currentVideoPathKey, videoPath);
+              resolve({ success: true, path: videoPath, canceled: false });
+            } catch (err) {
+              resolve({ success: false, error: String(err) });
+            } finally {
+              input.remove();
+            }
+          } else {
+            input.remove();
+            resolve({ success: false, canceled: true });
+          }
+        };
+        
+        input.oncancel = () => {
+          input.remove();
+          resolve({ success: false, canceled: true });
+        };
+        
+        input.click();
+      });
     },
     storeRecordedSession: async (input: RecordedSessionInput) => {
       if (tauriRuntime && tauriVideoDir && tauriJoin) {
@@ -1072,10 +1295,26 @@ export function installTauriCompatBridge() {
           };
         }
       }
-      const screenVideoPath = arrayBufferToDataUrl(input.screen.videoData, "video/webm");
-      const webcamVideoPath = input.webcam
-        ? arrayBufferToDataUrl(input.webcam.videoData, "video/webm")
-        : undefined;
+      let screenVideoPath = "";
+      let webcamVideoPath: string | undefined = undefined;
+      try {
+        screenVideoPath = await saveVideoToIndexedDb(
+          `screen-${input.createdAt || Date.now()}`,
+          input.screen.videoData,
+        );
+        if (input.webcam) {
+          webcamVideoPath = await saveVideoToIndexedDb(
+            `webcam-${input.createdAt || Date.now()}`,
+            input.webcam.videoData,
+          );
+        }
+      } catch (dbError) {
+        console.warn("Failed to save to IndexedDB, falling back to data URL:", dbError);
+        screenVideoPath = arrayBufferToDataUrl(input.screen.videoData, "video/webm");
+        webcamVideoPath = input.webcam
+          ? arrayBufferToDataUrl(input.webcam.videoData, "video/webm")
+          : undefined;
+      }
       const session = {
         screenVideoPath,
         ...(webcamVideoPath ? { webcamVideoPath } : {}),
@@ -1158,23 +1397,60 @@ export function installTauriCompatBridge() {
         `browser-download://diagnostic-${Date.now()}.json`,
       );
     },
-    readBinaryFile: tauriRuntime
-      ? async (path: string) => {
-          try {
-            const bytes = await invokeTauri<number[]>("read_binary_file", {
-              path,
-            });
+    readBinaryFile: async (path: string) => {
+      if (tauriRuntime) {
+        try {
+          const bytes = await invokeTauri<number[]>("read_binary_file", {
+            path,
+          });
+          return {
+            success: true,
+            data: new Uint8Array(bytes).buffer,
+            path,
+          };
+        } catch (error) {
+          const message = error instanceof Error ? error.message : String(error);
+          return { success: false, error: message, message, path };
+        }
+      }
+
+      // Browser mode fallback
+      if (path.startsWith("indexeddb://")) {
+        const key = path.replace("indexeddb://", "");
+        try {
+          const blob = await loadVideoFromIndexedDbRaw(key);
+          if (blob) {
+            const buffer = await blob.arrayBuffer();
             return {
               success: true,
-              data: new Uint8Array(bytes).buffer,
+              data: buffer,
               path,
             };
-          } catch (error) {
-            const message = error instanceof Error ? error.message : String(error);
-            return { success: false, error: message, message, path };
           }
+          return { success: false, error: "Video not found in IndexedDB", message: "Video not found in IndexedDB", path };
+        } catch (error) {
+          const message = String(error);
+          return { success: false, error: message, message, path };
         }
-      : undefined,
+      }
+
+      // Fallback: fetch http/https/blob URLs
+      try {
+        const response = await fetch(path);
+        if (!response.ok) {
+          return { success: false, error: `HTTP error ${response.status}`, message: `HTTP error ${response.status}`, path };
+        }
+        const buffer = await response.arrayBuffer();
+        return {
+          success: true,
+          data: buffer,
+          path,
+        };
+      } catch (error) {
+        const message = String(error);
+        return { success: false, error: message, message, path };
+      }
+    },
     openExternalUrl: (url: string) => window.open(url, "_blank", "noopener,noreferrer"),
     hudOverlayHide: async () => {
       if (tauriRuntime) {
@@ -1372,6 +1648,27 @@ export function installTauriCompatBridge() {
             meta,
           };
         }
+        if (project && typeof project === "object") {
+          const projectAny = project as any;
+          if (projectAny.media && typeof projectAny.media === "object") {
+            if (
+              typeof projectAny.media.screenVideoPath === "string" &&
+              projectAny.media.screenVideoPath.startsWith("indexeddb://")
+            ) {
+              const key = projectAny.media.screenVideoPath.replace("indexeddb://", "");
+              const objectUrl = await loadVideoFromIndexedDb(key);
+              if (objectUrl) projectAny.media.screenVideoPath = objectUrl;
+            }
+            if (
+              typeof projectAny.media.webcamVideoPath === "string" &&
+              projectAny.media.webcamVideoPath.startsWith("indexeddb://")
+            ) {
+              const key = projectAny.media.webcamVideoPath.replace("indexeddb://", "");
+              const objectUrl = await loadVideoFromIndexedDb(key);
+              if (objectUrl) projectAny.media.webcamVideoPath = objectUrl;
+            }
+          }
+        }
         localStorage.removeItem(currentVideoPathKey);
         localStorage.removeItem(currentRecordingSessionKey);
         return {
@@ -1385,11 +1682,23 @@ export function installTauriCompatBridge() {
         };
       }
       if (request?.domain === "project" && request?.action === "getCurrentVideoPath") {
+        let path = localStorage.getItem(currentVideoPathKey);
+        if (path && path.startsWith("indexeddb://")) {
+          try {
+            const key = path.replace("indexeddb://", "");
+            const objectUrl = await loadVideoFromIndexedDb(key);
+            if (objectUrl) {
+              path = objectUrl;
+            }
+          } catch (e) {
+            console.error("Failed to load video from IndexedDB:", e);
+          }
+        }
         return {
           ok: true,
           data: {
             success: true,
-            path: localStorage.getItem(currentVideoPathKey),
+            path,
           },
           meta,
         };

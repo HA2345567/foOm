@@ -6,6 +6,7 @@ echo ===================================================
 if not exist D:\temp mkdir D:\temp
 set TMP=D:\temp
 set TEMP=D:\temp
+set CARGO_TARGET_DIR=D:\ZoOmly-cargo-target
 
 cd apps\desktop\tauri-shell
 call bun x tauri build

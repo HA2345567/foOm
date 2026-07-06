@@ -10,6 +10,7 @@ import {
   DEFAULT_EXPORT_SETTINGS,
   DEFAULT_GIF_SETTINGS,
   DEFAULT_WEBCAM_SETTINGS,
+  DEFAULT_CURSOR_SETTINGS,
   LEGACY_OVERSIZED_EDITOR_PADDING,
   MAX_EDITOR_PADDING,
 } from "./editorDefaults";
@@ -91,6 +92,12 @@ export interface ProjectEditorState {
   gifFrameRate: GifFrameRate;
   gifLoop: boolean;
   gifSizePreset: GifSizePreset;
+  autoZoomEnabled: boolean;
+  autoFocusAll: boolean;
+  showTrimWaveform: boolean;
+  webcamMirrored: boolean;
+  webcamReactiveZoom: boolean;
+  cursorTheme: string;
 }
 
 export interface EditorProjectData {
@@ -168,6 +175,9 @@ function encodePathSegments(pathname: string, keepWindowsDrive = false): string 
 }
 
 export function toFileUrl(filePath: string): string {
+  if (/^(blob:|data:|https?:|file:|indexeddb:)/i.test(filePath)) {
+    return filePath;
+  }
   const normalized = filePath.replace(/\\/g, "/");
   if (normalized.match(/^[a-zA-Z]:/)) {
     return `file:///${encodePathSegments(normalized, true)}`;
@@ -561,10 +571,10 @@ export function normalizeProjectEditor(editor: Partial<ProjectEditorState>): Pro
     noiseReductionEnabled:
       typeof editor.noiseReductionEnabled === "boolean"
         ? editor.noiseReductionEnabled
-        : DEFAULT_EXPORT_SETTINGS.noiseReduction.enabled,
+        : false,
     noiseReductionAmount: isFiniteNumber(editor.noiseReductionAmount)
       ? clamp(editor.noiseReductionAmount, 0, 1)
-      : DEFAULT_EXPORT_SETTINGS.noiseReduction.amount,
+      : 0.45,
     gifFrameRate:
       editor.gifFrameRate === 15 ||
       editor.gifFrameRate === 20 ||
@@ -579,6 +589,12 @@ export function normalizeProjectEditor(editor: Partial<ProjectEditorState>): Pro
       editor.gifSizePreset === "original"
         ? editor.gifSizePreset
         : DEFAULT_GIF_SETTINGS.sizePreset,
+    autoZoomEnabled: typeof editor.autoZoomEnabled === "boolean" ? editor.autoZoomEnabled : true,
+    autoFocusAll: typeof editor.autoFocusAll === "boolean" ? editor.autoFocusAll : false,
+    showTrimWaveform: typeof editor.showTrimWaveform === "boolean" ? editor.showTrimWaveform : true,
+    webcamMirrored: typeof editor.webcamMirrored === "boolean" ? editor.webcamMirrored : false,
+    webcamReactiveZoom: typeof editor.webcamReactiveZoom === "boolean" ? editor.webcamReactiveZoom : false,
+    cursorTheme: typeof editor.cursorTheme === "string" ? editor.cursorTheme : DEFAULT_CURSOR_SETTINGS.theme,
   };
 }
 

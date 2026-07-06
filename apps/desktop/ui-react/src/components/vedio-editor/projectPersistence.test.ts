@@ -1,73 +1,273 @@
 import { describe, expect, it } from "vitest";
-import { DEFAULT_WALLPAPER } from "@/lib/wallpaper";
-import { DEFAULT_EDITOR_LAYOUT_SETTINGS, MAX_EDITOR_PADDING } from "./editorDefaults";
 import {
-  normalizeProjectEditor,
-  resolveProjectMedia,
-  validateProjectData,
+	createProjectData,
+	createProjectSnapshot,
+	hasProjectUnsavedChanges,
+	normalizeProjectEditor,
+	PROJECT_VERSION,
+	resolveProjectMedia,
+	validateProjectData,
 } from "./projectPersistence";
 
-describe("normalizeProjectEditor", () => {
-  it("keeps current bundled /wallp/ wallpaper values", () => {
-    const normalized = normalizeProjectEditor({ wallpaper: "/wallp/14.jpg" });
+describe("projectPersistence media compatibility", () => {
+	it("accepts legacy projects with a single videoPath", () => {
+		const project = {
+			version: 1,
+			videoPath: "/tmp/screen.webm",
+			editor: {},
+		};
 
-    expect(normalized.wallpaper).toBe("/wallp/14.jpg");
-  });
+		expect(validateProjectData(project)).toBe(true);
+		expect(resolveProjectMedia(project)).toEqual({
+			screenVideoPath: "/tmp/screen.webm",
+		});
+	});
 
-  it("rewrites legacy packaged wallpaper file URLs to current bundled paths", () => {
-    const normalized = normalizeProjectEditor({
-      wallpaper: "file:///C:/Program Files/foOm/resources/assets/wallpapers/wallpaper14.jpg",
-    });
+	it("creates version 2 projects with explicit media", () => {
+		const project = createProjectData(
+			{
+				screenVideoPath: "/tmp/screen.webm",
+				webcamVideoPath: "/tmp/webcam.webm",
+			},
+			{
+				wallpaper: "/wallpapers/wallpaper1.jpg",
+				shadowIntensity: 0,
+				showBlur: false,
+				motionBlurAmount: 0,
+				borderRadius: 0,
+				padding: 50,
+				cropRegion: { x: 0, y: 0, width: 1, height: 1 },
+				zoomRegions: [],
+				trimRegions: [],
+				speedRegions: [],
+				annotationRegions: [],
+				aspectRatio: "16:9",
+				webcamLayoutPreset: "picture-in-picture",
+				webcamMaskShape: "circle",
+				webcamMirrored: true,
+				webcamSizePreset: 25,
+				webcamPosition: null,
+				exportQuality: "good",
+				exportFormat: "mp4",
+				noiseReductionEnabled: false,
+				noiseReductionAmount: 50,
+				gifFrameRate: 15,
+				gifLoop: true,
+				gifSizePreset: "medium",
+				autoZoomEnabled: false,
+				autoFocusAll: false,
+				showTrimWaveform: true,
+				webcamReactiveZoom: false,
+				cursorTheme: "default",
+			},
+		);
 
-    expect(normalized.wallpaper).toBe("/wallp/wallpaper14.jpg");
-  });
+		expect(project.version).toBe(PROJECT_VERSION);
+		expect(project.media).toEqual({
+			screenVideoPath: "/tmp/screen.webm",
+			webcamVideoPath: "/tmp/webcam.webm",
+		});
+		expect(validateProjectData(project)).toBe(true);
+	});
 
-  it("rewrites legacy dev wallp file URLs to current bundled paths", () => {
-    const normalized = normalizeProjectEditor({
-      wallpaper:
-        "file:///C:/Users/Harsh/Desktop/Projects/ZoOmly/apps/desktop/ui-react/public/wallp/14.jpg",
-    });
+	it("normalizes webcam mask shape values safely", () => {
+		expect(normalizeProjectEditor({ webcamMaskShape: "rounded" }).webcamMaskShape).toBe("rounded");
+		expect(
+			normalizeProjectEditor({ webcamMaskShape: "not-a-real-shape" as never }).webcamMaskShape,
+		).toBe("rectangle");
+	});
 
-    expect(normalized.wallpaper).toBe("/wallp/14.jpg");
-  });
+	it("normalizes webcam mirroring safely", () => {
+		expect(normalizeProjectEditor({ webcamMirrored: true }).webcamMirrored).toBe(true);
+		expect(normalizeProjectEditor({ webcamMirrored: false }).webcamMirrored).toBe(false);
+		expect(normalizeProjectEditor({ webcamMirrored: "yes" as never }).webcamMirrored).toBe(false);
+	});
 
-  it("falls back for unknown legacy bundled wallpaper filenames", () => {
-    const normalized = normalizeProjectEditor({
-      wallpaper: "file:///C:/Program Files/foOm/resources/assets/wallpapers/wallpaper999.jpg",
-    });
+	it("normalizes blur region type and mosaic block size safely", () => {
+		const editor = normalizeProjectEditor({
+			annotationRegions: [
+				{
+					id: "annotation-1",
+					startMs: 0,
+					endMs: 500,
+					type: "blur",
+					content: "",
+					position: { x: 10, y: 10 },
+					size: { width: 20, height: 20 },
+					style: {
+						color: "#fff",
+						backgroundColor: "transparent",
+						fontSize: 32,
+						fontFamily: "Inter",
+						fontWeight: "bold",
+						fontStyle: "normal",
+						textDecoration: "none",
+						textAlign: "center",
+					},
+					zIndex: 1,
+					blurData: {
+						type: "mosaic",
+						shape: "rectangle",
+						color: "black",
+						intensity: 999,
+						blockSize: 999,
+					},
+				},
+				{
+					id: "annotation-2",
+					startMs: 0,
+					endMs: 500,
+					type: "blur",
+					content: "",
+					position: { x: 10, y: 10 },
+					size: { width: 20, height: 20 },
+					style: {
+						color: "#fff",
+						backgroundColor: "transparent",
+						fontSize: 32,
+						fontFamily: "Inter",
+						fontWeight: "bold",
+						fontStyle: "normal",
+						textDecoration: "none",
+						textAlign: "center",
+					},
+					zIndex: 2,
+					blurData: {
+						type: "invalid" as never,
+						shape: "rectangle",
+						color: "invalid" as never,
+						intensity: 10,
+						blockSize: 0,
+					},
+				},
+			],
+		});
 
-    expect(normalized.wallpaper).toBe(DEFAULT_WALLPAPER);
-  });
+		expect(editor.annotationRegions[0].blurData?.type).toBe("mosaic");
+		expect(editor.annotationRegions[0].blurData?.color).toBe("black");
+		expect(editor.annotationRegions[0].blurData?.intensity).toBe(40);
+		expect(editor.annotationRegions[0].blurData?.blockSize).toBe(48);
+		expect(editor.annotationRegions[1].blurData?.type).toBe("mosaic");
+		expect(editor.annotationRegions[1].blurData?.color).toBe("white");
+		expect(editor.annotationRegions[1].blurData?.blockSize).toBe(4);
+	});
 
-  it("repairs the accidental oversized default padding on load", () => {
-    const normalized = normalizeProjectEditor({ padding: 38 });
+	it("accepts the dual frame webcam layout preset", () => {
+		expect(normalizeProjectEditor({ webcamLayoutPreset: "dual-frame" }).webcamLayoutPreset).toBe(
+			"dual-frame",
+		);
+	});
 
-    expect(normalized.padding).toBe(DEFAULT_EDITOR_LAYOUT_SETTINGS.padding);
-  });
+	it("falls back from dual frame to picture in picture for portrait aspect ratios", () => {
+		expect(
+			normalizeProjectEditor({
+				aspectRatio: "9:16",
+				webcamLayoutPreset: "dual-frame",
+			}).webcamLayoutPreset,
+		).toBe("picture-in-picture");
+	});
 
-  it("clamps saved padding to the supported editor range", () => {
-    const normalized = normalizeProjectEditor({ padding: 80 });
-
-    expect(normalized.padding).toBe(MAX_EDITOR_PADDING);
-  });
+	it("clears webcamPosition when the normalized preset is not picture in picture", () => {
+		expect(
+			normalizeProjectEditor({
+				webcamLayoutPreset: "dual-frame",
+				webcamPosition: { cx: 0.2, cy: 0.8 },
+			}).webcamPosition,
+		).toBeNull();
+	});
 });
 
-describe("native recording documents", () => {
-  it("accepts Rust recording metadata as loadable project media", () => {
-    const document = {
-      documentVersion: 1,
-      media: {
-        rawVideoPath: "C:\\Users\\Harsh\\Videos\\foom\\recordings\\proj_123.mp4",
-        metadataPath: "C:\\Users\\Harsh\\Videos\\foom\\recordings\\proj_123.json",
-        cameraVideoPath: "C:\\Users\\Harsh\\Videos\\foom\\recordings\\proj_123_webcam.webm",
-      },
-      editor: {},
-    };
+it("creates stable snapshots for identical project state", () => {
+	const media = {
+		screenVideoPath: "/tmp/screen.webm",
+		webcamVideoPath: "/tmp/webcam.webm",
+	};
+	const editor = normalizeProjectEditor({
+		wallpaper: "/wallpapers/wallpaper1.jpg",
+		shadowIntensity: 0,
+		showBlur: false,
+		motionBlurAmount: 0,
+		borderRadius: 0,
+		padding: 50,
+		cropRegion: { x: 0, y: 0, width: 1, height: 1 },
+		zoomRegions: [],
+		trimRegions: [],
+		speedRegions: [],
+		annotationRegions: [],
+		aspectRatio: "16:9",
+		webcamLayoutPreset: "picture-in-picture",
+		webcamMaskShape: "circle",
+		exportQuality: "good",
+		exportFormat: "mp4",
+		gifFrameRate: 15,
+		gifLoop: true,
+		gifSizePreset: "medium",
+	});
 
-    expect(validateProjectData(document)).toBe(true);
-    expect(resolveProjectMedia(document)).toEqual({
-      screenVideoPath: "C:\\Users\\Harsh\\Videos\\foom\\recordings\\proj_123.mp4",
-      webcamVideoPath: "C:\\Users\\Harsh\\Videos\\foom\\recordings\\proj_123_webcam.webm",
-    });
-  });
+	expect(createProjectSnapshot(media, editor)).toBe(createProjectSnapshot(media, editor));
+});
+
+it("detects unsaved changes from differing snapshots", () => {
+	expect(hasProjectUnsavedChanges(null, null)).toBe(false);
+	expect(hasProjectUnsavedChanges("same", "same")).toBe(false);
+	expect(hasProjectUnsavedChanges("current", "baseline")).toBe(true);
+});
+
+describe("wallpaper legacy normalization", () => {
+	it("rewrites pre-fix packaged paths (resources/assets/wallpapers/…)", () => {
+		const normalized = normalizeProjectEditor({
+			wallpaper: "file:///opt/Openscreen/resources/assets/wallpapers/wallpaper5.jpg",
+		});
+		expect(normalized.wallpaper).toBe("/wallpapers/wallpaper5.jpg");
+	});
+
+	it("rewrites new packaged layout (resources/wallpapers/…)", () => {
+		const normalized = normalizeProjectEditor({
+			wallpaper: "file:///opt/Openscreen/resources/wallpapers/wallpaper3.jpg",
+		});
+		expect(normalized.wallpaper).toBe("/wallpapers/wallpaper3.jpg");
+	});
+
+	it("rewrites unpackaged dev layout (public/wallpapers/…)", () => {
+		const normalized = normalizeProjectEditor({
+			wallpaper: "file:///home/user/project/public/wallpapers/wallpaper1.jpg",
+		});
+		expect(normalized.wallpaper).toBe("/wallpapers/wallpaper1.jpg");
+	});
+
+	it("rewrites Windows-style file URLs with drive letter", () => {
+		const normalized = normalizeProjectEditor({
+			wallpaper: "file:///C:/Users/me/openscreen/resources/wallpapers/wallpaper2.jpg",
+		});
+		expect(normalized.wallpaper).toBe("/wallpapers/wallpaper2.jpg");
+	});
+
+	it("leaves canonical relative paths untouched", () => {
+		const normalized = normalizeProjectEditor({ wallpaper: "/wallpapers/wallpaper2.jpg" });
+		expect(normalized.wallpaper).toBe("/wallpapers/wallpaper2.jpg");
+	});
+
+	it("leaves data URIs untouched", () => {
+		const dataUri = "data:image/png;base64,AAA";
+		expect(normalizeProjectEditor({ wallpaper: dataUri }).wallpaper).toBe(dataUri);
+	});
+
+	it("leaves colors and gradients untouched", () => {
+		expect(normalizeProjectEditor({ wallpaper: "#1a1a2e" }).wallpaper).toBe("#1a1a2e");
+		expect(
+			normalizeProjectEditor({ wallpaper: "linear-gradient(90deg, red, blue)" }).wallpaper,
+		).toBe("linear-gradient(90deg, red, blue)");
+	});
+
+	it("does NOT rewrite user files outside the known install layout", () => {
+		const userPath = "file:///home/user/Pictures/wallpapers/wallpaper1.jpg";
+		expect(normalizeProjectEditor({ wallpaper: userPath }).wallpaper).toBe(userPath);
+	});
+
+	it("falls back to default for bundled paths outside WALLPAPER_PATHS", () => {
+		const normalized = normalizeProjectEditor({
+			wallpaper: "file:///opt/Openscreen/resources/wallpapers/wallpaper99.jpg",
+		});
+		expect(normalized.wallpaper).toBe("/wallpapers/wallpaper1.jpg");
+	});
 });

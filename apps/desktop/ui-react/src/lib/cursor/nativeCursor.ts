@@ -1,21 +1,21 @@
 import { type Container, Point } from "pixi.js";
-import appStartingUrl from "@/assets/Cursor=App-Starting.svg";
-import crosshairUrl from "@/assets/Cursor=Cross.svg";
-import arrowUrl from "@/assets/Cursor=Default.svg";
-import normalArrowUrl from "@/assets/Cursor=Normal-Black.svg";
-import closedHandUrl from "@/assets/Cursor=Hand-(Grabbing).svg";
-import openHandUrl from "@/assets/Cursor=Hand-(Open).svg";
-import pointerUrl from "@/assets/Cursor=Hand-(Pointing).svg";
-import helpUrl from "@/assets/Cursor=Help.svg";
-import moveUrl from "@/assets/Cursor=Move.svg";
-import notAllowedUrl from "@/assets/Cursor=Not-Allowed.svg";
-import resizeNeswUrl from "@/assets/Cursor=Resize-North-East-South-West.svg";
-import resizeNsUrl from "@/assets/Cursor=Resize-North-South.svg";
-import resizeNwseUrl from "@/assets/Cursor=Resize-North-West-South-East.svg";
-import resizeEwUrl from "@/assets/Cursor=Resize-West-East.svg";
-import textUrl from "@/assets/Cursor=Text-Cursor.svg";
-import upArrowUrl from "@/assets/Cursor=Up-Arrow.svg";
-import waitUrl from "@/assets/Cursor=Wait.svg";
+import appStartingUrl from "@/assets/cursors/Cursor=App-Starting.svg";
+import crosshairUrl from "@/assets/cursors/Cursor=Cross.svg";
+import arrowUrl from "@/assets/cursors/Cursor=Default.svg";
+import normalArrowUrl from "@/assets/cursors/Cursor=Normal-Black.svg";
+import closedHandUrl from "@/assets/cursors/Cursor=Hand-(Grabbing).svg";
+import openHandUrl from "@/assets/cursors/Cursor=Hand-(Open).svg";
+import pointerUrl from "@/assets/cursors/Cursor=Hand-(Pointing).svg";
+import helpUrl from "@/assets/cursors/Cursor=Help.svg";
+import moveUrl from "@/assets/cursors/Cursor=Move.svg";
+import notAllowedUrl from "@/assets/cursors/Cursor=Not-Allowed.svg";
+import resizeNeswUrl from "@/assets/cursors/Cursor=Resize-North-East-South-West.svg";
+import resizeNsUrl from "@/assets/cursors/Cursor=Resize-North-South.svg";
+import resizeNwseUrl from "@/assets/cursors/Cursor=Resize-North-West-South-East.svg";
+import resizeEwUrl from "@/assets/cursors/Cursor=Resize-West-East.svg";
+import textUrl from "@/assets/cursors/Cursor=Text-Cursor.svg";
+import upArrowUrl from "@/assets/cursors/Cursor=Up-Arrow.svg";
+import waitUrl from "@/assets/cursors/Cursor=Wait.svg";
 import type { CropRegion, CursorStyle } from "@/components/video-editor/types";
 import type {
   CursorRecordingData,
@@ -222,11 +222,11 @@ const PRETTY_NATIVE_CURSOR_ASSETS: Partial<Record<NativeCursorType, PrettyNative
 };
 
 const NORMAL_BLACK_ARROW_CURSOR_ASSET: PrettyNativeCursorAsset = {
-  imageDataUrl: "/cursor.svg",
+  imageDataUrl: normalArrowUrl,
   width: 32,
   height: 32,
-  hotspotX: 3.2,
-  hotspotY: 2.29,
+  hotspotX: 4.96,
+  hotspotY: 4.96,
 };
 
 const TELEMETRY_CURSOR_ASSET: NativeCursorAsset = {
@@ -605,7 +605,7 @@ export function resolveNativeCursorRenderAsset(
   asset: NativeCursorAsset,
   deviceScaleFactor: number,
   sample?: CursorRecordingSample,
-  cursorStyle: CursorStyle = "arrow",
+  cursorStyle: string = "arrow",
 ) {
   const prettyAsset = resolvePrettyNativeCursorAsset(asset, sample);
   if (prettyAsset) {

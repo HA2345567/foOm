@@ -259,13 +259,7 @@ html {
       0 22px 60px rgba(0, 0, 0, 0.32);
   }
 
-  .editor-resize-handle > div {
-    background: rgba(255, 255, 255, 0.16);
-  }
 
-  .editor-resize-handle:hover > div {
-    background: rgba(255, 255, 255, 0.42);
-  }
 
   .editor-inspector-shell {
     background: linear-gradient(180deg, rgba(255, 255, 255, 0.025), rgba(255, 255, 255, 0));
