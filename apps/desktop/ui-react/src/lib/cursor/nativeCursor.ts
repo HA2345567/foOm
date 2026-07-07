@@ -2,7 +2,7 @@ import { type Container, Point } from "pixi.js";
 import appStartingUrl from "@/assets/cursors/Cursor=App-Starting.svg";
 import crosshairUrl from "@/assets/cursors/Cursor=Cross.svg";
 import arrowUrl from "@/assets/cursors/Cursor=Default.svg";
-import normalArrowUrl from "@/assets/cursors/Cursor=Normal-Black.svg";
+
 import closedHandUrl from "@/assets/cursors/Cursor=Hand-(Grabbing).svg";
 import openHandUrl from "@/assets/cursors/Cursor=Hand-(Open).svg";
 import pointerUrl from "@/assets/cursors/Cursor=Hand-(Pointing).svg";
@@ -111,8 +111,8 @@ const PRETTY_NATIVE_CURSOR_ASSETS: Partial<Record<NativeCursorType, PrettyNative
     imageDataUrl: arrowUrl,
     width: 32,
     height: 32,
-    hotspotX: 2.6,
-    hotspotY: 2.3,
+    hotspotX: 5,
+    hotspotY: 2,
   },
   text: {
     imageDataUrl: textUrl,
@@ -125,8 +125,8 @@ const PRETTY_NATIVE_CURSOR_ASSETS: Partial<Record<NativeCursorType, PrettyNative
     imageDataUrl: pointerUrl,
     width: 32,
     height: 33,
-    hotspotX: 16.65,
-    hotspotY: 14.24,
+    hotspotX: 13,
+    hotspotY: 10,
   },
   crosshair: {
     imageDataUrl: crosshairUrl,
@@ -221,13 +221,6 @@ const PRETTY_NATIVE_CURSOR_ASSETS: Partial<Record<NativeCursorType, PrettyNative
   },
 };
 
-const NORMAL_BLACK_ARROW_CURSOR_ASSET: PrettyNativeCursorAsset = {
-  imageDataUrl: normalArrowUrl,
-  width: 32,
-  height: 32,
-  hotspotX: 4.96,
-  hotspotY: 4.96,
-};
 
 const TELEMETRY_CURSOR_ASSET: NativeCursorAsset = {
   id: "telemetry-arrow",
@@ -610,10 +603,7 @@ export function resolveNativeCursorRenderAsset(
   const prettyAsset = resolvePrettyNativeCursorAsset(asset, sample);
   if (prettyAsset) {
     const prettyCursorType = sample?.cursorType ?? asset.cursorType;
-    const resolvedPrettyAsset =
-      prettyCursorType === "arrow" && cursorStyle === "normal"
-        ? NORMAL_BLACK_ARROW_CURSOR_ASSET
-        : prettyAsset;
+    const resolvedPrettyAsset = prettyAsset;
     return {
       id: `pretty:${prettyCursorType}:${prettyCursorType === "arrow" ? cursorStyle : "default"}`,
       imageDataUrl: resolvedPrettyAsset.imageDataUrl,

@@ -257,10 +257,10 @@ export function resolveProjectMedia(
       : typeof rawMedia?.screenVideoPath === "string" && rawMedia.screenVideoPath.trim()
         ? rawMedia.screenVideoPath
         : typeof (candidate as NativeRecordingDocument).rawVideoPath === "string" &&
-            ((candidate as NativeRecordingDocument).rawVideoPath as string).trim()
+          ((candidate as NativeRecordingDocument).rawVideoPath as string).trim()
           ? ((candidate as NativeRecordingDocument).rawVideoPath as string)
           : typeof (candidate as NativeRecordingDocument).raw_video_path === "string" &&
-              ((candidate as NativeRecordingDocument).raw_video_path as string).trim()
+            ((candidate as NativeRecordingDocument).raw_video_path as string).trim()
             ? ((candidate as NativeRecordingDocument).raw_video_path as string)
             : null;
   if (screenVideoPath) {
@@ -270,7 +270,7 @@ export function resolveProjectMedia(
         : typeof rawMedia?.webcamVideoPath === "string" && rawMedia.webcamVideoPath.trim()
           ? rawMedia.webcamVideoPath
           : typeof (candidate as NativeRecordingDocument).cameraVideoPath === "string" &&
-              ((candidate as NativeRecordingDocument).cameraVideoPath as string).trim()
+            ((candidate as NativeRecordingDocument).cameraVideoPath as string).trim()
             ? ((candidate as NativeRecordingDocument).cameraVideoPath as string)
             : undefined;
     return {
@@ -299,197 +299,197 @@ export function normalizeProjectEditor(editor: Partial<ProjectEditorState>): Pro
   );
   const normalizedWebcamPosition: WebcamPosition | null =
     normalizedWebcamLayoutPreset === "picture-in-picture" &&
-    editor.webcamPosition &&
-    typeof editor.webcamPosition === "object" &&
-    isFiniteNumber((editor.webcamPosition as WebcamPosition).cx) &&
-    isFiniteNumber((editor.webcamPosition as WebcamPosition).cy)
+      editor.webcamPosition &&
+      typeof editor.webcamPosition === "object" &&
+      isFiniteNumber((editor.webcamPosition as WebcamPosition).cx) &&
+      isFiniteNumber((editor.webcamPosition as WebcamPosition).cy)
       ? {
-          cx: clamp((editor.webcamPosition as WebcamPosition).cx, 0, 1),
-          cy: clamp((editor.webcamPosition as WebcamPosition).cy, 0, 1),
-        }
+        cx: clamp((editor.webcamPosition as WebcamPosition).cx, 0, 1),
+        cy: clamp((editor.webcamPosition as WebcamPosition).cy, 0, 1),
+      }
       : DEFAULT_WEBCAM_SETTINGS.position;
 
   const normalizedZoomRegions: ZoomRegion[] = Array.isArray(editor.zoomRegions)
     ? editor.zoomRegions
-        .filter((region): region is ZoomRegion => Boolean(region && typeof region.id === "string"))
-        .map((region) => {
-          const rawStart = isFiniteNumber(region.startMs) ? Math.round(region.startMs) : 0;
-          const rawEnd = isFiniteNumber(region.endMs) ? Math.round(region.endMs) : rawStart + 1000;
-          const startMs = Math.max(0, Math.min(rawStart, rawEnd));
-          const endMs = Math.max(startMs + 1, rawEnd);
+      .filter((region): region is ZoomRegion => Boolean(region && typeof region.id === "string"))
+      .map((region) => {
+        const rawStart = isFiniteNumber(region.startMs) ? Math.round(region.startMs) : 0;
+        const rawEnd = isFiniteNumber(region.endMs) ? Math.round(region.endMs) : rawStart + 1000;
+        const startMs = Math.max(0, Math.min(rawStart, rawEnd));
+        const endMs = Math.max(startMs + 1, rawEnd);
 
-          const validPreset =
-            region.rotationPreset === "iso" ||
+        const validPreset =
+          region.rotationPreset === "iso" ||
             region.rotationPreset === "left" ||
             region.rotationPreset === "right"
-              ? region.rotationPreset
-              : undefined;
-          return {
-            id: region.id,
-            startMs,
-            endMs,
-            depth: [1, 2, 3, 4, 5, 6].includes(region.depth) ? region.depth : DEFAULT_ZOOM_DEPTH,
-            focus: {
-              cx: clamp(isFiniteNumber(region.focus?.cx) ? region.focus.cx : 0.5, 0, 1),
-              cy: clamp(isFiniteNumber(region.focus?.cy) ? region.focus.cy : 0.5, 0, 1),
-            },
-            focusMode: region.focusMode === "auto" ? "auto" : "manual",
-            ...(validPreset ? { rotationPreset: validPreset } : {}),
-          };
-        })
+            ? region.rotationPreset
+            : undefined;
+        return {
+          id: region.id,
+          startMs,
+          endMs,
+          depth: [1, 2, 3, 4, 5, 6].includes(region.depth) ? region.depth : DEFAULT_ZOOM_DEPTH,
+          focus: {
+            cx: clamp(isFiniteNumber(region.focus?.cx) ? region.focus.cx : 0.5, 0, 1),
+            cy: clamp(isFiniteNumber(region.focus?.cy) ? region.focus.cy : 0.5, 0, 1),
+          },
+          focusMode: region.focusMode === "auto" ? "auto" : "manual",
+          ...(validPreset ? { rotationPreset: validPreset } : {}),
+        };
+      })
     : [];
 
   const normalizedTrimRegions: TrimRegion[] = Array.isArray(editor.trimRegions)
     ? editor.trimRegions
-        .filter((region): region is TrimRegion => Boolean(region && typeof region.id === "string"))
-        .map((region) => {
-          const rawStart = isFiniteNumber(region.startMs) ? Math.round(region.startMs) : 0;
-          const rawEnd = isFiniteNumber(region.endMs) ? Math.round(region.endMs) : rawStart + 1000;
-          const startMs = Math.max(0, Math.min(rawStart, rawEnd));
-          const endMs = Math.max(startMs + 1, rawEnd);
-          return {
-            id: region.id,
-            startMs,
-            endMs,
-          };
-        })
+      .filter((region): region is TrimRegion => Boolean(region && typeof region.id === "string"))
+      .map((region) => {
+        const rawStart = isFiniteNumber(region.startMs) ? Math.round(region.startMs) : 0;
+        const rawEnd = isFiniteNumber(region.endMs) ? Math.round(region.endMs) : rawStart + 1000;
+        const startMs = Math.max(0, Math.min(rawStart, rawEnd));
+        const endMs = Math.max(startMs + 1, rawEnd);
+        return {
+          id: region.id,
+          startMs,
+          endMs,
+        };
+      })
     : [];
 
   const normalizedSpeedRegions: SpeedRegion[] = Array.isArray(editor.speedRegions)
     ? editor.speedRegions
-        .filter((region): region is SpeedRegion => Boolean(region && typeof region.id === "string"))
-        .map((region) => {
-          const rawStart = isFiniteNumber(region.startMs) ? Math.round(region.startMs) : 0;
-          const rawEnd = isFiniteNumber(region.endMs) ? Math.round(region.endMs) : rawStart + 1000;
-          const startMs = Math.max(0, Math.min(rawStart, rawEnd));
-          const endMs = Math.max(startMs + 1, rawEnd);
+      .filter((region): region is SpeedRegion => Boolean(region && typeof region.id === "string"))
+      .map((region) => {
+        const rawStart = isFiniteNumber(region.startMs) ? Math.round(region.startMs) : 0;
+        const rawEnd = isFiniteNumber(region.endMs) ? Math.round(region.endMs) : rawStart + 1000;
+        const startMs = Math.max(0, Math.min(rawStart, rawEnd));
+        const endMs = Math.max(startMs + 1, rawEnd);
 
-          const speed =
-            isFiniteNumber(region.speed) &&
+        const speed =
+          isFiniteNumber(region.speed) &&
             region.speed >= MIN_PLAYBACK_SPEED &&
             region.speed <= MAX_PLAYBACK_SPEED
-              ? clampPlaybackSpeed(region.speed)
-              : DEFAULT_PLAYBACK_SPEED;
+            ? clampPlaybackSpeed(region.speed)
+            : DEFAULT_PLAYBACK_SPEED;
 
-          return {
-            id: region.id,
-            startMs,
-            endMs,
-            speed,
-          };
-        })
+        return {
+          id: region.id,
+          startMs,
+          endMs,
+          speed,
+        };
+      })
     : [];
 
   const normalizedAnnotationRegions: AnnotationRegion[] = Array.isArray(editor.annotationRegions)
     ? editor.annotationRegions
-        .filter((region): region is AnnotationRegion =>
-          Boolean(region && typeof region.id === "string"),
-        )
-        .map((region, index) => {
-          const rawStart = isFiniteNumber(region.startMs) ? Math.round(region.startMs) : 0;
-          const rawEnd = isFiniteNumber(region.endMs) ? Math.round(region.endMs) : rawStart + 1000;
-          const startMs = Math.max(0, Math.min(rawStart, rawEnd));
-          const endMs = Math.max(startMs + 1, rawEnd);
-          const blurShape =
-            typeof region.blurData?.shape === "string" &&
+      .filter((region): region is AnnotationRegion =>
+        Boolean(region && typeof region.id === "string"),
+      )
+      .map((region, index) => {
+        const rawStart = isFiniteNumber(region.startMs) ? Math.round(region.startMs) : 0;
+        const rawEnd = isFiniteNumber(region.endMs) ? Math.round(region.endMs) : rawStart + 1000;
+        const startMs = Math.max(0, Math.min(rawStart, rawEnd));
+        const endMs = Math.max(startMs + 1, rawEnd);
+        const blurShape =
+          typeof region.blurData?.shape === "string" &&
             VALID_BLUR_SHAPES.has(region.blurData.shape)
-              ? region.blurData.shape
-              : DEFAULT_BLUR_DATA.shape;
-          const blurType = normalizeBlurType(region.blurData?.type);
-          const blurColor = normalizeBlurColor(region.blurData?.color);
+            ? region.blurData.shape
+            : DEFAULT_BLUR_DATA.shape;
+        const blurType = normalizeBlurType(region.blurData?.type);
+        const blurColor = normalizeBlurColor(region.blurData?.color);
 
-          return {
-            id: region.id,
-            startMs,
-            endMs,
-            type:
-              region.type === "image" || region.type === "figure" || region.type === "blur"
-                ? region.type
-                : "text",
-            content: typeof region.content === "string" ? region.content : "",
-            textContent: typeof region.textContent === "string" ? region.textContent : undefined,
-            imageContent: typeof region.imageContent === "string" ? region.imageContent : undefined,
-            position: {
-              x: clamp(
-                isFiniteNumber(region.position?.x)
-                  ? region.position.x
-                  : DEFAULT_ANNOTATION_POSITION.x,
-                0,
-                100,
-              ),
-              y: clamp(
-                isFiniteNumber(region.position?.y)
-                  ? region.position.y
-                  : DEFAULT_ANNOTATION_POSITION.y,
-                0,
-                100,
-              ),
-            },
-            size: {
-              width: clamp(
-                isFiniteNumber(region.size?.width)
-                  ? region.size.width
-                  : DEFAULT_ANNOTATION_SIZE.width,
-                1,
-                200,
-              ),
-              height: clamp(
-                isFiniteNumber(region.size?.height)
-                  ? region.size.height
-                  : DEFAULT_ANNOTATION_SIZE.height,
-                1,
-                200,
-              ),
-            },
-            style: {
-              ...DEFAULT_ANNOTATION_STYLE,
-              ...(region.style && typeof region.style === "object" ? region.style : {}),
-            },
-            zIndex: isFiniteNumber(region.zIndex) ? region.zIndex : index + 1,
-            figureData: region.figureData
+        return {
+          id: region.id,
+          startMs,
+          endMs,
+          type:
+            region.type === "image" || region.type === "figure" || region.type === "blur"
+              ? region.type
+              : "text",
+          content: typeof region.content === "string" ? region.content : "",
+          textContent: typeof region.textContent === "string" ? region.textContent : undefined,
+          imageContent: typeof region.imageContent === "string" ? region.imageContent : undefined,
+          position: {
+            x: clamp(
+              isFiniteNumber(region.position?.x)
+                ? region.position.x
+                : DEFAULT_ANNOTATION_POSITION.x,
+              0,
+              100,
+            ),
+            y: clamp(
+              isFiniteNumber(region.position?.y)
+                ? region.position.y
+                : DEFAULT_ANNOTATION_POSITION.y,
+              0,
+              100,
+            ),
+          },
+          size: {
+            width: clamp(
+              isFiniteNumber(region.size?.width)
+                ? region.size.width
+                : DEFAULT_ANNOTATION_SIZE.width,
+              1,
+              200,
+            ),
+            height: clamp(
+              isFiniteNumber(region.size?.height)
+                ? region.size.height
+                : DEFAULT_ANNOTATION_SIZE.height,
+              1,
+              200,
+            ),
+          },
+          style: {
+            ...DEFAULT_ANNOTATION_STYLE,
+            ...(region.style && typeof region.style === "object" ? region.style : {}),
+          },
+          zIndex: isFiniteNumber(region.zIndex) ? region.zIndex : index + 1,
+          figureData: region.figureData
+            ? {
+              ...DEFAULT_FIGURE_DATA,
+              ...region.figureData,
+            }
+            : undefined,
+          blurData:
+            region.blurData && typeof region.blurData === "object"
               ? {
-                  ...DEFAULT_FIGURE_DATA,
-                  ...region.figureData,
-                }
+                ...DEFAULT_BLUR_DATA,
+                ...region.blurData,
+                type: blurType,
+                shape: blurShape,
+                color: blurColor,
+                intensity: isFiniteNumber(region.blurData.intensity)
+                  ? clamp(region.blurData.intensity, MIN_BLUR_INTENSITY, MAX_BLUR_INTENSITY)
+                  : DEFAULT_BLUR_INTENSITY,
+                blockSize: isFiniteNumber(region.blurData.blockSize)
+                  ? clamp(region.blurData.blockSize, MIN_BLUR_BLOCK_SIZE, MAX_BLUR_BLOCK_SIZE)
+                  : DEFAULT_BLUR_BLOCK_SIZE,
+                freehandPoints: Array.isArray(region.blurData.freehandPoints)
+                  ? region.blurData.freehandPoints
+                    .filter(
+                      (
+                        point,
+                      ): point is {
+                        x: number;
+                        y: number;
+                      } =>
+                        Boolean(
+                          point &&
+                          isFiniteNumber((point as { x?: unknown }).x) &&
+                          isFiniteNumber((point as { y?: unknown }).y),
+                        ),
+                    )
+                    .map((point) => ({
+                      x: clamp(point.x, 0, 100),
+                      y: clamp(point.y, 0, 100),
+                    }))
+                  : DEFAULT_BLUR_FREEHAND_POINTS,
+              }
               : undefined,
-            blurData:
-              region.blurData && typeof region.blurData === "object"
-                ? {
-                    ...DEFAULT_BLUR_DATA,
-                    ...region.blurData,
-                    type: blurType,
-                    shape: blurShape,
-                    color: blurColor,
-                    intensity: isFiniteNumber(region.blurData.intensity)
-                      ? clamp(region.blurData.intensity, MIN_BLUR_INTENSITY, MAX_BLUR_INTENSITY)
-                      : DEFAULT_BLUR_INTENSITY,
-                    blockSize: isFiniteNumber(region.blurData.blockSize)
-                      ? clamp(region.blurData.blockSize, MIN_BLUR_BLOCK_SIZE, MAX_BLUR_BLOCK_SIZE)
-                      : DEFAULT_BLUR_BLOCK_SIZE,
-                    freehandPoints: Array.isArray(region.blurData.freehandPoints)
-                      ? region.blurData.freehandPoints
-                          .filter(
-                            (
-                              point,
-                            ): point is {
-                              x: number;
-                              y: number;
-                            } =>
-                              Boolean(
-                                point &&
-                                isFiniteNumber((point as { x?: unknown }).x) &&
-                                isFiniteNumber((point as { y?: unknown }).y),
-                              ),
-                          )
-                          .map((point) => ({
-                            x: clamp(point.x, 0, 100),
-                            y: clamp(point.y, 0, 100),
-                          }))
-                      : DEFAULT_BLUR_FREEHAND_POINTS,
-                  }
-                : undefined,
-          };
-        })
+        };
+      })
     : [];
 
   const rawCropX = isFiniteNumber(editor.cropRegion?.x)
@@ -549,9 +549,9 @@ export function normalizeProjectEditor(editor: Partial<ProjectEditorState>): Pro
     webcamLayoutPreset: normalizedWebcamLayoutPreset,
     webcamMaskShape:
       editor.webcamMaskShape === "rectangle" ||
-      editor.webcamMaskShape === "circle" ||
-      editor.webcamMaskShape === "square" ||
-      editor.webcamMaskShape === "rounded"
+        editor.webcamMaskShape === "circle" ||
+        editor.webcamMaskShape === "square" ||
+        editor.webcamMaskShape === "rounded"
         ? editor.webcamMaskShape
         : DEFAULT_WEBCAM_SETTINGS.maskShape,
     webcamSizePreset:
@@ -561,10 +561,10 @@ export function normalizeProjectEditor(editor: Partial<ProjectEditorState>): Pro
     webcamPosition: normalizedWebcamPosition,
     exportQuality:
       editor.exportQuality === "low" ||
-      editor.exportQuality === "medium" ||
-      editor.exportQuality === "good" ||
-      editor.exportQuality === "ultra" ||
-      editor.exportQuality === "source"
+        editor.exportQuality === "medium" ||
+        editor.exportQuality === "good" ||
+        editor.exportQuality === "ultra" ||
+        editor.exportQuality === "source"
         ? editor.exportQuality
         : DEFAULT_EXPORT_SETTINGS.quality,
     exportFormat: editor.exportFormat === "gif" ? "gif" : DEFAULT_EXPORT_SETTINGS.format,
@@ -577,16 +577,16 @@ export function normalizeProjectEditor(editor: Partial<ProjectEditorState>): Pro
       : 0.45,
     gifFrameRate:
       editor.gifFrameRate === 15 ||
-      editor.gifFrameRate === 20 ||
-      editor.gifFrameRate === 25 ||
-      editor.gifFrameRate === 30
+        editor.gifFrameRate === 20 ||
+        editor.gifFrameRate === 25 ||
+        editor.gifFrameRate === 30
         ? editor.gifFrameRate
         : DEFAULT_GIF_SETTINGS.frameRate,
     gifLoop: typeof editor.gifLoop === "boolean" ? editor.gifLoop : DEFAULT_GIF_SETTINGS.loop,
     gifSizePreset:
       editor.gifSizePreset === "medium" ||
-      editor.gifSizePreset === "large" ||
-      editor.gifSizePreset === "original"
+        editor.gifSizePreset === "large" ||
+        editor.gifSizePreset === "original"
         ? editor.gifSizePreset
         : DEFAULT_GIF_SETTINGS.sizePreset,
     autoZoomEnabled: typeof editor.autoZoomEnabled === "boolean" ? editor.autoZoomEnabled : true,

@@ -1,0 +1,6 @@
+<svg width="32" height="32" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <!-- White/gray outline layer (slightly expanded) -->
+  <path d="M5 2L5 24L10.5 19L14.5 28L17 27L13 18L20 18L5 2Z" fill="none" stroke="rgba(255,255,255,0.85)" stroke-width="2.5" stroke-linejoin="round" stroke-linecap="round"/>
+  <!-- Solid black fill on top -->
+  <path d="M5 2L5 24L10.5 19L14.5 28L17 27L13 18L20 18L5 2Z" fill="black"/>
+</svg>

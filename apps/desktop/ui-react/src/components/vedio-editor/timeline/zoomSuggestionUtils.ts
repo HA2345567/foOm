@@ -1,10 +1,9 @@
 import type { CursorTelemetryPoint, ZoomFocus } from "../types";
 
-export const MIN_DWELL_DURATION_MS = 300;
-export const MAX_DWELL_DURATION_MS = 8000;
-export const DWELL_MOVE_THRESHOLD = 0.03;
+export const MIN_DWELL_DURATION_MS = 200;
+export const DWELL_MOVE_THRESHOLD = 0.08; // 8% of screen — large enough for natural cursor micro-drift
 /** Minimum spacing between two accepted suggestion centres. */
-export const SUGGESTION_SPACING_MS = 800;
+export const SUGGESTION_SPACING_MS = 2000;
 
 export interface ZoomDwellCandidate {
 	centerTimeMs: number;
@@ -52,7 +51,8 @@ export function detectZoomDwellCandidates(samples: CursorTelemetryPoint[]): Zoom
 		const start = samples[startIndex];
 		const end = samples[endIndexExclusive - 1];
 		const runDuration = end.timeMs - start.timeMs;
-		if (runDuration < MIN_DWELL_DURATION_MS || runDuration > MAX_DWELL_DURATION_MS) {
+		// Accept any dwell long enough — no upper cap, long dwells are ideal zoom targets
+		if (runDuration < MIN_DWELL_DURATION_MS) {
 			return;
 		}
 
@@ -67,10 +67,13 @@ export function detectZoomDwellCandidates(samples: CursorTelemetryPoint[]): Zoom
 		});
 	};
 
+	// Measure distance from the ANCHOR of the current run (not frame-to-frame).
+	// Frame-to-frame distances are near-zero at high FPS, so they never trigger splits.
+	// Anchored distance correctly captures "how far did the cursor wander from where it started".
 	for (let index = 1; index < samples.length; index += 1) {
-		const prev = samples[index - 1];
+		const anchor = samples[runStart];
 		const curr = samples[index];
-		const distance = Math.hypot(curr.cx - prev.cx, curr.cy - prev.cy);
+		const distance = Math.hypot(curr.cx - anchor.cx, curr.cy - anchor.cy);
 
 		if (distance > DWELL_MOVE_THRESHOLD) {
 			pushRunIfDwell(runStart, index);

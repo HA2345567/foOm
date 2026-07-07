@@ -220,36 +220,36 @@ export class GifExporter {
       const webcamDecodePromise =
         this.webcamDecoder && webcamFrameQueue
           ? (() => {
-              const queue = webcamFrameQueue;
-              return this.webcamDecoder
-                .decodeAll(
-                  this.config.frameRate,
-                  this.config.trimRegions,
-                  this.config.speedRegions,
-                  async (webcamFrame, _exportTimestampUs, webcamSourceTimestampMs) => {
-                    while (queue.length >= 12 && !this.cancelled && !stopWebcamDecode) {
-                      await new Promise((resolve) => setTimeout(resolve, 2));
-                    }
-                    if (this.cancelled || stopWebcamDecode) {
-                      webcamFrame.close();
-                      return;
-                    }
-                    queue.enqueue(webcamFrame, webcamSourceTimestampMs);
-                  },
-                  onWarning,
-                )
-                .catch((error) => {
-                  webcamDecodeError = error instanceof Error ? error : new Error(String(error));
-                  throw error;
-                })
-                .finally(() => {
-                  if (webcamDecodeError) {
-                    queue.fail(webcamDecodeError);
-                  } else {
-                    queue.close();
+            const queue = webcamFrameQueue;
+            return this.webcamDecoder
+              .decodeAll(
+                this.config.frameRate,
+                this.config.trimRegions,
+                this.config.speedRegions,
+                async (webcamFrame, _exportTimestampUs, webcamSourceTimestampMs) => {
+                  while (queue.length >= 12 && !this.cancelled && !stopWebcamDecode) {
+                    await new Promise((resolve) => setTimeout(resolve, 2));
                   }
-                });
-            })()
+                  if (this.cancelled || stopWebcamDecode) {
+                    webcamFrame.close();
+                    return;
+                  }
+                  queue.enqueue(webcamFrame, webcamSourceTimestampMs);
+                },
+                onWarning,
+              )
+              .catch((error) => {
+                webcamDecodeError = error instanceof Error ? error : new Error(String(error));
+                throw error;
+              })
+              .finally(() => {
+                if (webcamDecodeError) {
+                  queue.fail(webcamDecodeError);
+                } else {
+                  queue.close();
+                }
+              });
+          })()
           : null;
 
       // Stream decode and process frames — no seeking!

@@ -42,6 +42,14 @@ html {
   scroll-behavior: smooth;
 }
 
+/* Applied by useCustomCursor inside Tauri to suppress the native browser cursor */
+html.hide-cursor,
+html.hide-cursor *,
+html.hide-cursor *::before,
+html.hide-cursor *::after {
+  cursor: none !important;
+}
+
 :root {
   /* Cal.com Dark Mode Palette */
   --background: #000000;

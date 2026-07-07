@@ -396,8 +396,11 @@ export default function VideoEditor() {
 		recordingCursorCaptureMode === "editable-overlay" &&
 		(nativePlatform === "win32" || nativePlatform === "darwin") &&
 		hasNativeCursorRecordingData(cursorRecordingData);
-	const effectiveShowCursor = showCursor && hasEditableCursorRecording;
-	const showCursorSettings = hasEditableCursorRecording;
+	// Also show the cursor when we only have telemetry (position track) but no
+	// full native cursor asset recording — e.g. system cursor capture mode.
+	const hasTelemetryCursor = cursorTelemetry.length > 0;
+	const effectiveShowCursor = showCursor && (hasEditableCursorRecording || hasTelemetryCursor);
+	const showCursorSettings = hasEditableCursorRecording || hasTelemetryCursor;
 	const { locale, setLocale, t: rawT } = useI18n();
 	const t = useScopedT("editor");
 	const ts = useScopedT("settings");
@@ -1141,7 +1144,8 @@ export default function VideoEditor() {
 				cursorTelemetry,
 				totalMs,
 				existingRegions,
-				defaultDurationMs: Math.max(1500, Math.round(totalMs * 0.08)),
+				// 5% of total duration per suggestion — smaller spans allow more non-overlapping zones
+				defaultDurationMs: Math.max(1500, Math.round(totalMs * 0.05)),
 			});
 			return suggestions.map((suggestion) => ({
 				id: `zoom-${nextZoomIdRef.current++}`,
