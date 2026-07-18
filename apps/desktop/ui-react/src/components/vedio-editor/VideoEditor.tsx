@@ -180,10 +180,8 @@ function buildSaveDiagnosticMessage(formatLabel: "GIF" | "Video", reason?: strin
 const CAPTION_WORD_CHOICES = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12] as const;
 
 const MP4_EXPORT_QUALITY_LABELS: Record<ExportQuality, string> = {
-	low: "480P",
 	medium: "720P",
 	good: "1080P",
-	ultra: "4K",
 	source: "SOURCE",
 };
 
@@ -300,7 +298,7 @@ export default function VideoEditor() {
 	// Unsaved-changes confirmation for New Project / Load Project.
 	// The window-close flow uses showCloseConfirmDialog above.
 	const [confirmDialogVariant, setConfirmDialogVariant] = useState<
-		"newProject" | "loadProject" | null
+		"newProject" | "loadProject" | "newRecording" | null
 	>(null);
 	const playerContainerRef = useRef<HTMLDivElement | null>(null);
 	const cursorTelemetrySourcePath = videoSourcePath ?? (videoPath ? fromFileUrl(videoPath) : null);

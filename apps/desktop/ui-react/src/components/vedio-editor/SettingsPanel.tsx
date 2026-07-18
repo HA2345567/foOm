@@ -393,10 +393,8 @@ const MP4_EXPORT_SHORT_SIDES = {
 } as const;
 
 const MP4_EXPORT_QUALITY_LABELS: Record<ExportQuality, string> = {
-  low: "480p",
   medium: "720p",
   good: "1080p",
-  ultra: "4K",
   source: "Source",
 };
 

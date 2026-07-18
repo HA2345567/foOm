@@ -26,9 +26,9 @@ const EXPORT_QUALITY_OPTIONS: Array<{
   label: string;
   summary: string;
 }> = [
-  { value: "low", label: "Low", summary: "SD 480p • 30 FPS • Fast Export" },
+  { value: "medium", label: "Low", summary: "SD 480p • 30 FPS • Fast Export" },
   { value: "good", label: "Medium", summary: "Full HD 1080p • 60 FPS • High Quality" },
-  { value: "ultra", label: "High", summary: "Ultra HD 4K • 60 FPS • Maximum Quality" },
+  { value: "source", label: "High", summary: "Ultra HD 4K • 60 FPS • Maximum Quality" },
 ];
 
 export function ExportDialog({

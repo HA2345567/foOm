@@ -13,7 +13,7 @@ interface UnsavedChangesDialogProps {
   onSaveAndClose: () => void;
   onDiscardAndClose: () => void;
   onCancel: () => void;
-  variant?: "newProject" | "loadProject";
+  variant?: "newProject" | "loadProject" | "newRecording";
 }
 
 export function UnsavedChangesDialog({

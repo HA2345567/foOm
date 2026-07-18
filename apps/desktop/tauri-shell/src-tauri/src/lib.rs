@@ -406,6 +406,7 @@ fn show_recording_overlay(app: tauri::AppHandle) -> Result<(), String> {
     window
         .set_ignore_cursor_events(false)
         .map_err(|e| e.to_string())?;
+    window.show().map_err(|e| e.to_string())?;
     exclude_window_from_capture(&window);
 
     Ok(())
@@ -571,6 +572,15 @@ fn switch_to_main_window(app: tauri::AppHandle) -> Result<(), String> {
     }
     if let Some(overlay_window) = app.get_webview_window("recording-overlay") {
         let _ = overlay_window.hide();
+    }
+    Ok(())
+}
+
+#[tauri::command]
+fn switch_to_overlay(app: tauri::AppHandle) -> Result<(), String> {
+    show_recording_overlay(app.clone())?;
+    if let Some(main_window) = app.get_webview_window("main") {
+        let _ = main_window.hide();
     }
     Ok(())
 }
@@ -1256,10 +1266,7 @@ pub fn run() {
                     let _ = app.emit_to("main", "menu-save-project-as", ());
                 }
                 "menu-new-recording" => {
-                    if let Some(main_window) = app.get_webview_window("main") {
-                        let _ = main_window.hide();
-                    }
-                    let _ = show_recording_overlay(app.clone());
+                    let _ = app.emit_to("main", "menu-new-recording", ());
                 }
                 "menu-reload-window" => {
                     if let Some(main_window) = app.get_webview_window("main") {
@@ -1284,6 +1291,7 @@ pub fn run() {
             show_countdown_overlay,
             hide_countdown_overlay,
             switch_to_main_window,
+            switch_to_overlay,
             close_app,
             get_recordings,
             delete_recording,

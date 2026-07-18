@@ -560,13 +560,13 @@ export function normalizeProjectEditor(editor: Partial<ProjectEditorState>): Pro
         : DEFAULT_WEBCAM_SETTINGS.sizePreset,
     webcamPosition: normalizedWebcamPosition,
     exportQuality:
-      editor.exportQuality === "low" ||
-        editor.exportQuality === "medium" ||
-        editor.exportQuality === "good" ||
-        editor.exportQuality === "ultra" ||
-        editor.exportQuality === "source"
-        ? editor.exportQuality
-        : DEFAULT_EXPORT_SETTINGS.quality,
+      (editor.exportQuality as unknown) === "low" || editor.exportQuality === "medium"
+        ? "medium"
+        : editor.exportQuality === "good"
+          ? "good"
+          : (editor.exportQuality as unknown) === "ultra" || editor.exportQuality === "source"
+            ? "source"
+            : DEFAULT_EXPORT_SETTINGS.quality,
     exportFormat: editor.exportFormat === "gif" ? "gif" : DEFAULT_EXPORT_SETTINGS.format,
     noiseReductionEnabled:
       typeof editor.noiseReductionEnabled === "boolean"

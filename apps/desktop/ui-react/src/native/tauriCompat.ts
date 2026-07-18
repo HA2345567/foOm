@@ -1083,6 +1083,7 @@ export function installTauriCompatBridge() {
     onRequestCloseConfirm: () => noop,
     sendCloseConfirmResponse: noop,
     onMenuNewProject: (callback: () => void) => listenToTauriEvent("menu-new-project", callback),
+    onMenuNewRecording: (callback: () => void) => listenToTauriEvent("menu-new-recording", callback),
     onMenuLoadProject: (callback: () => void) => listenToTauriEvent("menu-load-project", callback),
     onMenuSaveProject: (callback: () => void) => listenToTauriEvent("menu-save-project", callback),
     onMenuSaveProjectAs: (callback: () => void) =>
@@ -1170,6 +1171,18 @@ export function installTauriCompatBridge() {
         }
       } else {
         window.location.href = "#/video-editor";
+      }
+      return ok();
+    },
+    switchToOverlay: async () => {
+      if (tauriRuntime) {
+        try {
+          await invokeTauri("switch_to_overlay");
+          return ok();
+        } catch (error) {
+          const message = error instanceof Error ? error.message : String(error);
+          return { success: false, error: message, message };
+        }
       }
       return ok();
     },
