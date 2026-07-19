@@ -218,28 +218,28 @@ describe("wallpaper legacy normalization", () => {
 		const normalized = normalizeProjectEditor({
 			wallpaper: "file:///opt/Openscreen/resources/assets/wallpapers/wallpaper5.jpg",
 		});
-		expect(normalized.wallpaper).toBe("/wallpapers/wallpaper5.jpg");
+		expect(normalized.wallpaper).toBe("/wallp/05.jpg");
 	});
 
 	it("rewrites new packaged layout (resources/wallpapers/…)", () => {
 		const normalized = normalizeProjectEditor({
 			wallpaper: "file:///opt/Openscreen/resources/wallpapers/wallpaper3.jpg",
 		});
-		expect(normalized.wallpaper).toBe("/wallpapers/wallpaper3.jpg");
+		expect(normalized.wallpaper).toBe("/wallp/03.jpg");
 	});
 
 	it("rewrites unpackaged dev layout (public/wallpapers/…)", () => {
 		const normalized = normalizeProjectEditor({
 			wallpaper: "file:///home/user/project/public/wallpapers/wallpaper1.jpg",
 		});
-		expect(normalized.wallpaper).toBe("/wallpapers/wallpaper1.jpg");
+		expect(normalized.wallpaper).toBe("/wallp/01.jpg");
 	});
 
 	it("rewrites Windows-style file URLs with drive letter", () => {
 		const normalized = normalizeProjectEditor({
 			wallpaper: "file:///C:/Users/me/openscreen/resources/wallpapers/wallpaper2.jpg",
 		});
-		expect(normalized.wallpaper).toBe("/wallpapers/wallpaper2.jpg");
+		expect(normalized.wallpaper).toBe("/wallp/02.jpg");
 	});
 
 	it("leaves canonical relative paths untouched", () => {
@@ -268,6 +268,6 @@ describe("wallpaper legacy normalization", () => {
 		const normalized = normalizeProjectEditor({
 			wallpaper: "file:///opt/Openscreen/resources/wallpapers/wallpaper99.jpg",
 		});
-		expect(normalized.wallpaper).toBe("/wallpapers/wallpaper1.jpg");
+		expect(normalized.wallpaper).toBe("/wallp/01.jpg");
 	});
 });

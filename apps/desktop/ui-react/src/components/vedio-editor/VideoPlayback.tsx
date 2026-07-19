@@ -896,6 +896,9 @@ const VideoPlayback = forwardRef<VideoPlaybackRef, VideoPlaybackProps>(
 
 		useEffect(() => {
 			cursorThemeRef.current = cursorTheme;
+			void preloadCursorAssets(cursorTheme).then(() => {
+				cursorOverlayRef.current?.updateThemeAssets();
+			});
 		}, [cursorTheme]);
 
 		useEffect(() => {
@@ -1047,7 +1050,7 @@ const VideoPlayback = forwardRef<VideoPlaybackRef, VideoPlaybackProps>(
 			(async () => {
 				let cursorOverlayEnabled = true;
 				try {
-					await preloadCursorAssets();
+					await preloadCursorAssets(cursorThemeRef.current);
 				} catch {
 					cursorOverlayEnabled = false;
 				}

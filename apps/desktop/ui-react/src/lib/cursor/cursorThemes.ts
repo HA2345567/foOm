@@ -40,6 +40,26 @@ export const DEFAULT_CURSOR_THEME_ID = "default";
  */
 export const CURSOR_THEMES: readonly CursorTheme[] = [
 	{
+		id: "normal",
+		name: "Normal Black",
+		assets: {
+			arrow: {
+				assetPath: "cursor.svg",
+				width: 32,
+				height: 32,
+				hotspotX: 2,
+				hotspotY: 2,
+			},
+			pointer: {
+				assetPath: "cursor.svg",
+				width: 32,
+				height: 32,
+				hotspotX: 2,
+				hotspotY: 2,
+			},
+		},
+	},
+	{
 		id: "hello-kitty-watermelon",
 		name: "Hello Kitty & Watermelon",
 		source: "sweezy-cursors.com",

@@ -394,9 +394,12 @@ export default function VideoEditor() {
 		recordingCursorCaptureMode === "editable-overlay" &&
 		(nativePlatform === "win32" || nativePlatform === "darwin") &&
 		hasNativeCursorRecordingData(cursorRecordingData);
-	// Also show the cursor when we only have telemetry (position track) but no
-	// full native cursor asset recording — e.g. system cursor capture mode.
-	const hasTelemetryCursor = cursorTelemetry.length > 0;
+	const isBrowserPreview = Boolean((window.electronAPI || window.foomNative)?.isBrowserPreview);
+	// In system cursor mode, the system cursor is already baked into the video.
+	// Only show the overlay and settings if we recorded in editable-overlay mode,
+	// or if we have telemetry and the capture mode is not explicitly "system" (except in browser preview).
+	const hasTelemetryCursor =
+		cursorTelemetry.length > 0 && (recordingCursorCaptureMode !== "system" || isBrowserPreview);
 	const effectiveShowCursor = showCursor && (hasEditableCursorRecording || hasTelemetryCursor);
 	const showCursorSettings = hasEditableCursorRecording || hasTelemetryCursor;
 	const { locale, setLocale, t: rawT } = useI18n();
@@ -1192,10 +1195,13 @@ export default function VideoEditor() {
 		(enabled: boolean) => {
 			if (enabled) {
 				autoProcessedSourceRef.current = cursorTelemetrySourcePath;
-				pushState((prev) => ({
-					autoZoomEnabled: true,
-					zoomRegions: [...prev.zoomRegions, ...buildAutoZoomRegions(prev.zoomRegions)],
-				}));
+				pushState((prev) => {
+					const manualRegions = prev.zoomRegions.filter((region) => region.source !== "auto");
+					return {
+						autoZoomEnabled: true,
+						zoomRegions: [...manualRegions, ...buildAutoZoomRegions(manualRegions)],
+					};
+				});
 			} else {
 				pushState((prev) => ({
 					autoZoomEnabled: false,
@@ -2298,6 +2304,23 @@ export default function VideoEditor() {
 			return;
 		}
 
+		setShowExportDialog(true);
+		setExportError(null);
+		setExportedFilePath(null);
+	}, [videoPath]);
+
+	const handleStartExport = useCallback(() => {
+		if (!videoPath) {
+			toast.error("No video loaded");
+			return;
+		}
+
+		const video = videoPlaybackRef.current?.video;
+		if (!video) {
+			toast.error("Video not ready");
+			return;
+		}
+
 		// Build export settings from current state
 		const sourceWidth = video.videoWidth || DEFAULT_SOURCE_DIMENSIONS.width;
 		const sourceHeight = video.videoHeight || DEFAULT_SOURCE_DIMENSIONS.height;
@@ -2333,11 +2356,6 @@ export default function VideoEditor() {
 					: undefined,
 		};
 
-		setShowExportDialog(true);
-		setExportError(null);
-		setExportedFilePath(null);
-
-		// Start export immediately
 		handleExport(settings);
 	}, [
 		videoPath,
@@ -3181,7 +3199,7 @@ export default function VideoEditor() {
 									)
 									: getAspectRatioValue(aspectRatio),
 							)}
-							onExport={handleOpenExportDialog}
+							onExport={handleStartExport}
 							onExportPanelOpen={() => {
 								setSelectedZoomId(null);
 								setSelectedTrimId(null);
@@ -3257,6 +3275,10 @@ export default function VideoEditor() {
 				error={exportError}
 				onCancel={handleCancelExport}
 				exportFormat={exportFormat}
+				onExportFormatChange={setExportFormat}
+				exportQuality={exportQuality}
+				onExportQualityChange={setExportQuality}
+				onStartExport={handleStartExport}
 				exportedFilePath={exportedFilePath || undefined}
 				onShowInFolder={
 					exportedFilePath ? () => void handleShowExportedFile(exportedFilePath) : undefined

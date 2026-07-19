@@ -62,7 +62,15 @@ const LEGACY_WALLPAPER_BASENAME_TO_CANONICAL = new Map(
 function normalizeWallpaperValue(value: string): string {
   const match = LEGACY_FILE_WALLPAPER_RE.exec(value);
   if (!match) return value;
-  const canonical = LEGACY_WALLPAPER_BASENAME_TO_CANONICAL.get(match[1].toLowerCase());
+  let filename = match[1].toLowerCase();
+  
+  // Map legacy "wallpaperX.jpg" (for X = 1..5) to "0X.jpg"
+  const legacyMatch = /^wallpaper([1-5])\.(jpg|jpeg|png)$/i.exec(filename);
+  if (legacyMatch) {
+    filename = `0${legacyMatch[1]}.${legacyMatch[2]}`;
+  }
+
+  const canonical = LEGACY_WALLPAPER_BASENAME_TO_CANONICAL.get(filename);
   return canonical && CANONICAL_WALLPAPERS.has(canonical) ? canonical : DEFAULT_WALLPAPER;
 }
 

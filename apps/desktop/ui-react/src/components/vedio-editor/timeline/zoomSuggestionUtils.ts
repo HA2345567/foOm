@@ -20,6 +20,7 @@ function normalizeTelemetrySample(
 		timeMs: Math.max(0, Math.min(sample.timeMs, totalMs)),
 		cx: Math.max(0, Math.min(sample.cx, 1)),
 		cy: Math.max(0, Math.min(sample.cy, 1)),
+		interactionType: sample.interactionType,
 	};
 }
 
@@ -79,7 +80,46 @@ export function detectZoomDwellCandidates(samples: CursorTelemetryPoint[]): Zoom
 	}
 	pushRunIfDwell(runStart, samples.length);
 
-	return dwellCandidates;
+	// Add click/double-click/right-click interactions as high-strength candidates
+	const clickCandidates: ZoomDwellCandidate[] = [];
+	for (const sample of samples) {
+		if (
+			sample.interactionType === "click" ||
+			sample.interactionType === "double-click" ||
+			sample.interactionType === "right-click"
+		) {
+			clickCandidates.push({
+				centerTimeMs: sample.timeMs,
+				focus: { cx: sample.cx, cy: sample.cy },
+				strength: MAX_DWELL_DURATION_MS + 1,
+			});
+		}
+	}
+
+	// Merge and sort by centerTimeMs
+	const allCandidates = [...dwellCandidates, ...clickCandidates].sort(
+		(a, b) => a.centerTimeMs - b.centerTimeMs,
+	);
+
+	// Cluster/deduplicate candidates within a 500ms window
+	const clusteredCandidates: ZoomDwellCandidate[] = [];
+	for (const candidate of allCandidates) {
+		if (clusteredCandidates.length === 0) {
+			clusteredCandidates.push(candidate);
+		} else {
+			const last = clusteredCandidates[clusteredCandidates.length - 1];
+			if (candidate.centerTimeMs - last.centerTimeMs < 500) {
+				// Keep the one with higher strength (clicks have priority)
+				if (candidate.strength > last.strength) {
+					clusteredCandidates[clusteredCandidates.length - 1] = candidate;
+				}
+			} else {
+				clusteredCandidates.push(candidate);
+			}
+		}
+	}
+
+	return clusteredCandidates;
 }
 
 export interface AutoZoomSuggestion {

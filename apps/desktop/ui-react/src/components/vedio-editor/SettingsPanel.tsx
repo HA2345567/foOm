@@ -769,6 +769,7 @@ export function SettingsPanel({
     { id: "layout", label: "Webcam", icon: Webcam, disabled: !hasWebcam },
     { id: "captions", label: "Captions", icon: Captions },
     { id: "audio", label: "Audio", icon: AudioLines, disabled: !videoElement },
+    { id: "export", label: "Export", icon: Download, disabled: !videoElement },
   ];
    const activeModeLabel =
     [...panelModes, { id: "zoom", label: "Zoom" }].find(
@@ -1995,6 +1996,166 @@ export function SettingsPanel({
                         className="w-full [&_[role=slider]]:bg-[#D4D4D8] [&_[role=slider]]:border-[#D4D4D8] [&_[role=slider]]:h-3 [&_[role=slider]]:w-3"
                       />
                     </div>
+                  </div>
+                </div>
+              )}
+
+              {activePanelMode === "export" && (
+                <div className="space-y-3">
+                  <div className="foom-inspector-card space-y-3.5">
+                    <div>
+                      <span className="text-[10px] font-semibold uppercase tracking-wider text-slate-400 block">
+                        Export Settings
+                      </span>
+                      <p className="mt-1 text-[11px] text-slate-500">
+                        Choose the output format and quality parameters.
+                      </p>
+                    </div>
+
+                    <div className="space-y-1.5">
+                      <div className="text-[10px] font-semibold uppercase tracking-wider text-slate-400">
+                        Format
+                      </div>
+                      <div className="flex bg-white/5 border border-white/5 p-0.5 grid grid-cols-2 h-7 rounded-lg">
+                        <button
+                          type="button"
+                          onClick={() => onExportFormatChange?.("mp4")}
+                          className={cn(
+                            "rounded-md transition-all text-[10px] font-medium cursor-pointer",
+                            exportFormat === "mp4"
+                              ? "bg-white/20 text-white"
+                              : "text-slate-400 hover:text-slate-200",
+                          )}
+                        >
+                          MP4
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => onExportFormatChange?.("gif")}
+                          className={cn(
+                            "rounded-md transition-all text-[10px] font-medium cursor-pointer",
+                            exportFormat === "gif"
+                              ? "bg-white/20 text-white"
+                              : "text-slate-400 hover:text-slate-200",
+                          )}
+                        >
+                          GIF
+                        </button>
+                      </div>
+                    </div>
+
+                    {exportFormat === "mp4" && (
+                      <div className="space-y-2">
+                        <div className="text-[10px] font-semibold uppercase tracking-wider text-slate-400 mb-1">
+                          Resolution
+                        </div>
+                        <div className="grid grid-cols-2 gap-2">
+                          {(["low", "medium", "good", "ultra", "source"] as ExportQuality[]).map(
+                            (quality) => {
+                              const dimensions = getMp4ExportDimensions(quality);
+                              const isSelected = exportQuality === quality;
+                              return (
+                                <button
+                                  key={quality}
+                                  type="button"
+                                  onClick={() => onExportQualityChange?.(quality)}
+                                  className={cn(
+                                    "flex flex-col items-center justify-center py-2 px-2.5 rounded-lg border transition-all text-center cursor-pointer",
+                                    isSelected
+                                      ? "bg-white/[0.08] border-white/30 text-white"
+                                      : "bg-white/5 border-transparent text-slate-400 hover:bg-white/10 hover:text-slate-200",
+                                  )}
+                                >
+                                  <span className="text-[10px] font-semibold uppercase tracking-wider">
+                                    {MP4_EXPORT_QUALITY_LABELS[quality]}
+                                  </span>
+                                  <span className="text-[8px] opacity-75 font-mono mt-0.5">
+                                    {dimensions.width} x {dimensions.height}
+                                  </span>
+                                </button>
+                              );
+                            },
+                          )}
+                        </div>
+                      </div>
+                    )}
+
+                    {exportFormat === "gif" && (
+                      <div className="space-y-3">
+                        <div className="space-y-1.5">
+                          <div className="text-[10px] font-semibold uppercase tracking-wider text-slate-400">
+                            Output Size
+                          </div>
+                          <div className="flex bg-white/5 border border-white/5 p-0.5 grid grid-cols-3 h-7 rounded-lg">
+                            {Object.entries(GIF_SIZE_PRESETS).map(([key, _preset]) => (
+                              <button
+                                key={key}
+                                type="button"
+                                onClick={() => onGifSizePresetChange?.(key as GifSizePreset)}
+                                className={cn(
+                                  "rounded-md transition-all text-[10px] font-medium cursor-pointer",
+                                  gifSizePreset === key
+                                    ? "bg-white/20 text-white"
+                                    : "text-slate-400 hover:text-slate-200",
+                                )}
+                              >
+                                {key === "original"
+                                  ? "Orig"
+                                  : key.charAt(0).toUpperCase() + key.slice(1, 3)}
+                              </button>
+                            ))}
+                          </div>
+                          <div className="text-[10px] text-slate-500 font-mono">
+                            {gifOutputDimensions.width} × {gifOutputDimensions.height}px
+                          </div>
+                        </div>
+
+                        <div className="space-y-1.5">
+                          <div className="text-[10px] font-semibold uppercase tracking-wider text-slate-400">
+                            Frame Rate
+                          </div>
+                          <div className="flex bg-white/5 border border-white/5 p-0.5 grid grid-cols-3 h-7 rounded-lg">
+                            {GIF_FRAME_RATES.map((rate) => (
+                              <button
+                                key={rate.value}
+                                type="button"
+                                onClick={() => onGifFrameRateChange?.(rate.value)}
+                                className={cn(
+                                  "rounded-md transition-all text-[10px] font-medium cursor-pointer",
+                                  gifFrameRate === rate.value
+                                    ? "bg-white/20 text-white"
+                                    : "text-slate-400 hover:text-slate-200",
+                                )}
+                              >
+                                {rate.label}
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+
+                        <div className="flex items-center justify-between py-1 border-t border-white/5 pt-2">
+                          <div>
+                            <label className="text-xs font-semibold text-slate-200">Loop Animation</label>
+                            <p className="text-[10px] text-slate-500">GIF will play continuously</p>
+                          </div>
+                          <Switch
+                            checked={gifLoop}
+                            onCheckedChange={onGifLoopChange}
+                            className="data-[state=checked]:bg-[#34B27B] scale-90"
+                          />
+                        </div>
+                      </div>
+                    )}
+
+                    <Button
+                      type="button"
+                      size="lg"
+                      onClick={onExport}
+                      className="w-full py-5 text-xs font-semibold flex items-center justify-center gap-2 bg-[#D4D4D8] text-[#09090b] rounded-xl shadow-lg shadow-[#D4D4D8]/20 hover:bg-[#E4E4E7] hover:scale-[1.01] active:scale-[0.99] transition-all duration-200 cursor-pointer"
+                    >
+                      <Download className="w-4 h-4" />
+                      {exportFormat === "gif" ? "Export GIF" : "Export Video"}
+                    </Button>
                   </div>
                 </div>
               )}

@@ -1,6 +1,9 @@
 import { Assets, BlurFilter, Container, Graphics, Sprite, Texture } from "pixi.js";
 import { MotionBlurFilter } from "pixi-filters/motion-blur";
 import type { CursorTelemetryPoint } from "../types";
+import { getAssetPath } from "@/lib/assetPath";
+import { getCursorTheme } from "@/lib/cursor/cursorThemes";
+import type { NativeCursorType } from "@/native/contracts";
 import {
 	createSpringState,
 	getCursorSpringConfig,
@@ -169,102 +172,138 @@ function getAvailableCursorKeys(): CursorAssetKey[] {
 	return loadedKeys.length > 0 ? loadedKeys : ["arrow"];
 }
 
-export async function preloadCursorAssets() {
-	if (!cursorAssetsPromise) {
-		cursorAssetsPromise = (async () => {
-			let systemCursors: Record<string, SystemCursorAsset> = {};
+let loadedThemeId: string | null = null;
 
-			try {
-				const api = window.electronAPI as Record<string, unknown>;
-				if (typeof api.getSystemCursorAssets === "function") {
-					const result = await (
-						api.getSystemCursorAssets as () => Promise<{
-							success: boolean;
-							cursors?: Record<string, SystemCursorAsset>;
-						}>
-					)();
-					if (result.success && result.cursors) {
-						systemCursors = result.cursors;
-					}
-				}
-			} catch (error) {
-				console.warn("[CursorRenderer] Failed to fetch system cursor assets:", error);
-			}
-
-			const entries = await Promise.all(
-				SUPPORTED_CURSOR_KEYS.map(async (key) => {
-					const systemAsset = systemCursors[key];
-					const uploadedAsset = uploadedCursorAssets[key];
-					const assetUrl = uploadedAsset?.url ?? systemAsset?.dataUrl;
-
-					if (!assetUrl) {
-						console.warn(`[CursorRenderer] No cursor image for: ${key}`);
-						return null;
-					}
-
-					try {
-						let finalUrl: string;
-						let width: number;
-						let height: number;
-						let normalizedAnchor: { x: number; y: number };
-
-						if (uploadedAsset) {
-							const { trim, fallbackAnchor } = uploadedAsset;
-							const rasterized = await rasterizeAndCropSvg(
-								assetUrl,
-								UPLOADED_CURSOR_SAMPLE_SIZE,
-								trim.x,
-								trim.y,
-								trim.width,
-								trim.height,
-							);
-							finalUrl = rasterized.dataUrl;
-							width = rasterized.width;
-							height = rasterized.height;
-							normalizedAnchor = {
-								x: clamp((fallbackAnchor.x * trim.width) / width, 0, 1),
-								y: clamp((fallbackAnchor.y * trim.height) / height, 0, 1),
-							};
-						} else {
-							finalUrl = assetUrl;
-							const img = await loadImage(finalUrl);
-							width = img.naturalWidth;
-							height = img.naturalHeight;
-							normalizedAnchor = getNormalizedAnchor(systemAsset, { x: 0, y: 0 });
-						}
-
-						await Assets.load(finalUrl);
-						const image = await loadImage(finalUrl);
-						const texture = Texture.from(finalUrl);
-
-						return [
-							key,
-							{
-								texture,
-								image,
-								aspectRatio: height > 0 ? width / height : 1,
-								anchorX: normalizedAnchor.x,
-								anchorY: normalizedAnchor.y,
-							} satisfies LoadedCursorAsset,
-						] as const;
-					} catch (error) {
-						console.warn(`[CursorRenderer] Failed to load cursor image for: ${key}`, error);
-						return null;
-					}
-				}),
-			);
-
-			loadedCursorAssets = Object.fromEntries(
-				entries.filter(Boolean).map((entry) => entry!),
-			) as Partial<Record<CursorAssetKey, LoadedCursorAsset>>;
-
-			if (!loadedCursorAssets.arrow) {
-				throw new Error("Failed to initialize the fallback arrow cursor asset");
-			}
-		})();
+export async function preloadCursorAssets(themeId: string = "default") {
+	if (cursorAssetsPromise && loadedThemeId === themeId) {
+		return cursorAssetsPromise;
 	}
 
-	return cursorAssetsPromise;
+	// Invalidate if theme changed
+	if (loadedThemeId !== themeId) {
+		cursorAssetsPromise = null;
+		loadedCursorAssets = {};
+	}
+
+	loadedThemeId = themeId;
+	cursorAssetsPromise = (async () => {
+		let systemCursors: Record<string, SystemCursorAsset> = {};
+
+		try {
+			const api = window.electronAPI as Record<string, unknown>;
+			if (typeof api.getSystemCursorAssets === "function") {
+				const result = await (
+					api.getSystemCursorAssets as () => Promise<{
+						success: boolean;
+						cursors?: Record<string, SystemCursorAsset>;
+					}>
+				)();
+				if (result.success && result.cursors) {
+					systemCursors = result.cursors;
+				}
+			}
+		} catch (error) {
+			console.warn("[CursorRenderer] Failed to fetch system cursor assets:", error);
+		}
+
+		// Retrieve custom theme if set
+		const theme = themeId && themeId !== "default" ? getCursorTheme(themeId) : null;
+
+		const entries = await Promise.all(
+			SUPPORTED_CURSOR_KEYS.map(async (key) => {
+				const systemAsset = systemCursors[key];
+				const uploadedAsset = uploadedCursorAssets[key];
+				
+				// Check if the theme overrides this specific cursor type (usually arrow or pointer)
+				const themedAsset = theme?.assets[key as NativeCursorType];
+				
+				let assetUrl: string | undefined;
+				if (themedAsset) {
+					try {
+						assetUrl = getAssetPath(themedAsset.assetPath);
+					} catch {
+						assetUrl = undefined;
+					}
+				}
+				if (!assetUrl) {
+					assetUrl = uploadedAsset?.url ?? systemAsset?.dataUrl;
+				}
+
+				if (!assetUrl) {
+					console.warn(`[CursorRenderer] No cursor image for: ${key}`);
+					return null;
+				}
+
+				try {
+					let finalUrl: string;
+					let width: number;
+					let height: number;
+					let normalizedAnchor: { x: number; y: number };
+
+					if (themedAsset && assetUrl) {
+						finalUrl = assetUrl;
+						const img = await loadImage(finalUrl);
+						width = img.naturalWidth;
+						height = img.naturalHeight;
+						// Hotspot is in the 32-logical reference
+						normalizedAnchor = {
+							x: clamp(themedAsset.hotspotX / themedAsset.width, 0, 1),
+							y: clamp(themedAsset.hotspotY / themedAsset.height, 0, 1),
+						};
+					} else if (uploadedAsset) {
+						const { trim, fallbackAnchor } = uploadedAsset;
+						const rasterized = await rasterizeAndCropSvg(
+							assetUrl,
+							UPLOADED_CURSOR_SAMPLE_SIZE,
+							trim.x,
+							trim.y,
+							trim.width,
+							trim.height,
+						);
+						finalUrl = rasterized.dataUrl;
+						width = rasterized.width;
+						height = rasterized.height;
+						normalizedAnchor = {
+							x: clamp((fallbackAnchor.x * trim.width) / width, 0, 1),
+							y: clamp((fallbackAnchor.y * trim.height) / height, 0, 1),
+						};
+					} else {
+						finalUrl = assetUrl;
+						const img = await loadImage(finalUrl);
+						width = img.naturalWidth;
+						height = img.naturalHeight;
+						normalizedAnchor = getNormalizedAnchor(systemAsset, { x: 0, y: 0 });
+					}
+
+					await Assets.load(finalUrl);
+					const image = await loadImage(finalUrl);
+					const texture = Texture.from(finalUrl);
+
+					return [
+						key,
+						{
+							texture,
+							image,
+							aspectRatio: height > 0 ? width / height : 1,
+							anchorX: normalizedAnchor.x,
+							anchorY: normalizedAnchor.y,
+						} satisfies LoadedCursorAsset,
+					] as const;
+				} catch (error) {
+					console.warn(`[CursorRenderer] Failed to load cursor image for: ${key}`, error);
+					return null;
+				}
+			}),
+		);
+
+		loadedCursorAssets = Object.fromEntries(
+			entries.filter(Boolean).map((entry) => entry!),
+		) as Partial<Record<CursorAssetKey, LoadedCursorAsset>>;
+
+		if (!loadedCursorAssets.arrow) {
+			throw new Error("Failed to initialize the fallback arrow cursor asset");
+		}
+	})();
 }
 
 /**
@@ -690,6 +729,22 @@ export class PixiCursorOverlay {
 		this.cursorMotionBlurFilter.velocity = magnitude > 0.05 ? velocity : { x: 0, y: 0 };
 		this.cursorMotionBlurFilter.kernelSize = magnitude > 3 ? 9 : magnitude > 1 ? 7 : 5;
 		this.cursorMotionBlurFilter.offset = magnitude > 0.5 ? -0.25 : 0;
+	}
+
+	updateThemeAssets(): void {
+		for (const key of getAvailableCursorKeys()) {
+			const asset = getCursorAsset(key);
+			const shadowSprite = this.cursorShadowSprites[key];
+			if (shadowSprite) {
+				shadowSprite.texture = asset.texture;
+				shadowSprite.anchor.set(asset.anchorX, asset.anchorY);
+			}
+			const sprite = this.cursorSprites[key];
+			if (sprite) {
+				sprite.texture = asset.texture;
+				sprite.anchor.set(asset.anchorX, asset.anchorY);
+			}
+		}
 	}
 
 	reset(): void {
