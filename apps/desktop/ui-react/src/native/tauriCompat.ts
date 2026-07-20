@@ -1,3 +1,6 @@
+import { convertFileSrc } from "@tauri-apps/api/core";
+import { getCurrentWindow } from "@tauri-apps/api/window";
+
 const noop = () => {};
 const ok = (extra: Record<string, unknown> = {}) => ({
   success: true,
@@ -17,6 +20,10 @@ const editorRouteIntentKey = "foom-open-editor-route-intent";
 const settingsRouteIntentKey = "foom-open-settings-route-intent";
 const currentNativeCursorCaptureModeKey = "foom-current-native-cursor-capture-mode";
 const localProjectPath = "local-storage://video-project";
+
+let currentHasUnsavedChanges = false;
+let saveBeforeCloseCallback: (() => Promise<boolean>) | null = null;
+let closeConfirmCallback: (() => void) | null = null;
 
 function arrayBufferToDataUrl(buffer: ArrayBuffer, mimeType: string) {
   const bytes = new Uint8Array(buffer);
@@ -694,12 +701,12 @@ export function installTauriCompatBridge() {
     isBrowserPreview: true,
     assetBaseUrl: "/",
     convertFileSrc: (path: string) => {
-      if (tauriRuntime && tauriConvertFileSrc) {
+      if (tauriRuntime) {
         const cleanPath = path.startsWith("file://") ? fromFileUrl(path) : path;
         try {
-          return tauriConvertFileSrc(cleanPath);
+          return convertFileSrc(cleanPath);
         } catch (e) {
-          console.warn("tauriConvertFileSrc error:", e);
+          console.warn("convertFileSrc error:", e);
         }
       }
       return /^(blob:|data:|https?:|file:)/i.test(path) ? path : toFileUrl(path);
@@ -716,12 +723,12 @@ export function installTauriCompatBridge() {
           return "";
         }
       }
-      if (tauriRuntime && tauriConvertFileSrc) {
+      if (tauriRuntime) {
         const cleanPath = path.startsWith("file://") ? fromFileUrl(path) : path;
         try {
-          return tauriConvertFileSrc(cleanPath);
+          return convertFileSrc(cleanPath);
         } catch (e) {
-          console.warn("tauriConvertFileSrc error in resolveVideoPath:", e);
+          console.warn("convertFileSrc error in resolveVideoPath:", e);
         }
       }
       return /^(blob:|data:|https?:|file:)/i.test(path) ? path : toFileUrl(path);
@@ -1078,10 +1085,51 @@ export function installTauriCompatBridge() {
       localStorage.removeItem(currentRecordingSessionKey);
       return ok();
     },
-    setHasUnsavedChanges: noop,
-    onRequestSaveBeforeClose: () => noop,
-    onRequestCloseConfirm: () => noop,
-    sendCloseConfirmResponse: noop,
+    setHasUnsavedChanges: (hasChanges: boolean) => {
+      currentHasUnsavedChanges = hasChanges;
+    },
+    onRequestSaveBeforeClose: (callback: () => Promise<boolean>) => {
+      saveBeforeCloseCallback = callback;
+      return () => {
+        if (saveBeforeCloseCallback === callback) {
+          saveBeforeCloseCallback = null;
+        }
+      };
+    },
+    onRequestCloseConfirm: (callback: () => void) => {
+      closeConfirmCallback = callback;
+      return () => {
+        if (closeConfirmCallback === callback) {
+          closeConfirmCallback = null;
+        }
+      };
+    },
+    sendCloseConfirmResponse: async (response: "save" | "discard" | "cancel") => {
+      if (response === "save") {
+        if (saveBeforeCloseCallback) {
+          const success = await saveBeforeCloseCallback();
+          if (success) {
+            currentHasUnsavedChanges = false;
+            try {
+              const appWindow = getCurrentWindow();
+              await appWindow.destroy();
+            } catch (err) {
+              console.error("Failed to destroy window on save:", err);
+            }
+          }
+        }
+      } else if (response === "discard") {
+        currentHasUnsavedChanges = false;
+        try {
+          const appWindow = getCurrentWindow();
+          await appWindow.destroy();
+        } catch (err) {
+          console.error("Failed to destroy window on discard:", err);
+        }
+      } else if (response === "cancel") {
+        // Do nothing, close is already prevented
+      }
+    },
     onMenuNewProject: (callback: () => void) => listenToTauriEvent("menu-new-project", callback),
     onMenuNewRecording: (callback: () => void) => listenToTauriEvent("menu-new-recording", callback),
     onMenuLoadProject: (callback: () => void) => listenToTauriEvent("menu-load-project", callback),
@@ -1798,6 +1846,22 @@ export function installTauriCompatBridge() {
     ...existingFoomNative,
     isBrowserPreview: existingFoomNative.isBrowserPreview ?? isBrowserPreview,
   };
+  if (tauriRuntime) {
+    try {
+      const appWindow = getCurrentWindow();
+      appWindow.onCloseRequested(async (event) => {
+        if (currentHasUnsavedChanges) {
+          event.preventDefault();
+          if (closeConfirmCallback) {
+            closeConfirmCallback();
+          }
+        }
+      });
+    } catch (err) {
+      console.error("Failed to register onCloseRequested listener:", err);
+    }
+  }
+
   window.foomNative = nativeBridge;
   window.electronAPI = nativeBridge;
 }

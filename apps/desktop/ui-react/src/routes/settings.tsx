@@ -235,7 +235,7 @@ function SettingsRoute() {
 
         {/* Version footer */}
         <div className="p-6 border-t border-white/5 text-[11px] text-zinc-500">
-          foOm Studio v0.1.0 (Beta)
+          foOm Studio v0.2.0 (Beta)
         </div>
       </div>
 
@@ -493,7 +493,7 @@ function SettingsRoute() {
 
                 <div className="space-y-1">
                   <h3 className="text-lg font-bold text-white">foOm Cinematic Studio</h3>
-                  <p className="text-xs text-zinc-500">v0.1.0-beta.windows-x64</p>
+                  <p className="text-xs text-zinc-500">v0.2.0-beta.windows-x64</p>
                 </div>
 
                 <div className="bg-white/[0.03] border border-white/5 rounded-xl px-6 py-4 max-w-sm w-full text-center">

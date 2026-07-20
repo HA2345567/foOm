@@ -874,6 +874,19 @@ export default function VideoEditor() {
 	}, [saveProject]);
 
 	const handleNewRecordingConfirm = useCallback(async () => {
+		// If the current session is unsaved (no project file saved yet), delete the
+		// raw recording files from disk to avoid orphaned MP4s accumulating.
+		if (!currentProjectPath && videoSourcePath) {
+			const fileName = videoSourcePath.split(/[/\\]/).pop() ?? "";
+			const match = fileName.match(/^(proj_[^.]+)/);
+			const projectId = match ? match[1] : videoSourcePath;
+			try {
+				await window.electronAPI.deleteRecording(projectId);
+			} catch {
+				// Non-fatal – proceed to new recording regardless
+			}
+		}
+
 		const result = await window.electronAPI.startNewRecording();
 		if (result.success) {
 			setShowNewRecordingDialog(false);
@@ -881,7 +894,7 @@ export default function VideoEditor() {
 			console.error("Failed to start new recording:", result.error);
 			setError("Failed to start new recording: " + (result.error || "Unknown error"));
 		}
-	}, []);
+	}, [currentProjectPath, videoSourcePath]);
 
 	const doLoadProject = useCallback(async () => {
 		const result = await nativeBridgeClient.project.loadProjectFile(getProjectFolder());
@@ -2558,8 +2571,8 @@ export default function VideoEditor() {
 					style={{ WebkitAppRegion: "no-drag" } as CSSProperties}
 				>
 					<DialogHeader>
-						<DialogTitle>{t("newRecording.title")}</DialogTitle>
-						<DialogDescription>{t("newRecording.description")}</DialogDescription>
+						<DialogTitle>Discard and Start New Recording?</DialogTitle>
+						<DialogDescription>This will permanently delete the current recording session and all unsaved changes. Are you sure you want to proceed?</DialogDescription>
 					</DialogHeader>
 					<DialogFooter>
 						<button
@@ -2567,14 +2580,14 @@ export default function VideoEditor() {
 							onClick={() => setShowNewRecordingDialog(false)}
 							className="px-4 py-2 rounded-md bg-white/10 text-white hover:bg-white/20 text-sm font-medium transition-colors"
 						>
-							{t("newRecording.cancel")}
+							Cancel
 						</button>
 						<button
 							type="button"
 							onClick={handleNewRecordingConfirm}
 							className="px-4 py-2 rounded-md bg-[#34B27B] text-white hover:bg-[#34B27B]/90 text-sm font-medium transition-colors"
 						>
-							{t("newRecording.confirm")}
+							Discard & Record Again
 						</button>
 					</DialogFooter>
 				</DialogContent>

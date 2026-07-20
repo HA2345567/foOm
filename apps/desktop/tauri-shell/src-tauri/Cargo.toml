@@ -1,6 +1,6 @@
 [package]
 name = "foOm"
-version = "0.1.0"
+version = "0.2.0"
 description = "Cinematic screen recorder for Windows"
 authors = ["Harsh Bhardwaj"]
 license = "Proprietary"
