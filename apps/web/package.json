@@ -3,9 +3,9 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "bun x vite",
-    "build": "bun x vite build",
-    "preview": "bun x vite preview"
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview"
   },
   "dependencies": {
     "@polar-sh/checkout": "^0.2.0",
