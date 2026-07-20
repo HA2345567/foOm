@@ -30,5 +30,13 @@ jobs:
         working-directory: apps/desktop/ui-react
         run: bun run build
 
+      - name: Ensure ffmpeg sidecar exists for Tauri check
+        run: |
+          $ffmpegPath = "apps/desktop/tauri-shell/src-tauri/binaries/ffmpeg-x86_64-pc-windows-msvc.exe"
+          if (-not (Test-Path $ffmpegPath)) {
+            New-Item -ItemType Directory -Path (Split-Path -Parent $ffmpegPath) -Force | Out-Null
+            New-Item -ItemType File -Path $ffmpegPath -Force | Out-Null
+          }
+
       - name: Check native workspace
         run: cargo check --workspace
