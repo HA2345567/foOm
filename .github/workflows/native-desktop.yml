@@ -20,6 +20,9 @@ jobs:
       - name: Set up Rust
         uses: dtolnay/rust-toolchain@stable
 
+      - name: Rust Cache
+        uses: Swatinem/rust-cache@v2
+
       - name: Install JavaScript dependencies
         run: bun install
 
@@ -27,10 +30,5 @@ jobs:
         working-directory: apps/desktop/ui-react
         run: bun run build
 
-      - name: Initialize MSVC environment and check native workspace
-        shell: cmd
-        run: |
-          "%ProgramFiles(x86)%\Microsoft Visual Studio\Installer\vswhere.exe" -latest -products * -requires Microsoft.VisualStudio.Component.VC.Tools.x86.x64 Microsoft.VisualStudio.Component.Windows10SDK -property installationPath > vs_path.txt
-          set /p VSINSTALLDIR=<vs_path.txt
-          call "%VSINSTALLDIR%\Common7\Tools\VsDevCmd.bat" -arch=x64 -host_arch=x64
-          cargo check --workspace
+      - name: Check native workspace
+        run: cargo check --workspace
