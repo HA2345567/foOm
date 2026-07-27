@@ -1,34 +1,70 @@
-name: Native Desktop
+name: Native Desktop / windows-native-check
 
 on:
-  pull_request:
   push:
-    branches:
-      - main
+    branches: [main, master, dev]
+  pull_request:
+    branches: [main, master]
+  workflow_dispatch:
 
 jobs:
-  windows-native-check:
-    runs-on: windows-2022
+  windows-check:
+    runs-on: windows-latest
 
     steps:
-      - name: Checkout
+      - name: Checkout Repository
         uses: actions/checkout@v4
 
-      - name: Set up Bun
+      - name: Setup Bun Environment
         uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
 
-      - name: Set up Rust
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'bun'
+
+      - name: Install Rust stable (Windows MSVC target)
         uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: x86_64-pc-windows-msvc
 
-      - name: Rust Cache
+      - name: Cache Rust build
         uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: 'apps/desktop/tauri-shell/src-tauri -> target'
+          cache-on-failure: true
 
-      - name: Install JavaScript dependencies
+      - name: Install dependencies
         run: bun install
 
-      - name: Build desktop UI
+      - name: Setup FFmpeg (Windows)
+        shell: pwsh
+        run: |
+          choco install ffmpeg -y
+          echo "FFMPEG_DIR=C:\ProgramData\chocolatey\lib\ffmpeg\tools\ffmpeg" >> $env:GITHUB_ENV
+
+      - name: Install WebView2 (Windows requirement)
+        shell: pwsh
+        run: |
+          $WebView2Installer = "$env:TEMP\WebView2Setup.exe"
+          Invoke-WebRequest -Uri "https://go.microsoft.com/fwlink/partners/116" -OutFile $WebView2Installer
+          Start-Process -FilePath $WebView2Installer -Args "/silent /install" -Wait
+          Remove-Item $WebView2Installer
+
+      - name: Build Desktop React UI (Vite)
         working-directory: apps/desktop/ui-react
         run: bun run build
 
-      - name: Check native workspace
-        run: cargo check --workspace
+      - name: Check Tauri app (Rust compile check)
+        run: cargo check --manifest-path apps/desktop/tauri-shell/src-tauri/Cargo.toml
+        env:
+          WEBKIT_DISABLE_COMPOSITING_MODE: 1
+
+      - name: Full Tauri build check
+        run: cargo build --manifest-path apps/desktop/tauri-shell/src-tauri/Cargo.toml --debug
+        env:
+          WEBKIT_DISABLE_COMPOSITING_MODE: 1
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
