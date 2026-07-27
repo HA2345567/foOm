@@ -833,8 +833,8 @@ export default function VideoEditor() {
 	);
 
 	useEffect(() => {
-		window.electronAPI.setHasUnsavedChanges(hasUnsavedChanges);
-	}, [hasUnsavedChanges]);
+		window.electronAPI.setHasUnsavedChanges(hasUnsavedChanges || Boolean(videoPath));
+	}, [hasUnsavedChanges, videoPath]);
 
 	useEffect(() => {
 		const cleanup = window.electronAPI.onRequestSaveBeforeClose(async () => {
