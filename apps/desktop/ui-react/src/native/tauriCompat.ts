@@ -701,10 +701,13 @@ export function installTauriCompatBridge() {
     isBrowserPreview: true,
     assetBaseUrl: "/",
     convertFileSrc: (path: string) => {
+      if (!path) return "";
       if (tauriRuntime) {
-        const cleanPath = path.startsWith("file://") ? fromFileUrl(path) : path;
+        let cleanPath = path.startsWith("file://") ? fromFileUrl(path) : path;
+        cleanPath = cleanPath.replace(/\\/g, "/");
         try {
-          return convertFileSrc(cleanPath);
+          const fn = tauriConvertFileSrc || convertFileSrc;
+          return fn(cleanPath);
         } catch (e) {
           console.warn("convertFileSrc error:", e);
         }
@@ -724,9 +727,11 @@ export function installTauriCompatBridge() {
         }
       }
       if (tauriRuntime) {
-        const cleanPath = path.startsWith("file://") ? fromFileUrl(path) : path;
+        let cleanPath = path.startsWith("file://") ? fromFileUrl(path) : path;
+        cleanPath = cleanPath.replace(/\\/g, "/");
         try {
-          return convertFileSrc(cleanPath);
+          const fn = tauriConvertFileSrc || convertFileSrc;
+          return fn(cleanPath);
         } catch (e) {
           console.warn("convertFileSrc error in resolveVideoPath:", e);
         }

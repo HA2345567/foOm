@@ -1193,14 +1193,22 @@ fn save_to_downloads(
         std::path::PathBuf::from(&project.raw_video_path)
     } else {
         let raw_path = std::path::Path::new(&project.raw_video_path);
-        raw_path.with_file_name(format!(
+        let cinematic = raw_path.with_file_name(format!(
             "{}_cinematic.mp4",
             raw_path.file_stem().unwrap().to_string_lossy()
-        ))
+        ));
+        if cinematic.exists() {
+            cinematic
+        } else {
+            raw_path.to_path_buf()
+        }
     };
 
     if !source_path.exists() {
-        return Err("Source video file is missing. If downloading edited video, make sure to export it first.".to_string());
+        return Err(format!(
+            "Recorded video file missing at: {}",
+            project.raw_video_path
+        ));
     }
 
     let download_dir = app.path().download_dir().map_err(|e| e.to_string())?;

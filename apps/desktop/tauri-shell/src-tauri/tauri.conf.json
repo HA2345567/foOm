@@ -30,7 +30,7 @@
       "csp": null,
       "assetProtocol": {
         "enable": true,
-        "scope": ["$LOCALAPPDATA/foom/**/*", "$VIDEO/foom/**/*"]
+        "scope": ["**"]
       }
     }
   },
