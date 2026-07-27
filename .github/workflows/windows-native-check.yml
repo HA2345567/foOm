@@ -78,7 +78,7 @@ jobs:
           WEBKIT_DISABLE_COMPOSITING_MODE: 1
 
       - name: Full Tauri build check
-        run: cargo build --manifest-path apps/desktop/tauri-shell/src-tauri/Cargo.toml --debug
+        run: cargo build --manifest-path apps/desktop/tauri-shell/src-tauri/Cargo.toml
         env:
           WEBKIT_DISABLE_COMPOSITING_MODE: 1
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

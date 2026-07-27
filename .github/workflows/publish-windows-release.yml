@@ -45,6 +45,12 @@ jobs:
           choco install ffmpeg -y
           echo "FFMPEG_DIR=C:\ProgramData\chocolatey\lib\ffmpeg\tools\ffmpeg" >> $env:GITHUB_ENV
 
+      - name: Prepare FFmpeg sidecar for Tauri
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force -Path "apps/desktop/tauri-shell/src-tauri/binaries" | Out-Null
+          Copy-Item "C:\ProgramData\chocolatey\lib\ffmpeg\tools\ffmpeg\bin\ffmpeg.exe" "apps/desktop/tauri-shell/src-tauri/binaries/ffmpeg-x86_64-pc-windows-msvc.exe" -Force
+
       - name: Ensure WebView2 Runtime (Windows)
         shell: pwsh
         run: |
