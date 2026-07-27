@@ -1,0 +1,177 @@
+import React, { useState } from "react";
+import StarBorder from "./StarBorder";
+import { Download, Loader2, ExternalLink, ShieldCheck, X } from "lucide-react";
+import { WindowsIcon } from "./WindowsIcon";
+
+interface DownloadButtonProps {
+  className?: string;
+  innerClassName?: string;
+  label?: string;
+  showIcon?: boolean;
+  useWindowsIcon?: boolean;
+  color?: string;
+  speed?: string;
+  onClick?: () => void;
+}
+
+// Global analytics event dispatcher
+function trackDownloadEvent(platform = "windows") {
+  try {
+    // 1. Google Analytics 4 (GA4)
+    if (typeof window !== "undefined" && typeof (window as any).gtag === "function") {
+      (window as any).gtag("event", "download_app", {
+        event_category: "desktop_app",
+        event_label: platform,
+        os: platform,
+      });
+    }
+    // 2. PostHog Analytics
+    if (typeof window !== "undefined" && (window as any).posthog?.capture) {
+      (window as any).posthog.capture("app_download_clicked", { platform, os: "windows" });
+    }
+    // 3. Google Tag Manager / GTM DataLayer
+    if (typeof window !== "undefined" && Array.isArray((window as any).dataLayer)) {
+      (window as any).dataLayer.push({ event: "download_desktop_app", platform });
+    }
+  } catch (err) {
+    console.warn("Analytics track failed:", err);
+  }
+}
+
+export function DownloadButton({
+  className = "",
+  innerClassName = "px-6 py-3 flex items-center gap-2",
+  label = "Download for Windows",
+  showIcon = true,
+  useWindowsIcon = true,
+  color = "white",
+  speed = "4s",
+  onClick,
+}: DownloadButtonProps) {
+  const [loading, setLoading] = useState(false);
+  const [releaseModalOpen, setReleaseModalOpen] = useState(false);
+
+  const envDownloadUrl = import.meta.env.VITE_DOWNLOAD_URL;
+  const githubRepo = import.meta.env.VITE_GITHUB_REPO || "HA2345567/foOm";
+  const githubReleaseUrl = `https://github.com/${githubRepo}/releases/latest`;
+
+
+  const handleDownloadClick = async (e: React.MouseEvent) => {
+    e.preventDefault();
+    if (onClick) onClick();
+
+    // Fire download tracking analytics event
+    trackDownloadEvent("windows");
+
+    // 1. Direct environment download URL (GitHub Release asset, S3, R2, Cloud storage CDN)
+    if (envDownloadUrl && (envDownloadUrl.startsWith("http://") || envDownloadUrl.startsWith("https://"))) {
+      window.location.href = envDownloadUrl;
+      return;
+    }
+
+    setLoading(true);
+    const localTargetUrl = "/downloads/foom-setup.exe";
+
+    try {
+      // 2. Test relative path (for local dev server or self-hosted static servers)
+      const response = await fetch(localTargetUrl, { method: "HEAD" });
+      const contentType = response.headers.get("content-type") || "";
+
+      // If server returned 200 OK and valid binary (not SPA index.html rewrite)
+      if (response.ok && !contentType.includes("text/html")) {
+        const anchor = document.createElement("a");
+        anchor.href = localTargetUrl;
+        anchor.download = "foom-setup.exe";
+        document.body.appendChild(anchor);
+        anchor.click();
+        document.body.removeChild(anchor);
+        setLoading(false);
+        return;
+      }
+    } catch (err) {
+      console.warn("Local download verification skipped:", err);
+    }
+
+    // 3. If file is not present locally on web host (e.g. Vercel 100MB static limit in production),
+    // open production release guidance modal with direct GitHub Release link instead of downloading HTML
+    setLoading(false);
+    setReleaseModalOpen(true);
+  };
+
+  return (
+    <>
+      <StarBorder
+        as="button"
+        type="button"
+        onClick={handleDownloadClick}
+        disabled={loading}
+        className={`cursor-pointer transition-all hover:scale-105 active:scale-95 ${className}`}
+        innerClassName={innerClassName}
+        color={color}
+        speed={speed}
+      >
+        {loading ? (
+          <Loader2 className="w-4 h-4 animate-spin text-white" />
+        ) : showIcon ? (
+          useWindowsIcon ? (
+            <WindowsIcon className="w-4 h-4 text-white" />
+          ) : (
+            <Download className="w-4 h-4 text-white" />
+          )
+        ) : null}
+        <span className="font-bold text-sm tracking-tight text-white">{label}</span>
+      </StarBorder>
+
+      {/* Production-Grade Release Modal */}
+      {releaseModalOpen && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/80 backdrop-blur-md animate-in fade-in duration-200">
+          <div className="relative w-full max-w-lg bg-zinc-950 border border-white/10 rounded-2xl p-6 sm:p-8 shadow-2xl text-left overflow-hidden">
+            <div className="absolute top-0 right-0 p-3">
+              <button
+                onClick={() => setReleaseModalOpen(false)}
+                className="p-2 text-zinc-400 hover:text-white hover:bg-white/5 rounded-xl transition-colors"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="flex items-center gap-3 text-emerald-400 mb-5">
+              <div className="p-2.5 bg-emerald-500/10 border border-emerald-500/20 rounded-xl">
+                <ShieldCheck className="w-6 h-6 text-emerald-400" />
+              </div>
+              <div>
+                <h3 className="text-lg font-bold text-white leading-tight">Production Release Binary</h3>
+                <p className="text-xs text-zinc-400 font-medium">Verified Windows Desktop Application</p>
+              </div>
+            </div>
+
+            <p className="text-zinc-300 text-sm leading-relaxed mb-6">
+              Production desktop binaries (<strong>foom-setup.exe • 288 MB</strong>) are hosted securely via GitHub Releases CDN to ensure high-speed global downloads.
+            </p>
+
+            <div className="space-y-3 mb-6">
+              <a
+                href={githubReleaseUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                onClick={() => trackDownloadEvent("windows_github_release")}
+                className="w-full flex items-center justify-between px-5 py-3.5 bg-white text-black font-semibold text-sm rounded-xl hover:bg-zinc-200 transition-all shadow-lg group"
+              >
+                <span className="flex items-center gap-2">
+                  <Download className="w-4 h-4 text-black" />
+                  Download from GitHub Releases CDN
+                </span>
+                <ExternalLink className="w-4 h-4 text-zinc-600 group-hover:translate-x-0.5 transition-transform" />
+              </a>
+            </div>
+
+            <div className="p-3.5 bg-zinc-900/80 rounded-xl border border-white/5 text-xs text-zinc-400 space-y-1 font-mono">
+              <div className="text-zinc-300 font-semibold mb-1">Production Environment Setup:</div>
+              <div>Set <code className="text-emerald-400">VITE_DOWNLOAD_URL</code> in your deployment dashboard to link direct installer URLs.</div>
+            </div>
+          </div>
+        </div>
+      )}
+    </>
+  );
+}

@@ -2,8 +2,7 @@ import { Link } from "@tanstack/react-router";
 import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Logo } from "./Logo";
-import StarBorder from "./StarBorder";
-import { Download } from "lucide-react";
+import { DownloadButton } from "./DownloadButton";
 
 const navLinks: { label: string; href: string }[] = [];
 
@@ -42,18 +41,12 @@ export function Navbar() {
 
         {/* CTA */}
         <div className="hidden md:flex items-center gap-6">
-          <StarBorder
-            as="a"
-            href="/downloads/foom-setup.exe"
-            download
-            className="transition-all active:scale-95 hover:scale-105"
+          <DownloadButton
+            label="Download"
+            useWindowsIcon={false}
             innerClassName="px-5 py-2 text-[14px] flex items-center gap-2"
-            color="white"
             speed="5s"
-          >
-            <Download size={14} className="text-white" />
-            <span className="font-bold">Download</span>
-          </StarBorder>
+          />
         </div>
 
         {/* Mobile hamburger */}
@@ -95,19 +88,13 @@ export function Navbar() {
                   {link.label}
                 </a>
               ))}
-              <StarBorder
-                as="a"
-                href="/downloads/foom-setup.exe"
-                download
+              <DownloadButton
+                label="Download for Windows"
                 className="w-full"
                 innerClassName="px-4 py-3.5 text-[15px] flex items-center justify-center gap-2"
-                color="white"
                 speed="5s"
                 onClick={() => setMobileOpen(false)}
-              >
-                <Download size={16} className="text-white" />
-                <span className="font-bold">Download for Windows</span>
-              </StarBorder>
+              />
             </div>
           </motion.div>
         )}

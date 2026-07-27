@@ -1,6 +1,5 @@
 import { motion } from "framer-motion";
-import StarBorder from "./StarBorder";
-import { WindowsIcon } from "./WindowsIcon";
+import { DownloadButton } from "./DownloadButton";
 import { BackgroundStars } from "./BackgroundStars";
 
 export function HeroSection() {
@@ -56,20 +55,11 @@ export function HeroSection() {
           transition={{ duration: 0.8, delay: 0.4, ease: [0.23, 1, 0.32, 1] }}
           className="mt-12 flex justify-center"
         >
-          <StarBorder
-            as="a"
-            href="/downloads/foom-setup.exe"
-            download
-            className="transition-all hover:scale-105 active:scale-95"
+          <DownloadButton
+            label="Download for Windows"
             innerClassName="px-8 py-4 flex items-center gap-3"
-            color="white"
             speed="4s"
-          >
-            <WindowsIcon className="w-4.5 h-4.5 text-white" />
-            <span className="font-bold text-sm tracking-wider text-white">
-              Download for Windows
-            </span>
-          </StarBorder>
+          />
         </motion.div>
       </div>
 

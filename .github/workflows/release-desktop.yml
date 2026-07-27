@@ -1,0 +1,47 @@
+name: Release Desktop Application
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+
+jobs:
+  publish-windows-release:
+    permissions:
+      contents: write
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Setup Bun Environment
+        uses: oven-sh/setup-bun@v2
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: lts/*
+
+      - name: Setup Rust Toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Install Dependencies
+        run: bun install
+
+      - name: Build Desktop React UI
+        working-directory: apps/desktop/ui-react
+        run: bun run build
+
+      - name: Build & Publish Tauri Windows Installer
+        uses: tauri-apps/tauri-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tagName: app-v__VERSION__
+          releaseName: 'foOm Desktop v__VERSION__'
+          releaseBody: 'Latest production release of foOm Desktop for Windows.'
+          releaseDraft: false
+          prerelease: false
+          projectPath: './apps/desktop/tauri-shell'

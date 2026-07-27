@@ -1,6 +1,5 @@
 import { motion } from "framer-motion";
-import StarBorder from "./StarBorder";
-import { WindowsIcon } from "./WindowsIcon";
+import { DownloadButton } from "./DownloadButton";
 import cubePreview from "../assets/cube_prod_preview.webp";
 
 export function CtaSection() {
@@ -60,20 +59,12 @@ export function CtaSection() {
           transition={{ delay: 0.2 }}
           className="mt-12 flex flex-col sm:flex-row items-center justify-center gap-6"
         >
-          <StarBorder
-            as="a"
-            href="/downloads/foom-setup.exe"
-            download
-            className="w-full sm:w-auto shrink-0 transition-all hover:scale-105 active:scale-95"
+          <DownloadButton
+            label="Download for Windows"
+            className="w-full sm:w-auto shrink-0"
             innerClassName="px-12 py-5 flex items-center gap-3 justify-center"
-            color="white"
             speed="5s"
-          >
-            <WindowsIcon className="w-4.5 h-4.5 text-white" />
-            <span className="font-bold text-sm tracking-tight uppercase text-white">
-              Download for Windows
-            </span>
-          </StarBorder>
+          />
         </motion.div>
       </div>
     </section>
