@@ -76,7 +76,7 @@ jobs:
           tagName: ${{ github.ref_name }}
           releaseName: 'foOm ${{ github.ref_name }}'
           releaseBody: 'See release notes for foOm Screen Recorder.'
-          releaseDraft: true
+          releaseDraft: false
           prerelease: false
           projectPath: apps/desktop/tauri-shell
           configPath: apps/desktop/tauri-shell/src-tauri/tauri.conf.json
