@@ -18,11 +18,13 @@ jobs:
 
       - name: Setup Bun Environment
         uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: lts/*
+          node-version: 20
 
       - name: Setup Rust Toolchain
         uses: dtolnay/rust-toolchain@stable
@@ -39,9 +41,10 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
-          tagName: app-v__VERSION__
-          releaseName: 'foOm Desktop v__VERSION__'
+          tagName: ${{ github.ref_name }}
+          releaseName: 'foOm Desktop ${{ github.ref_name }}'
           releaseBody: 'Latest production release of foOm Desktop for Windows.'
           releaseDraft: false
           prerelease: false
-          projectPath: './apps/desktop/tauri-shell'
+          projectPath: apps/desktop/tauri-shell
+          configPath: apps/desktop/tauri-shell/src-tauri/tauri.conf.json
