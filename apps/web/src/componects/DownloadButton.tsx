@@ -53,7 +53,7 @@ export function DownloadButton({
 
   const envDownloadUrl = import.meta.env.VITE_DOWNLOAD_URL;
   const githubRepo = import.meta.env.VITE_GITHUB_REPO || "HA2345567/foOm";
-  const defaultDownloadUrl = `https://github.com/${githubRepo}/releases/latest/download/foom-setup.exe`;
+  const defaultDownloadUrl = `https://github.com/${githubRepo}/releases/latest`;
   const targetDownloadUrl =
     envDownloadUrl && (envDownloadUrl.startsWith("http://") || envDownloadUrl.startsWith("https://"))
       ? envDownloadUrl
