@@ -45,13 +45,11 @@ jobs:
           choco install ffmpeg -y
           echo "FFMPEG_DIR=C:\ProgramData\chocolatey\lib\ffmpeg\tools\ffmpeg" >> $env:GITHUB_ENV
 
-      - name: Install WebView2 (Windows requirement)
+      - name: Prepare FFmpeg sidecar for Tauri
         shell: pwsh
         run: |
-          $WebView2Installer = "$env:TEMP\WebView2Setup.exe"
-          Invoke-WebRequest -Uri "https://go.microsoft.com/fwlink/partners/116" -OutFile $WebView2Installer
-          Start-Process -FilePath $WebView2Installer -Args "/silent /install" -Wait
-          Remove-Item $WebView2Installer
+          New-Item -ItemType Directory -Force -Path "apps/desktop/tauri-shell/src-tauri/binaries" | Out-Null
+          Copy-Item "C:\ProgramData\chocolatey\lib\ffmpeg\tools\ffmpeg\bin\ffmpeg.exe" "apps/desktop/tauri-shell/src-tauri/binaries/ffmpeg-x86_64-pc-windows-msvc.exe" -Force
 
       - name: Build Desktop React UI (Vite)
         working-directory: apps/desktop/ui-react
