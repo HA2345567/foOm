@@ -38,8 +38,27 @@ import {
 import { SAMPLE_TRACKS, MusicTrack } from "../lib/background-music";
 
 // Clean Download Utils
-export function triggerDownload(blob: Blob, filename: string): void {
-  // FIX: Never re-wrap blob (re-wrapping corrupts video container)
+export async function triggerDownload(blob: Blob, filename: string): Promise<void> {
+  const nativeApi = (window as any).foomNative || (window as any).electronAPI;
+  if (nativeApi?.pickExportSavePath && nativeApi?.writeExportToPath) {
+    try {
+      const pickRes = await nativeApi.pickExportSavePath(filename);
+      if (pickRes?.canceled || pickRes?.data?.canceled) return;
+
+      const targetPath = pickRes?.path || pickRes?.data?.path;
+      if (targetPath && !targetPath.startsWith("browser-download://")) {
+        const arrayBuffer = await blob.arrayBuffer();
+        const writeRes = await nativeApi.writeExportToPath(arrayBuffer, targetPath);
+        if (writeRes?.success || writeRes?.ok) {
+          return;
+        }
+      }
+    } catch (err) {
+      console.warn("Native save dialog failed, falling back to browser download:", err);
+    }
+  }
+
+  // Browser Fallback (or web preview environment)
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
   a.style.display = "none";
@@ -48,7 +67,6 @@ export function triggerDownload(blob: Blob, filename: string): void {
   document.body.appendChild(a);
   a.click();
 
-  // FIX: Revoke after 30s instead of 1s
   setTimeout(() => {
     document.body.removeChild(a);
     URL.revokeObjectURL(url);
@@ -184,16 +202,16 @@ export const AutoZoomEditor: React.FC<AutoZoomEditorProps> = ({ recordingResult,
     }
   };
 
-  const handleDownloadExport = () => {
+  const handleDownloadExport = async () => {
     const ext = mimeToExtension(recordingResult.mimeType, "webm");
     const filename = makeFilename("foOm_Demo", ext);
-    triggerDownload(recordingResult.blob, filename);
+    await triggerDownload(recordingResult.blob, filename);
   };
 
-  const handleDownloadRaw = () => {
+  const handleDownloadRaw = async () => {
     const ext = mimeToExtension(recordingResult.mimeType, "webm");
     const filename = makeFilename("foOm_Raw_Original", ext);
-    triggerDownload(recordingResult.blob, filename);
+    await triggerDownload(recordingResult.blob, filename);
   };
 
   return (

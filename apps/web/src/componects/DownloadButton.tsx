@@ -48,54 +48,34 @@ export function DownloadButton({
   speed = "4s",
   onClick,
 }: DownloadButtonProps) {
-  const [loading, setLoading] = useState(false);
+  const [loading] = useState(false);
   const [releaseModalOpen, setReleaseModalOpen] = useState(false);
 
   const envDownloadUrl = import.meta.env.VITE_DOWNLOAD_URL;
   const githubRepo = import.meta.env.VITE_GITHUB_REPO || "HA2345567/foOm";
-  const githubReleaseUrl = `https://github.com/${githubRepo}/releases/latest`;
+  const defaultDownloadUrl = `https://github.com/${githubRepo}/releases/latest/download/foom-setup.exe`;
+  const targetDownloadUrl =
+    envDownloadUrl && (envDownloadUrl.startsWith("http://") || envDownloadUrl.startsWith("https://"))
+      ? envDownloadUrl
+      : defaultDownloadUrl;
+  const githubReleaseUrl = targetDownloadUrl;
 
-
-  const handleDownloadClick = async (e: React.MouseEvent) => {
+  const handleDownloadClick = (e: React.MouseEvent) => {
     e.preventDefault();
     if (onClick) onClick();
 
     // Fire download tracking analytics event
     trackDownloadEvent("windows");
 
-    // 1. Direct environment download URL (GitHub Release asset, S3, R2, Cloud storage CDN)
-    if (envDownloadUrl && (envDownloadUrl.startsWith("http://") || envDownloadUrl.startsWith("https://"))) {
-      window.location.href = envDownloadUrl;
-      return;
-    }
-
-    setLoading(true);
-    const localTargetUrl = "/downloads/foom-setup.exe";
-
-    try {
-      // 2. Test relative path (for local dev server or self-hosted static servers)
-      const response = await fetch(localTargetUrl, { method: "HEAD" });
-      const contentType = response.headers.get("content-type") || "";
-
-      // If server returned 200 OK and valid binary (not SPA index.html rewrite)
-      if (response.ok && !contentType.includes("text/html")) {
-        const anchor = document.createElement("a");
-        anchor.href = localTargetUrl;
-        anchor.download = "foom-setup.exe";
-        document.body.appendChild(anchor);
-        anchor.click();
-        document.body.removeChild(anchor);
-        setLoading(false);
-        return;
-      }
-    } catch (err) {
-      console.warn("Local download verification skipped:", err);
-    }
-
-    // 3. If file is not present locally on web host (e.g. Vercel 100MB static limit in production),
-    // open production release guidance modal with direct GitHub Release link instead of downloading HTML
-    setLoading(false);
-    setReleaseModalOpen(true);
+    // Directly trigger browser download of installer executable
+    const anchor = document.createElement("a");
+    anchor.href = targetDownloadUrl;
+    anchor.download = "foom-setup.exe";
+    anchor.target = "_blank";
+    anchor.rel = "noopener noreferrer";
+    document.body.appendChild(anchor);
+    anchor.click();
+    document.body.removeChild(anchor);
   };
 
   return (
