@@ -51,6 +51,23 @@ jobs:
           New-Item -ItemType Directory -Force -Path "apps/desktop/tauri-shell/src-tauri/binaries" | Out-Null
           Copy-Item "C:\ProgramData\chocolatey\lib\ffmpeg\tools\ffmpeg\bin\ffmpeg.exe" "apps/desktop/tauri-shell/src-tauri/binaries/ffmpeg-x86_64-pc-windows-msvc.exe" -Force
 
+      - name: Ensure WebView2 Runtime (Windows)
+        shell: pwsh
+        run: |
+          $installed = Get-ItemProperty -Path 'HKLM:\SOFTWARE\WOW6432Node\Microsoft\EdgeUpdate\Clients\{F3017226-FE2A-4295-8BDF-00C3A9A7E4C5}' -ErrorAction SilentlyContinue
+          if ($null -eq $installed) {
+            $installed = Get-ItemProperty -Path 'HKCU:\SOFTWARE\Microsoft\EdgeUpdate\Clients\{F3017226-FE2A-4295-8BDF-00C3A9A7E4C5}' -ErrorAction SilentlyContinue
+          }
+          if ($null -eq $installed) {
+            Write-Host "WebView2 Runtime not found. Downloading Microsoft Evergreen Bootstrapper..."
+            $WebView2Installer = "$env:TEMP\MicrosoftEdgeWebview2Setup.exe"
+            Invoke-WebRequest -Uri "https://go.microsoft.com/fwlink/p/?LinkId=2124703" -OutFile $WebView2Installer
+            Start-Process -FilePath $WebView2Installer -Args "/silent /install" -Wait
+            Remove-Item $WebView2Installer
+          } else {
+            Write-Host "WebView2 Runtime is already installed."
+          }
+
       - name: Build Desktop React UI (Vite)
         working-directory: apps/desktop/ui-react
         run: bun run build
