@@ -67,15 +67,8 @@ export function DownloadButton({
     // Fire download tracking analytics event
     trackDownloadEvent("windows");
 
-    // Directly trigger browser download of installer executable
-    const anchor = document.createElement("a");
-    anchor.href = targetDownloadUrl;
-    anchor.download = "foom-setup.exe";
-    anchor.target = "_blank";
-    anchor.rel = "noopener noreferrer";
-    document.body.appendChild(anchor);
-    anchor.click();
-    document.body.removeChild(anchor);
+    // Direct browser navigation / download trigger (bypasses cross-origin anchor blocks)
+    window.open(targetDownloadUrl, "_blank", "noopener,noreferrer");
   };
 
   return (
