@@ -1,6 +1,7 @@
 import { motion } from "framer-motion";
 import { DownloadButton } from "./DownloadButton";
 import { BackgroundStars } from "./BackgroundStars";
+import { Apple, MonitorDown } from "lucide-react";
 
 export function HeroSection() {
   return (
@@ -44,7 +45,7 @@ export function HeroSection() {
           transition={{ duration: 0.6, delay: 0.2 }}
           className="mt-8 text-body-large text-zinc-100 font-medium max-w-2xl mx-auto drop-shadow-md"
         >
-          foOm automatically applies smart autozoom, focus, and cinematic editing to your screen
+          foOom automatically applies smart autozoom, focus, and cinematic editing to your screen
           recordings. Record, polish, and export from a focused native desktop app.
         </motion.p>
 
@@ -61,6 +62,17 @@ export function HeroSection() {
             speed="4s"
           />
         </motion.div>
+        <div className="mt-4 flex flex-wrap justify-center gap-3" aria-label="More desktop platforms">
+          <span className="inline-flex min-h-11 items-center gap-2 rounded-lg border border-white/10 bg-white/[0.03] px-4 py-2 text-sm font-semibold text-zinc-400" aria-label="macOS support coming soon">
+            <Apple className="h-4 w-4" aria-hidden="true" />
+            macOS <span className="text-emerald-300">Coming soon</span>
+          </span>
+          <span className="inline-flex min-h-11 items-center gap-2 rounded-lg border border-white/10 bg-white/[0.03] px-4 py-2 text-sm font-semibold text-zinc-400" aria-label="Linux support coming soon">
+            <MonitorDown className="h-4 w-4" aria-hidden="true" />
+            Linux <span className="text-emerald-300">Coming soon</span>
+          </span>
+        </div>
+        <p className="mt-2 text-xs text-zinc-400">The native recorder is currently available for Windows only.</p>
       </div>
 
       {/* Cinematic Mockup with Live Video Preview (Wider Layout) */}

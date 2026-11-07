@@ -1,6 +1,6 @@
 /**
  * @file usePersistentWebcam.ts
- * @description Tab-switch persistent webcam hook for foOm Screen Recorder.
+ * @description Tab-switch persistent webcam hook for foOom Screen Recorder.
  *
  * Fixes:
  * - FIX 1: Force video.play() on document visibilitychange return.
@@ -60,9 +60,9 @@ export function usePersistentWebcam(enabled: boolean = false) {
           videoRef.current.muted = true;
           videoRef.current.play().catch(() => {});
         }
-      } catch (err: any) {
+      } catch (err: unknown) {
         if (isMounted) {
-          setError(err?.message || "Failed to access webcam");
+          setError(err instanceof Error ? err.message : "Failed to access webcam");
           setIsActive(false);
         }
       }

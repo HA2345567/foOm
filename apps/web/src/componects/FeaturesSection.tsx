@@ -80,7 +80,7 @@ export function FeaturesSection() {
             transition={{ delay: 0.1 }}
             className="mt-6 text-body-large"
           >
-            Stop spending hours in video editors. foOm handles the heavy lifting
+            Stop spending hours in video editors. foOom handles the heavy lifting
             so you can focus on building and sharing.
           </motion.p>
         </div>

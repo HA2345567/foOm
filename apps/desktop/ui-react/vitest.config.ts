@@ -8,6 +8,8 @@ export default mergeConfig(
     test: {
       globals: true,
       environment: "node",
+      pool: "threads",
+      maxWorkers: 2,
       exclude: [...configDefaults.exclude, "**/*.browser.test.ts"],
     },
   }),

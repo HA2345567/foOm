@@ -104,6 +104,29 @@ export function findConflict(
   return null;
 }
 
+export function findGlobalRecordingShortcutConflict(
+  binding: ShortcutBinding,
+  config: ShortcutsConfig,
+): ShortcutConflict | null {
+  for (const fixed of FIXED_SHORTCUTS) {
+    if (fixed.bindings.some((candidate) => bindingsEqual(candidate, binding))) {
+      return { type: "fixed", label: fixed.label };
+    }
+  }
+  for (const action of SHORTCUT_ACTIONS) {
+    if (bindingsEqual(config[action], binding)) {
+      return { type: "configurable", action };
+    }
+  }
+  return null;
+}
+
+export const DEFAULT_GLOBAL_RECORDING_SHORTCUT: ShortcutBinding = {
+  key: "r",
+  ctrl: true,
+  shift: true,
+};
+
 export const DEFAULT_SHORTCUTS: ShortcutsConfig = {
   addZoom: { key: "z" },
   addTrim: { key: "t" },

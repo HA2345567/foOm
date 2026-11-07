@@ -1,5 +1,6 @@
 import { convertFileSrc } from "@tauri-apps/api/core";
 import { getCurrentWindow } from "@tauri-apps/api/window";
+import type { NativeCursorType } from "./contracts";
 
 const noop = () => {};
 const ok = (extra: Record<string, unknown> = {}) => ({
@@ -20,10 +21,22 @@ const editorRouteIntentKey = "foom-open-editor-route-intent";
 const settingsRouteIntentKey = "foom-open-settings-route-intent";
 const currentNativeCursorCaptureModeKey = "foom-current-native-cursor-capture-mode";
 const localProjectPath = "local-storage://video-project";
+const SUPPORTED_NATIVE_CURSOR_TYPES = new Set<NativeCursorType>([
+  "arrow", "text", "pointer", "crosshair", "open-hand", "closed-hand", "resize-ew",
+  "resize-ns", "resize-nesw", "resize-nwse", "move", "not-allowed", "wait",
+  "app-starting", "help", "up-arrow",
+]);
 
 let currentHasUnsavedChanges = false;
 let saveBeforeCloseCallback: (() => Promise<boolean>) | null = null;
 let closeConfirmCallback: (() => void) | null = null;
+
+async function returnToRecorder() {
+  if (isTauriRuntime()) await invokeTauri("switch_to_overlay");
+  currentHasUnsavedChanges = false;
+  // Unmount the hidden editor so the next take starts with its own timeline.
+  window.location.hash = isTauriRuntime() ? "/" : "/overlay/recording";
+}
 
 function arrayBufferToDataUrl(buffer: ArrayBuffer, mimeType: string) {
   const bytes = new Uint8Array(buffer);
@@ -54,12 +67,12 @@ function openDatabase(): Promise<IDBDatabase> {
   });
 }
 
-function saveVideoToIndexedDb(key: string, data: ArrayBuffer): Promise<string> {
+function saveVideoToIndexedDb(key: string, data: ArrayBuffer, type = "video/webm"): Promise<string> {
   return openDatabase().then((db) => {
     return new Promise<string>((resolve, reject) => {
       const transaction = db.transaction("videos", "readwrite");
       const store = transaction.objectStore("videos");
-      const blob = new Blob([data], { type: "video/webm" });
+      const blob = new Blob([data], { type });
       const request = store.put(blob, key);
       request.onsuccess = () => {
         resolve(`indexeddb://${key}`);
@@ -144,6 +157,15 @@ function getPlatform() {
   if (platform.includes("mac")) return "darwin";
   if (platform.includes("win")) return "win32";
   return "linux";
+}
+
+function formatCaptureSourceName(kind: string, title: string | null | undefined, index = 0) {
+  const normalizedTitle = title?.trim();
+  if (kind === "monitor") {
+    const windowsDisplay = normalizedTitle?.match(/DISPLAY\s*(\d+)$/i);
+    return windowsDisplay ? `Display ${windowsDisplay[1]}` : normalizedTitle || `Display ${index + 1}`;
+  }
+  return normalizedTitle || "Window";
 }
 
 function isTauriRuntime() {
@@ -256,7 +278,7 @@ async function projectToRecordingSession(project: NativeProject) {
     createdAt: Date.now(),
     durationMs:
       typeof project?.duration === "number" && Number.isFinite(project.duration)
-        ? project.duration * 1000
+        ? project.duration
         : typeof document?.duration === "number" && Number.isFinite(document.duration)
           ? document.duration
           : undefined,
@@ -316,6 +338,14 @@ interface NativeMouseEvent {
 
 function nativeDocumentToCursorSamples(document: NativeDocument | null | undefined) {
   const events = Array.isArray(document?.events) ? document.events : [];
+  const mediaDurationMs = Number(document?.duration);
+  const lastEventMs = events.reduce((last, event) =>
+    Math.max(last, Number.isFinite(Number(event?.t)) ? Number(event.t) : 0), 0);
+  // Older recordings can contain fewer encoded frames than the capture clock
+  // expected. Keep the cursor and autozoom timeline inside the actual video.
+  const timeScale = mediaDurationMs > 0 && lastEventMs > mediaDurationMs * 1.05
+    ? mediaDurationMs / lastEventMs
+    : 1;
   const width = Number(document?.width);
   const height = Number(document?.height);
   if (!Number.isFinite(width) || !Number.isFinite(height) || width <= 0 || height <= 0) {
@@ -339,14 +369,19 @@ function nativeDocumentToCursorSamples(document: NativeDocument | null | undefin
         return null;
       }
 
-      const button =
+      const button: "click" | "right-click" | "middle-click" =
         event.btn === "right" ? "right-click" : event.btn === "middle" ? "middle-click" : "click";
+      const cursorType =
+        typeof event.cursorType === "string" &&
+        SUPPORTED_NATIVE_CURSOR_TYPES.has(event.cursorType as NativeCursorType)
+          ? (event.cursorType as NativeCursorType)
+          : "arrow";
       return {
-        timeMs: Number(event.t),
+        timeMs: Number(event.t) * timeScale,
         cx: clamp01((Number(event.x) - captureX) / width),
         cy: clamp01((Number(event.y) - captureY) / height),
         visible: true,
-        cursorType: "arrow",
+        cursorType,
         interactionType:
           event.type === "click_down" ? button : event.type === "click_up" ? "mouseup" : "move",
       };
@@ -359,7 +394,7 @@ function nativeDocumentToCursorSamples(document: NativeDocument | null | undefin
         cx: number;
         cy: number;
         visible: boolean;
-        cursorType: "arrow";
+        cursorType: NativeCursorType;
         interactionType: "move" | "click" | "right-click" | "middle-click" | "mouseup";
       } => Boolean(sample),
     );
@@ -378,115 +413,6 @@ function pathsEqual(p1?: string, p2?: string): boolean {
   const n1 = fromFileUrl(p1).replace(/\\/g, "/").toLowerCase();
   const n2 = fromFileUrl(p2).replace(/\\/g, "/").toLowerCase();
   return n1 === n2;
-}
-
-function getStubCursorTelemetry() {
-  return [
-    {
-      timeMs: 100,
-      cx: 0.5,
-      cy: 0.5,
-      visible: true,
-      interactionType: "move" as const,
-      cursorType: "arrow",
-    },
-    {
-      timeMs: 1000,
-      cx: 0.5,
-      cy: 0.5,
-      visible: true,
-      interactionType: "move" as const,
-      cursorType: "arrow",
-    },
-    {
-      timeMs: 2000,
-      cx: 0.3,
-      cy: 0.3,
-      visible: true,
-      interactionType: "move" as const,
-      cursorType: "arrow",
-    },
-    {
-      timeMs: 2500,
-      cx: 0.301,
-      cy: 0.299,
-      visible: true,
-      interactionType: "move" as const,
-      cursorType: "arrow",
-    },
-    {
-      timeMs: 3000,
-      cx: 0.3,
-      cy: 0.3,
-      visible: true,
-      interactionType: "move" as const,
-      cursorType: "arrow",
-    },
-    {
-      timeMs: 5000,
-      cx: 0.7,
-      cy: 0.4,
-      visible: true,
-      interactionType: "click" as const,
-      cursorType: "pointer",
-    },
-    {
-      timeMs: 5100,
-      cx: 0.7,
-      cy: 0.4,
-      visible: true,
-      interactionType: "mouseup" as const,
-      cursorType: "pointer",
-    },
-    {
-      timeMs: 7000,
-      cx: 0.5,
-      cy: 0.7,
-      visible: true,
-      interactionType: "move" as const,
-      cursorType: "arrow",
-    },
-    {
-      timeMs: 7500,
-      cx: 0.5,
-      cy: 0.7,
-      visible: true,
-      interactionType: "move" as const,
-      cursorType: "arrow",
-    },
-    {
-      timeMs: 8000,
-      cx: 0.5,
-      cy: 0.7,
-      visible: true,
-      interactionType: "move" as const,
-      cursorType: "arrow",
-    },
-    {
-      timeMs: 10000,
-      cx: 0.4,
-      cy: 0.6,
-      visible: true,
-      interactionType: "click" as const,
-      cursorType: "pointer",
-    },
-    {
-      timeMs: 10100,
-      cx: 0.4,
-      cy: 0.6,
-      visible: true,
-      interactionType: "mouseup" as const,
-      cursorType: "pointer",
-    },
-    {
-      timeMs: 15000,
-      cx: 0.5,
-      cy: 0.5,
-      visible: true,
-      interactionType: "move" as const,
-      cursorType: "arrow",
-    },
-  ];
 }
 
 function browserSessionCursorSamples(videoPath?: string) {
@@ -532,8 +458,9 @@ function browserSessionCursorSamples(videoPath?: string) {
             ? rawSample.interactionType
             : undefined;
         const cursorType =
-          rawSample.cursorType === "pointer" || rawSample.cursorType === "text"
-            ? rawSample.cursorType
+          typeof rawSample.cursorType === "string" &&
+          SUPPORTED_NATIVE_CURSOR_TYPES.has(rawSample.cursorType as NativeCursorType)
+            ? (rawSample.cursorType as NativeCursorType)
             : "arrow";
         return {
           timeMs: Math.max(0, Number(rawSample.timeMs)),
@@ -556,6 +483,7 @@ interface NativeCaptureSource {
   kind: "monitor" | "window";
   title?: string;
   primary?: boolean;
+  thumbnail?: string | null;
   [key: string]: unknown;
 }
 
@@ -567,7 +495,8 @@ interface NativeWindowsRecordingRequest {
     sourceId?: string;
     displayId?: string | number;
     display_id?: string | number;
-    type?: "window" | "screen" | "monitor";
+    type?: "window" | "screen" | "monitor" | "display" | "region";
+    region?: { x: number; y: number; width: number; height: number };
     [key: string]: unknown;
   };
   audio?: {
@@ -599,6 +528,7 @@ function getCaptureSourceType(source: NativeWindowsRecordingRequest["source"]) {
 
 interface StopNativeWindowsRecordingInput {
   discard?: boolean;
+  micAudioData?: ArrayBuffer | null;
   cameraVideoData?: ArrayBuffer | null;
   cameraMimeType?: string | null;
   cameraShape?: string | null;
@@ -678,15 +608,15 @@ if (typeof window !== "undefined") {
   import("@tauri-apps/api/core")
     .then((m) => {
       if (m) {
-        tauriConvertFileSrc = m.convertFileSrc || (m as any).default?.convertFileSrc;
+        tauriConvertFileSrc = m.convertFileSrc;
       }
     })
     .catch(() => {});
   import("@tauri-apps/api/path")
     .then((m) => {
       if (m) {
-        tauriVideoDir = m.videoDir || (m as any).default?.videoDir;
-        tauriJoin = m.join || (m as any).default?.join;
+        tauriVideoDir = m.videoDir;
+        tauriJoin = m.join;
       }
     })
     .catch(() => {});
@@ -702,6 +632,7 @@ export function installTauriCompatBridge() {
     assetBaseUrl: "/",
     convertFileSrc: (path: string) => {
       if (!path) return "";
+      if (/^(blob:|data:|https?:)/i.test(path)) return path;
       if (tauriRuntime) {
         let cleanPath = path.startsWith("file://") ? fromFileUrl(path) : path;
         cleanPath = cleanPath.replace(/\\/g, "/");
@@ -716,6 +647,7 @@ export function installTauriCompatBridge() {
     },
     resolveVideoPath: async (path: string) => {
       if (!path) return "";
+      if (/^(blob:|data:|https?:)/i.test(path)) return path;
       if (path.startsWith("indexeddb://")) {
         const key = path.replace("indexeddb://", "");
         try {
@@ -751,9 +683,23 @@ export function installTauriCompatBridge() {
     getSelectedSource: async () => {
       const raw = localStorage.getItem("foom-selected-capture-source");
       if (raw) {
-        return JSON.parse(raw);
+        try {
+          const source = JSON.parse(raw);
+          if (source && typeof source.id === "string" && source.id.length > 0 && (!tauriRuntime || source.id !== "screen")) {
+            const normalizedName = formatCaptureSourceName(
+              source.id.startsWith("window:") ? "window" : "monitor",
+              source.name,
+            );
+            if (normalizedName !== source.name) {
+              source.name = normalizedName;
+              localStorage.setItem("foom-selected-capture-source", JSON.stringify(source));
+            }
+            return source;
+          }
+        } catch { /* A corrupt saved selection must not prevent choosing a new source. */ }
+        localStorage.removeItem("foom-selected-capture-source");
       }
-      return { id: "screen", name: "Screen" };
+      return tauriRuntime ? null : { id: "screen", name: "Screen" };
     },
     showWindow: async () => {
       if (tauriRuntime) {
@@ -782,34 +728,14 @@ export function installTauriCompatBridge() {
         if (!opened) {
           window.location.href = selectorUrl.toString();
         }
-        return;
+        return { opened: true };
       }
       try {
         await invokeTauri("show_source_selector");
+        return { opened: true };
       } catch (error) {
         console.error("Failed to open source selector:", error);
-        // Fallback: auto-select primary monitor via list_capture_sources
-        try {
-          const sources = await invokeTauri<NativeCaptureSource[]>("list_capture_sources").catch(
-            () => [] as NativeCaptureSource[],
-          );
-          const primary =
-            sources.find((s) => s.kind === "monitor" && s.primary) ??
-            sources.find((s) => s.kind === "monitor") ??
-            null;
-          if (primary) {
-            localStorage.setItem(
-              "foom-selected-capture-source",
-              JSON.stringify({
-                id: primary.id,
-                name: primary.title ?? "Screen",
-                display_id: primary.id,
-              }),
-            );
-          }
-        } catch {
-          // ignore
-        }
+        return { opened: false, reason: error instanceof Error ? error.message : String(error) };
       }
     },
     getSources: async (_opts?: {
@@ -830,24 +756,26 @@ export function installTauriCompatBridge() {
       }
       try {
         const sources = await invokeTauri<NativeCaptureSource[]>("list_capture_sources");
-        return sources.map((s) => ({
+        return sources.map((s, index) => ({
           id: s.kind === "monitor" ? `screen:${s.id}` : `window:${s.id}`,
-          name: s.title ?? (s.kind === "monitor" ? "Screen" : "Window"),
-          thumbnail: null,
+          name: formatCaptureSourceName(s.kind, s.title, index),
+          thumbnail: s.thumbnail ?? null,
           display_id: s.id,
           appIcon: null,
+          bounds: { x: Number(s.x), y: Number(s.y), width: Number(s.width), height: Number(s.height) },
         }));
-      } catch {
-        return [];
+      } catch (error) {
+        throw new Error(`Could not load capture sources: ${error instanceof Error ? error.message : String(error)}`);
       }
     },
-    selectSource: async (source: { id: string; name: string; display_id?: string }) => {
+    selectSource: async (source: ProcessedDesktopSource) => {
       // Normalize id: strip "screen:" prefix for storage so recording logic gets raw monitor id
       const rawId = source.id.replace(/^screen:/, "").replace(/^window:/, "");
       const stored = {
         id: source.id.startsWith("window:") ? `window:${rawId}` : rawId,
         name: source.name,
         display_id: source.display_id ?? rawId,
+        ...(source.type === "region" ? { type: source.type, region: source.region, bounds: source.bounds } : {}),
       };
       localStorage.setItem("foom-selected-capture-source", JSON.stringify(stored));
 
@@ -869,7 +797,7 @@ export function installTauriCompatBridge() {
         try {
           const { WebviewWindow } = await import("@tauri-apps/api/webviewWindow");
           const win = await WebviewWindow.getByLabel("source-selector");
-          if (win) await win.close();
+          if (win) await win.hide();
         } catch {
           // ignore
         }
@@ -887,7 +815,18 @@ export function installTauriCompatBridge() {
         const selectedSource = request?.source;
         const normalizedSourceId = normalizeCaptureSourceId(selectedSource);
         const normalizedSourceType = getCaptureSourceType(selectedSource);
-        const isCustomArea = normalizedSourceId === "custom_area";
+        const isCustomArea = normalizedSourceId === "custom_area" || selectedSource?.type === "region";
+        const region = selectedSource?.region;
+        if (isCustomArea && (
+          !region ||
+          ![region.x, region.y, region.width, region.height].every(Number.isSafeInteger) ||
+          region.width <= 0 || region.height <= 0 ||
+          region.width > 2147483647 || region.height > 2147483647 ||
+          region.x < -2147483648 || region.y < -2147483648 ||
+          region.x + region.width > 2147483647 || region.y + region.height > 2147483647
+        )) {
+          throw new Error("Select a valid capture area before recording.");
+        }
         const options = {
           sourceType: isCustomArea
             ? "area"
@@ -908,14 +847,7 @@ export function installTauriCompatBridge() {
                   primary: true,
                 }
               : undefined,
-          region: isCustomArea
-            ? {
-                x: 100,
-                y: 100,
-                width: 1280,
-                height: 720,
-              }
-            : undefined,
+          region: isCustomArea ? region : undefined,
           systemAudioEnabled: Boolean(request?.audio?.system?.enabled),
           cursorEnabled: request?.cursor?.mode === "editable-overlay",
         };
@@ -936,14 +868,56 @@ export function installTauriCompatBridge() {
         return { success: false, error: message, message };
       }
     },
+    appendRecordingSidecarChunk: async (
+      kind: "mic" | "webcam",
+      data: ArrayBuffer,
+      timestampMs: number,
+      sequence: number,
+    ) => {
+      if (!tauriRuntime) {
+        return unavailable("Native recording sidecars require the desktop shell.");
+      }
+      try {
+        await invokeTauri("append_recording_sidecar_chunk", {
+          kind,
+          bytes: arrayBufferToNumberArray(data),
+          timestampMs: Math.max(0, Math.round(timestampMs)),
+          sequence: Math.max(0, Math.round(sequence)),
+        });
+        return ok();
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+        return { success: false, error: message, message };
+      }
+    },
+    discardRecordingSidecar: async (kind: "mic" | "webcam") => {
+      if (!tauriRuntime) {
+        return unavailable("Native recording sidecars require the desktop shell.");
+      }
+      try {
+        await invokeTauri("discard_recording_sidecar", { kind });
+        return ok();
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+        return { success: false, error: message, message };
+      }
+    },
     stopNativeWindowsRecording: async (input?: boolean | StopNativeWindowsRecordingInput) => {
       if (!tauriRuntime) {
         return unavailable("Native Windows recording requires the desktop shell.");
       }
       try {
         const discard = typeof input === "boolean" ? input : Boolean(input?.discard);
+        if (discard) {
+          await invokeTauri("cancel_recording");
+          localStorage.removeItem(currentNativeCursorCaptureModeKey);
+          return ok({ discarded: true });
+        }
         const project = await invokeTauri<NativeProject>("stop_recording", {
-          micAudioBytes: null,
+          micAudioBytes:
+            typeof input === "object" && input?.micAudioData
+              ? arrayBufferToNumberArray(input.micAudioData)
+              : null,
           cameraVideoBytes:
             typeof input === "object" && input?.cameraVideoData
               ? arrayBufferToNumberArray(input.cameraVideoData)
@@ -951,13 +925,6 @@ export function installTauriCompatBridge() {
           cameraMimeType: typeof input === "object" ? (input.cameraMimeType ?? null) : null,
           cameraShape: typeof input === "object" ? (input.cameraShape ?? null) : null,
         });
-        if (discard) {
-          if (project?.id) {
-            await invokeTauri("delete_recording", { id: project.id }).catch(() => undefined);
-          }
-          localStorage.removeItem(currentNativeCursorCaptureModeKey);
-          return ok({ discarded: true });
-        }
         const session = await projectToRecordingSession(project);
         if (session.screenVideoPath) {
           localStorage.setItem(currentRecordingSessionKey, JSON.stringify(session));
@@ -996,54 +963,42 @@ export function installTauriCompatBridge() {
       unavailable("Native macOS recording requires the desktop shell."),
     stopNativeMacRecording: async () =>
       unavailable("Native macOS recording requires the desktop shell."),
-    showCountdownOverlay: async () => {
-      if (tauriRuntime) {
-        await invokeTauri("show_countdown_overlay");
-      }
-      return ok();
-    },
-    setCountdownOverlayValue: async (value: number) => {
-      if (tauriRuntime) {
-        const { emit } = await import("@tauri-apps/api/event");
-        await emit("countdown-value", value);
-      } else {
-        window.dispatchEvent(new CustomEvent("foom-countdown-value", { detail: value }));
-      }
-      return ok();
-    },
-    hideCountdownOverlay: async () => {
-      if (tauriRuntime) {
-        await invokeTauri("hide_countdown_overlay");
-      }
-      return ok();
-    },
     setRecordingState: async () => ok(),
-    setHudOverlayIgnoreMouseEvents: async (_ignore: boolean) => {
+    setHudOverlayIgnoreMouseEvents: async (ignore: boolean) => {
       if (tauriRuntime) {
-        await (await getCurrentTauriWindow()).setIgnoreCursorEvents(false);
+        const { WebviewWindow } = await import("@tauri-apps/api/webviewWindow");
+        const overlayWindow = await WebviewWindow.getByLabel("recording-overlay");
+        if (!overlayWindow) {
+          return {
+            success: false,
+            error: "Recording controls window is not available.",
+            message: "Recording controls window is not available.",
+          };
+        }
+        await overlayWindow.setIgnoreCursorEvents(ignore);
       }
       return ok();
     },
-    setHudOverlaySize: async (width: number, height: number) => {
+    setHudOverlaySize: async (
+      width: number,
+      height: number,
+      layout?: string,
+      preservePosition?: boolean,
+    ) => {
       if (tauriRuntime) {
-        await invokeTauri("set_hud_overlay_size", { width, height });
+        await invokeTauri("set_hud_overlay_size", { width, height, layout, preservePosition });
       }
       return ok();
     },
     moveHudOverlayBy: async (deltaX: number, deltaY: number) => {
       if (tauriRuntime) {
-        const { PhysicalPosition } = await import("@tauri-apps/api/dpi");
-        const currentWindow = await getCurrentTauriWindow();
-        const position = await currentWindow.outerPosition();
-        const scale = await currentWindow.scaleFactor();
-
-        const physicalDeltaX = Math.round(deltaX * scale);
-        const physicalDeltaY = Math.round(deltaY * scale);
-
-        await currentWindow.setPosition(
-          new PhysicalPosition(position.x + physicalDeltaX, position.y + physicalDeltaY),
-        );
-        await invokeTauri("persist_recording_overlay_placement").catch(() => undefined);
+        await invokeTauri("move_recording_overlay_by", { deltaX, deltaY });
+      }
+      return ok();
+    },
+    persistHudOverlayPlacement: async () => {
+      if (tauriRuntime) {
+        await invokeTauri("persist_recording_overlay_placement");
       }
       return ok();
     },
@@ -1110,30 +1065,9 @@ export function installTauriCompatBridge() {
       };
     },
     sendCloseConfirmResponse: async (response: "save" | "discard" | "cancel") => {
-      if (response === "save") {
-        if (saveBeforeCloseCallback) {
-          const success = await saveBeforeCloseCallback();
-          if (success) {
-            currentHasUnsavedChanges = false;
-            try {
-              const appWindow = getCurrentWindow();
-              await appWindow.destroy();
-            } catch (err) {
-              console.error("Failed to destroy window on save:", err);
-            }
-          }
-        }
-      } else if (response === "discard") {
-        currentHasUnsavedChanges = false;
-        try {
-          const appWindow = getCurrentWindow();
-          await appWindow.destroy();
-        } catch (err) {
-          console.error("Failed to destroy window on discard:", err);
-        }
-      } else if (response === "cancel") {
-        // Do nothing, close is already prevented
-      }
+      if (response === "cancel") return;
+      if (response === "save" && !(await saveBeforeCloseCallback?.())) return;
+      await returnToRecorder();
     },
     onMenuNewProject: (callback: () => void) => listenToTauriEvent("menu-new-project", callback),
     onMenuNewRecording: (callback: () => void) => listenToTauriEvent("menu-new-recording", callback),
@@ -1141,10 +1075,8 @@ export function installTauriCompatBridge() {
     onMenuSaveProject: (callback: () => void) => listenToTauriEvent("menu-save-project", callback),
     onMenuSaveProjectAs: (callback: () => void) =>
       listenToTauriEvent("menu-save-project-as", callback),
-    onSourceSelected: (callback: (source: any) => void) =>
+    onSourceSelected: (callback: (source: ProcessedDesktopSource) => void) =>
       listenToTauriEventWithPayload("source-selected", callback),
-    onCountdownOverlayValue: (callback: (value: number) => void) =>
-      listenToTauriEventWithPayload("countdown-value", callback),
     deleteRecording: async (id: string) => {
       localStorage.removeItem(currentVideoPathKey);
       localStorage.removeItem(currentRecordingSessionKey);
@@ -1173,23 +1105,12 @@ export function installTauriCompatBridge() {
       }
     },
     startNewRecording: async () => {
-
-      if (tauriRuntime) {
-        try {
-          const { WebviewWindow } = await import("@tauri-apps/api/webviewWindow");
-          const mainWindow = await WebviewWindow.getByLabel("main");
-          if (mainWindow) {
-            await mainWindow.hide();
-          }
-          await invokeTauri("show_recording_overlay");
-          return ok();
-        } catch (error) {
-          const message = error instanceof Error ? error.message : String(error);
-          return { success: false, error: message, message };
-        }
+      try {
+        await returnToRecorder();
+        return ok();
+      } catch (error) {
+        return { success: false, error: String(error) };
       }
-      window.location.href = "#/overlay/recording";
-      return ok();
     },
     switchToEditor: async () => {
       if (tauriRuntime) {
@@ -1221,6 +1142,7 @@ export function installTauriCompatBridge() {
           window.location.hash = "/video-editor";
         } catch (error) {
           console.error("Error switching to editor:", error);
+          return { success: false, error: String(error) };
         }
       } else {
         window.location.href = "#/video-editor";
@@ -1260,10 +1182,10 @@ export function installTauriCompatBridge() {
       }
       return ok();
     },
-    openVideoFilePicker: async () => {
+    openVideoFilePicker: async (kind: "video" | "audio" = "video") => {
       if (tauriRuntime) {
         try {
-          const path = await invokeTauri<string | null>("open_video_file_picker");
+          const path = await invokeTauri<string | null>("open_video_file_picker", { kind });
           if (path) {
             return { success: true, path, canceled: false };
           }
@@ -1276,7 +1198,7 @@ export function installTauriCompatBridge() {
       return new Promise((resolve) => {
         const input = document.createElement("input");
         input.type = "file";
-        input.accept = "video/*";
+        input.accept = kind === "audio" ? "audio/*" : "video/*";
         input.style.display = "none";
         document.body.appendChild(input);
         
@@ -1286,9 +1208,9 @@ export function installTauriCompatBridge() {
             try {
               const buffer = await file.arrayBuffer();
               const key = `screen-${Date.now()}`;
-              const videoPath = await saveVideoToIndexedDb(key, buffer);
-              localStorage.setItem(currentVideoPathKey, videoPath);
-              resolve({ success: true, path: videoPath, canceled: false });
+              const videoPath = await saveVideoToIndexedDb(key, buffer, file.type);
+              if (kind === "video") localStorage.setItem(currentVideoPathKey, videoPath);
+              resolve({ success: true, path: videoPath, name: file.name, canceled: false });
             } catch (err) {
               resolve({ success: false, error: String(err) });
             } finally {
@@ -1466,13 +1388,14 @@ export function installTauriCompatBridge() {
     readBinaryFile: async (path: string) => {
       if (tauriRuntime) {
         try {
+          const nativePath = fromFileUrl(path);
           const bytes = await invokeTauri<number[]>("read_binary_file", {
-            path,
+            path: nativePath,
           });
           return {
             success: true,
             data: new Uint8Array(bytes).buffer,
-            path,
+            path: nativePath,
           };
         } catch (error) {
           const message = error instanceof Error ? error.message : String(error);
@@ -1715,23 +1638,24 @@ export function installTauriCompatBridge() {
           };
         }
         if (project && typeof project === "object") {
-          const projectAny = project as any;
+          const projectAny = project as Record<string, unknown>;
           if (projectAny.media && typeof projectAny.media === "object") {
+            const media = projectAny.media as Record<string, unknown>;
             if (
-              typeof projectAny.media.screenVideoPath === "string" &&
-              projectAny.media.screenVideoPath.startsWith("indexeddb://")
+              typeof media.screenVideoPath === "string" &&
+              media.screenVideoPath.startsWith("indexeddb://")
             ) {
-              const key = projectAny.media.screenVideoPath.replace("indexeddb://", "");
+              const key = media.screenVideoPath.replace("indexeddb://", "");
               const objectUrl = await loadVideoFromIndexedDb(key);
-              if (objectUrl) projectAny.media.screenVideoPath = objectUrl;
+              if (objectUrl) media.screenVideoPath = objectUrl;
             }
             if (
-              typeof projectAny.media.webcamVideoPath === "string" &&
-              projectAny.media.webcamVideoPath.startsWith("indexeddb://")
+              typeof media.webcamVideoPath === "string" &&
+              media.webcamVideoPath.startsWith("indexeddb://")
             ) {
-              const key = projectAny.media.webcamVideoPath.replace("indexeddb://", "");
+              const key = media.webcamVideoPath.replace("indexeddb://", "");
               const objectUrl = await loadVideoFromIndexedDb(key);
-              if (objectUrl) projectAny.media.webcamVideoPath = objectUrl;
+              if (objectUrl) media.webcamVideoPath = objectUrl;
             }
           }
         }
@@ -1822,13 +1746,10 @@ export function installTauriCompatBridge() {
         }
 
         const document = await loadNativeRecordingDocument(request?.payload?.videoPath);
-        let samples =
+        const samples =
           document && Array.isArray(document.events)
             ? nativeDocumentToCursorSamples(document)
             : browserSessionCursorSamples(request?.payload?.videoPath);
-        if (samples.length === 0) {
-          samples = getStubCursorTelemetry();
-        }
         return {
           ok: true,
           data:
@@ -1855,11 +1776,10 @@ export function installTauriCompatBridge() {
     try {
       const appWindow = getCurrentWindow();
       appWindow.onCloseRequested(async (event) => {
-        if (currentHasUnsavedChanges) {
+        if (closeConfirmCallback) {
           event.preventDefault();
-          if (closeConfirmCallback) {
-            closeConfirmCallback();
-          }
+          if (currentHasUnsavedChanges) closeConfirmCallback();
+          else await returnToRecorder();
         }
       });
     } catch (err) {

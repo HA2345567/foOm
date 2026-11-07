@@ -10,6 +10,52 @@ import {
 } from "./projectPersistence";
 
 describe("projectPersistence media compatibility", () => {
+  it("enables reactive webcam sizing for new and legacy editor state while preserving explicit choices", () => {
+    expect(normalizeProjectEditor({}).webcamReactiveZoom).toBe(true);
+    expect(normalizeProjectEditor({ webcamReactiveZoom: false }).webcamReactiveZoom).toBe(false);
+  });
+
+  it("round-trips linked and independent canvas padding", () => {
+    const media = { screenVideoPath: "C:/recordings/demo.mp4" };
+    const edges = { top: 38, right: 3, bottom: 10, left: 50 };
+    const editor = { padding: 38, paddingEdges: edges };
+    const saved = createProjectData(media, editor);
+    const reopened = normalizeProjectEditor(JSON.parse(JSON.stringify(saved)).editor);
+    expect(reopened).toMatchObject(editor);
+    expect(createProjectSnapshot(media, reopened)).toBe(createProjectSnapshot(media, editor));
+    expect(normalizeProjectEditor({ padding: 38 }).padding).toBe(38);
+  });
+
+  it("round-trips cursor and audio edits without changing the saved snapshot", () => {
+    const media = { screenVideoPath: "C:/recordings/proj_test.mp4" };
+    const editor = {
+      padding: 50,
+      showCursor: false,
+      cursorSize: 4.2,
+      cursorSmoothing: 0.21,
+      cursorMotionBlur: 0.8,
+      cursorClickBounce: 4.5,
+      cursorClipToBounds: false,
+      noiseReductionEnabled: true,
+      noiseReductionAmount: 0.7,
+    };
+    const saved = createProjectData(media, editor);
+    const reopened = normalizeProjectEditor(JSON.parse(JSON.stringify(saved)).editor);
+
+    expect(reopened).toMatchObject(editor);
+    const beforeSave = createProjectSnapshot(media, editor);
+    const afterOpen = createProjectSnapshot(media, reopened);
+    expect(hasProjectUnsavedChanges(afterOpen, beforeSave)).toBe(false);
+    expect(hasProjectUnsavedChanges(createProjectSnapshot(media, { ...reopened, cursorSize: 2 }), afterOpen)).toBe(true);
+    expect(hasProjectUnsavedChanges(createProjectSnapshot(media, { ...reopened, noiseReductionEnabled: false }), afterOpen)).toBe(true);
+  });
+
+  it("safely defaults missing legacy cursor settings and bounds invalid values", () => {
+    expect(normalizeProjectEditor({}).cursorSize).toBe(1.5);
+    expect(normalizeProjectEditor({}).showCursor).toBe(true);
+    expect(normalizeProjectEditor({ cursorSize: Infinity, cursorSmoothing: -1, cursorMotionBlur: 2, cursorClickBounce: 99 })).toMatchObject({ cursorSize: 1.5, cursorSmoothing: 0, cursorMotionBlur: 1, cursorClickBounce: 5 });
+  });
+
 	it("accepts legacy projects with a single videoPath", () => {
 		const project = {
 			version: 1,

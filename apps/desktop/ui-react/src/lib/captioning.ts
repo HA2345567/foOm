@@ -1,18 +1,21 @@
-import type { AnnotationRegion, TrimRegion } from "@/components/video-editor/types";
+import type { AnnotationRegion, TrimRegion } from "@/components/vedio-editor/types";
 
 export const MAX_CAPTION_AUDIO_SEC = 600; // 10 minutes
+
+export interface CaptionSegment {
+  startSec: number;
+  endSec: number;
+  text: string;
+}
 
 export async function extractMono16kFromVideoUrl(videoUrl: string): Promise<{
   samples: Float32Array;
   truncated: boolean;
   durationSec: number;
 }> {
-  console.log("Mock extractMono16kFromVideoUrl called for:", videoUrl);
-  return {
-    samples: new Float32Array(0),
-    truncated: false,
-    durationSec: 0,
-  };
+  throw new Error(
+    "Automatic captions are unavailable: this build has no transcription engine. Add captions manually in the Captions panel.",
+  );
 }
 
 export function trimLeadingSilenceMono16k(samples: Float32Array): {
@@ -27,7 +30,7 @@ export function trimLeadingSilenceMono16k(samples: Float32Array): {
 
 export function shiftTrimRegionsMsForCaptionBuffer(
   trimRegions: TrimRegion[],
-  trimMs: number
+  trimMs: number,
 ): TrimRegion[] {
   return trimRegions.map((region) => ({
     ...region,
@@ -41,33 +44,25 @@ export async function transcribeMono16kToSegments(
   options?: {
     trimRegions?: TrimRegion[];
     onStatus?: (phase: "model" | "transcribe") => void;
-  }
+  },
 ): Promise<{
-  segments: any[];
+  segments: CaptionSegment[];
   granularity: "word" | "segment";
 }> {
-  console.log("Mock transcribeMono16kToSegments called");
-  if (options?.onStatus) {
-    options.onStatus("model");
-    await new Promise((resolve) => setTimeout(resolve, 500));
-    options.onStatus("transcribe");
-    await new Promise((resolve) => setTimeout(resolve, 500));
-  }
-  return {
-    segments: [],
-    granularity: "word",
-  };
+  throw new Error(
+    "Automatic captions are unavailable: this build has no transcription engine. Add captions manually in the Captions panel.",
+  );
 }
 
 export function captionSegmentsToAnnotationRegions(
-  segments: any[],
+  segments: CaptionSegment[],
   nextId: number,
   nextZIndex: number,
   options?: {
     minWordsPerCaption?: number;
     maxWordsPerCaption?: number;
     timestampGranularity?: "word" | "segment";
-  }
+  },
 ): {
   regions: AnnotationRegion[];
   nextNumericId: number;

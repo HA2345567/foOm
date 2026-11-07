@@ -3,7 +3,7 @@ import { DEFAULT_ROTATION_3D, getRotation3D, getZoomScale, lerpRotation3D } from
 import { TRANSITION_WINDOW_MS, ZOOM_IN_TRANSITION_WINDOW_MS } from "./constants";
 import { interpolateCursorAt } from "./cursorFollowUtils";
 import { clampFocusToScale } from "./focusUtils";
-import { clamp01, cubicBezier, easeOutScreenStudio } from "./mathUtils";
+import { clamp01, cubicBezier, smoothStep } from "./mathUtils";
 
 const CHAINED_ZOOM_PAN_GAP_MS = 1500;
 const CONNECTED_ZOOM_PAN_DURATION_MS = 1000;
@@ -49,7 +49,7 @@ export function computeRegionStrength(region: ZoomRegion, timeMs: number) {
 
 	if (timeMs < zoomInEnd) {
 		const progress = (timeMs - leadInStart) / ZOOM_IN_TRANSITION_WINDOW_MS;
-		return easeOutScreenStudio(progress);
+		return smoothStep(progress);
 	}
 
 	if (timeMs <= region.endMs) {
@@ -57,7 +57,7 @@ export function computeRegionStrength(region: ZoomRegion, timeMs: number) {
 	}
 
 	const progress = clamp01((timeMs - region.endMs) / TRANSITION_WINDOW_MS);
-	return 1 - easeOutScreenStudio(progress);
+	return 1 - smoothStep(progress);
 }
 
 function getLinearFocus(start: ZoomFocus, end: ZoomFocus, amount: number): ZoomFocus {

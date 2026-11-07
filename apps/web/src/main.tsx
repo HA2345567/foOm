@@ -46,7 +46,7 @@ const recordRoute = createRoute({
   component: () => (
     <div className="flex h-screen items-center justify-center bg-black text-white px-6">
       <div className="text-center max-w-md">
-        <h1 className="text-3xl font-bold tracking-tight font-brand">Launching foOm Studio...</h1>
+        <h1 className="text-3xl font-bold tracking-tight font-brand">Launching foOom Studio...</h1>
         <p className="text-sm text-zinc-400 mt-4 leading-relaxed">
           Make sure you have downloaded, installed, and launched the desktop app. If it is already open, recording toolbar is active.
         </p>

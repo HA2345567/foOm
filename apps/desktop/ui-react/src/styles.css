@@ -42,6 +42,13 @@ html {
   scroll-behavior: smooth;
 }
 
+/* Keep transparent Tauri HUD windows clear from the first WebView paint. */
+html[data-transparent-window],
+html[data-transparent-window] body,
+html[data-transparent-window] #root {
+  background: transparent !important;
+}
+
 /* Applied by useCustomCursor inside Tauri to suppress the native browser cursor */
 html.hide-cursor,
 html.hide-cursor *,
@@ -51,30 +58,30 @@ html.hide-cursor *::after {
 }
 
 :root {
-  /* Cal.com Dark Mode Palette */
-  --background: #000000;
-  --foreground: #e5e5e5;
+  /* foOom Studio: black and neutral gray. */
+  --background: #101010;
+  --foreground: #f4f4f4;
   /* Refined off-white from user request */
 
-  --card: #0a0a0a;
+  --card: #191919;
   --card-foreground: #ffffff;
 
-  --primary: #ffffff;
-  --primary-foreground: #000000;
+  --primary: #eeeeee;
+  --primary-foreground: #171717;
 
-  --secondary: #161616;
-  --secondary-foreground: #a1a1a1;
+  --secondary: #222222;
+  --secondary-foreground: #d4d4d4;
 
-  --muted: #161616;
-  --muted-foreground: #898989;
+  --muted: #222222;
+  --muted-foreground: #a3a3a3;
 
-  --accent: #ffffff;
-  --accent-foreground: #000000;
+  --accent: #cccccc;
+  --accent-foreground: #1e1e1e;
 
   --border: rgba(255, 255, 255, 0.1);
   --input: rgba(255, 255, 255, 0.05);
   --ring: rgba(255, 255, 255, 0.2);
-  --destructive: #ff453a;
+  --destructive: #7f7f7f;
   --destructive-foreground: #ffffff;
 
   /* Cal.com 11-Shadow System (adapted for Dark Mode) */
@@ -193,7 +200,7 @@ html.hide-cursor *::after {
     background:
       radial-gradient(circle at 18% 0%, rgba(255, 255, 255, 0.055), transparent 34%),
       radial-gradient(circle at 82% 12%, rgba(120, 120, 130, 0.08), transparent 28%),
-      linear-gradient(180deg, #050506 0%, #08080a 48%, #050506 100%);
+      linear-gradient(180deg, #050505 0%, #090909 48%, #050505 100%);
   }
 
   .editor-topbar {
@@ -230,21 +237,21 @@ html.hide-cursor *::after {
     line-height: 1;
     white-space: nowrap;
     min-width: max-content;
-    background: linear-gradient(180deg, #ff4a4a 0%, #e92f2f 100%);
+    background: linear-gradient(180deg, #868686 0%, #6d6d6d 100%);
     box-shadow:
       0 8px 22px rgba(239, 47, 47, 0.24),
       inset 0 1px 0 rgba(255, 255, 255, 0.28);
   }
 
   .editor-export-action:hover {
-    background: linear-gradient(180deg, #ff5a5a 0%, #f23535 100%);
+    background: linear-gradient(180deg, #919191 0%, #747474 100%);
   }
 
   .editor-main-deck,
   .editor-timeline-panel,
   .editor-settings-rail {
     background:
-      linear-gradient(180deg, rgba(255, 255, 255, 0.035), rgba(255, 255, 255, 0.012)), #050506;
+      linear-gradient(180deg, rgba(255, 255, 255, 0.035), rgba(255, 255, 255, 0.012)), #050505;
     border: 1px solid rgba(255, 255, 255, 0.075);
     box-shadow:
       inset 0 1px 0 rgba(255, 255, 255, 0.045),

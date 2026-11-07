@@ -3,7 +3,7 @@ import { motion } from "framer-motion";
 const steps = [
   {
     number: "01",
-    title: "Install foOm",
+    title: "Install foOom",
     description: "Download the Windows app and launch the compact recorder toolbar.",
   },
   {

@@ -32,6 +32,39 @@ vi.mock("@/contexts/I18nContext", () => ({
 }));
 
 describe("SourceSelector", () => {
+  it("clears pending recording when source selection is cancelled", async () => {
+    const close = vi.spyOn(window, "close").mockImplementation(() => {});
+    localStorage.setItem("foom-start-recording-after-select", "true");
+    window.electronAPI = { ...window.electronAPI, getSources: vi.fn().mockResolvedValue([
+      { id: "screen:1", name: "Display", display_id: "1", thumbnail: null, appIcon: null },
+    ]), selectSource: vi.fn() } as typeof window.electronAPI;
+    render(<SourceSelector />);
+    fireEvent.click(await screen.findByRole("button", { name: "Cancel" }));
+    expect(localStorage.getItem("foom-start-recording-after-select")).toBeNull();
+    expect(close).toHaveBeenCalledOnce();
+    close.mockRestore();
+  });
+  it("selects an exact region on a secondary display", async () => {
+    const selectSource = vi.fn();
+    window.electronAPI = {
+      ...window.electronAPI,
+      getSources: vi.fn().mockResolvedValue([{ id: "screen:2", name: "Left display", display_id: "2", thumbnail: null, appIcon: null,
+        bounds: { x: -1920, y: -200, width: 1920, height: 1080 } }]),
+      selectSource,
+    } as typeof window.electronAPI;
+    render(<SourceSelector />);
+    fireEvent.click(await screen.findByText("Left display"));
+    fireEvent.click(screen.getByRole("button", { name: "Choose region" }));
+    fireEvent.change(screen.getByLabelText("Region x"), { target: { value: "-1800" } });
+    fireEvent.change(screen.getByLabelText("Region y"), { target: { value: "-100" } });
+    fireEvent.change(screen.getByLabelText("Region width"), { target: { value: "800" } });
+    fireEvent.change(screen.getByLabelText("Region height"), { target: { value: "600" } });
+    fireEvent.click(screen.getByRole("button", { name: "Use region" }));
+    expect(selectSource).toHaveBeenCalledWith(expect.objectContaining({
+      id: "custom_area", type: "region", display_id: "2",
+      region: { x: -1800, y: -100, width: 800, height: 600 },
+    }));
+  });
   beforeEach(() => {
     window.electronAPI = {
       ...window.electronAPI,

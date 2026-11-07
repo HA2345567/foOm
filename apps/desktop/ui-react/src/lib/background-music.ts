@@ -1,6 +1,6 @@
 /**
  * @file background-music.ts
- * @description Background Royalty-Free Music System for foOm Screen Recorder.
+ * @description Background Royalty-Free Music System for foOom Screen Recorder.
  * Pre-decodes AudioBuffer and mixes music into recording AudioContext.
  */
 
@@ -22,7 +22,7 @@ export const SAMPLE_TRACKS: MusicTrack[] = [
   {
     id: "track-1",
     title: "Cinematic Glow",
-    artist: "foOm Originals",
+    artist: "foOom Originals",
     mood: "cinematic",
     url: "https://cdn.pixabay.com/download/audio/2022/05/27/audio_1808fbf07a.mp3",
     previewUrl: "https://cdn.pixabay.com/download/audio/2022/05/27/audio_1808fbf07a.mp3",
@@ -31,7 +31,7 @@ export const SAMPLE_TRACKS: MusicTrack[] = [
   {
     id: "track-2",
     title: "Deep Focus Flow",
-    artist: "foOm Originals",
+    artist: "foOom Originals",
     mood: "focus",
     url: "https://cdn.pixabay.com/download/audio/2022/03/15/audio_c8c8a73229.mp3",
     previewUrl: "https://cdn.pixabay.com/download/audio/2022/03/15/audio_c8c8a73229.mp3",
@@ -40,7 +40,7 @@ export const SAMPLE_TRACKS: MusicTrack[] = [
   {
     id: "track-3",
     title: "Upbeat Tech Demo",
-    artist: "foOm Originals",
+    artist: "foOom Originals",
     mood: "upbeat",
     url: "https://cdn.pixabay.com/download/audio/2022/01/18/audio_d0a13f69d2.mp3",
     previewUrl: "https://cdn.pixabay.com/download/audio/2022/01/18/audio_d0a13f69d2.mp3",
@@ -60,7 +60,7 @@ export class BackgroundMusicManager {
    * Load and decode a music track before recording starts.
    */
   public async loadTrack(track: MusicTrack, existingCtx?: AudioContext): Promise<void> {
-    this.audioCtx = existingCtx || new (window.AudioContext || (window as any).webkitAudioContext)();
+    this.audioCtx = existingCtx || new (window.AudioContext || window.webkitAudioContext!)();
     const resp = await fetch(track.url);
     const arrayBuffer = await resp.arrayBuffer();
     this.audioBuffer = await this.audioCtx.decodeAudioData(arrayBuffer);

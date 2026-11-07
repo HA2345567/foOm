@@ -37,7 +37,6 @@ dist-ssr
 apps/web/public/downloads/foom-setup.exe
 target-build/
 target/
-Cargo.lock
 .cargo/
 .codex/
 .tanstack/

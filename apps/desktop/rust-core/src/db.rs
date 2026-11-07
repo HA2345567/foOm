@@ -1,6 +1,7 @@
 use rusqlite::{Connection, Result};
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
+use shared_core::{DocumentIntegrity, ProjectDocument};
 use std::collections::HashSet;
 use std::fs;
 use std::path::PathBuf;
@@ -27,11 +28,47 @@ pub struct ProjectIntegrity {
 }
 
 fn get_db_path() -> PathBuf {
-    let mut path = PathBuf::from(std::env::var("LOCALAPPDATA").unwrap_or_else(|_| ".".to_string()));
+    let mut path = app_data_root();
     path.push("foom");
     let _ = fs::create_dir_all(&path);
     path.push("foom.db");
     path
+}
+
+fn app_data_root() -> PathBuf {
+    app_data_root_for(
+        std::env::consts::OS,
+        std::env::var_os("LOCALAPPDATA").map(PathBuf::from),
+        std::env::var_os("XDG_DATA_HOME").map(PathBuf::from),
+        std::env::var_os("HOME")
+            .or_else(|| std::env::var_os("USERPROFILE"))
+            .map(PathBuf::from),
+    )
+}
+
+fn app_data_root_for(
+    operating_system: &str,
+    local_app_data: Option<PathBuf>,
+    xdg_data_home: Option<PathBuf>,
+    home: Option<PathBuf>,
+) -> PathBuf {
+    match operating_system {
+        // Keep the current Windows location; use the conventional path if the
+        // environment variable is unavailable (for example in tests/tools).
+        "windows" => local_app_data
+            .or_else(|| home.map(|home| home.join("AppData").join("Local")))
+            .unwrap_or_else(|| PathBuf::from(".")),
+        "macos" => home
+            .map(|home| home.join("Library").join("Application Support"))
+            .unwrap_or_else(|| PathBuf::from(".")),
+        "linux" => xdg_data_home
+            .filter(|path| path.is_absolute())
+            .or_else(|| home.map(|home| home.join(".local").join("share")))
+            .unwrap_or_else(|| PathBuf::from(".")),
+        _ => home
+            .map(|home| home.join(".local").join("share"))
+            .unwrap_or_else(|| PathBuf::from(".")),
+    }
 }
 
 pub fn init_db() {
@@ -56,19 +93,52 @@ pub fn init_db() {
 }
 
 fn get_recordings_dir() -> PathBuf {
-    let mut path = std::env::var("USERPROFILE")
-        .map(PathBuf::from)
-        .map(|home| home.join("Videos"))
-        .unwrap_or_else(|_| {
-            PathBuf::from(std::env::var("LOCALAPPDATA").unwrap_or_else(|_| ".".to_string()))
-        });
+    let user_profile = std::env::var_os("USERPROFILE").map(PathBuf::from);
+    let home = std::env::var_os("HOME")
+        .or_else(|| user_profile.clone().map(|path| path.into_os_string()))
+        .map(PathBuf::from);
+    let mut path = recordings_root_for(
+        std::env::consts::OS,
+        user_profile,
+        std::env::var_os("XDG_VIDEOS_DIR").map(PathBuf::from),
+        home,
+        app_data_root(),
+    );
     path.push("foom");
     path.push("recordings");
     path
 }
 
+fn recordings_root_for(
+    operating_system: &str,
+    user_profile: Option<PathBuf>,
+    xdg_videos_dir: Option<PathBuf>,
+    home: Option<PathBuf>,
+    app_data_root: PathBuf,
+) -> PathBuf {
+    match operating_system {
+        "windows" => user_profile
+            .map(|home| home.join("Videos"))
+            .unwrap_or(app_data_root),
+        "macos" => home
+            .map(|home| home.join("Movies"))
+            .unwrap_or(app_data_root),
+        "linux" => xdg_videos_dir
+            .filter(|path| path.is_absolute())
+            .or_else(|| home.map(|home| home.join("Videos")))
+            .unwrap_or(app_data_root),
+        _ => home
+            .map(|home| home.join("Videos"))
+            .unwrap_or(app_data_root),
+    }
+}
+
 fn cleanup_orphaned_recording_files(conn: &Connection) {
     let rec_dir = get_recordings_dir();
+    cleanup_recording_directory(conn, &rec_dir);
+}
+
+fn cleanup_recording_directory(conn: &Connection, rec_dir: &std::path::Path) {
     let entries = match fs::read_dir(&rec_dir) {
         Ok(entries) => entries,
         Err(_) => return,
@@ -100,18 +170,154 @@ fn cleanup_orphaned_recording_files(conn: &Connection) {
         };
 
         let is_managed_temp = name.ends_with("_temp.mp4")
-            || name.ends_with("_mic.webm")
             || name.ends_with("_audio.wav")
             || name.starts_with("foom_filter_");
-        let is_orphan_project_file = name.starts_with("proj_")
-            && matches!(
-                path.extension().and_then(|s| s.to_str()),
-                Some("mp4" | "json" | "webm" | "wav")
-            );
-
-        if is_managed_temp || is_orphan_project_file {
+        // A recording without a database row may still be recoverable after a
+        // crash or failed insert. Keep original media and documents on disk.
+        if is_managed_temp {
             let _ = fs::remove_file(path);
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn app_data_paths_follow_each_platform_convention() {
+        let home = PathBuf::from("C:/Users/foom");
+        let local = PathBuf::from("C:/Users/foom/AppData/Local");
+        let xdg = std::env::temp_dir().join("foom-xdg-data");
+
+        assert_eq!(
+            app_data_root_for("windows", Some(local.clone()), None, Some(home.clone())),
+            local
+        );
+        assert_eq!(
+            app_data_root_for("macos", None, None, Some(PathBuf::from("/Users/foom"))),
+            PathBuf::from("/Users/foom/Library/Application Support")
+        );
+        assert_eq!(
+            app_data_root_for("linux", None, Some(xdg.clone()), Some(home.clone())),
+            xdg
+        );
+        assert_eq!(
+            app_data_root_for("linux", None, None, Some(home.clone())),
+            home.join(".local").join("share")
+        );
+    }
+
+    #[test]
+    fn recordings_paths_follow_each_platform_convention() {
+        let home = PathBuf::from("C:/Users/foom");
+        let fallback = PathBuf::from("fallback-data");
+        let xdg_videos = std::env::temp_dir().join("foom-xdg-videos");
+
+        assert_eq!(
+            recordings_root_for("windows", Some(home.clone()), None, None, fallback.clone()),
+            home.join("Videos")
+        );
+        assert_eq!(
+            recordings_root_for(
+                "macos",
+                None,
+                None,
+                Some(PathBuf::from("/Users/foom")),
+                fallback.clone()
+            ),
+            PathBuf::from("/Users/foom/Movies")
+        );
+        assert_eq!(
+            recordings_root_for(
+                "linux",
+                None,
+                Some(xdg_videos.clone()),
+                Some(home.clone()),
+                fallback.clone()
+            ),
+            xdg_videos
+        );
+        assert_eq!(
+            recordings_root_for("linux", None, None, Some(home.clone()), fallback.clone()),
+            home.join("Videos")
+        );
+        assert_eq!(
+            recordings_root_for("windows", None, None, None, fallback.clone()),
+            fallback
+        );
+    }
+
+    #[test]
+    fn linux_ignores_relative_xdg_directory_overrides() {
+        let home = PathBuf::from("/home/foom");
+        assert_eq!(
+            app_data_root_for(
+                "linux",
+                None,
+                Some(PathBuf::from("relative-data")),
+                Some(home.clone())
+            ),
+            home.join(".local").join("share")
+        );
+        assert_eq!(
+            recordings_root_for(
+                "linux",
+                None,
+                Some(PathBuf::from("relative-videos")),
+                Some(home.clone()),
+                PathBuf::from("fallback")
+            ),
+            home.join("Videos")
+        );
+    }
+
+    #[test]
+    fn project_document_save_replaces_existing_document() {
+        let path =
+            std::env::temp_dir().join(format!("foom-atomic-save-{}.json", std::process::id()));
+        fs::write(&path, "old state").unwrap();
+        write_project_document(&path, "new state").unwrap();
+        assert_eq!(fs::read_to_string(&path).unwrap(), "new state");
+        assert!(!path.with_extension("json.tmp").exists());
+        fs::remove_file(path).unwrap();
+    }
+
+    #[test]
+    fn startup_cleanup_preserves_recoverable_recordings() {
+        let dir = std::env::temp_dir().join(format!(
+            "foom-recovery-test-{}-{}",
+            std::process::id(),
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_nanos()
+        ));
+        fs::create_dir(&dir).unwrap();
+        let conn = Connection::open_in_memory().unwrap();
+        conn.execute(
+            "CREATE TABLE projects (raw_video_path TEXT, metadata_path TEXT)",
+            [],
+        )
+        .unwrap();
+        let files = [
+            "proj_crashed.mp4",
+            "proj_crashed.json",
+            "proj_crashed_mic.webm",
+            "proj_crashed_webcam.webm",
+        ];
+        for name in files {
+            fs::write(dir.join(name), b"recoverable").unwrap();
+        }
+        let temp = dir.join("proj_crashed_temp.mp4");
+        fs::write(&temp, b"temporary").unwrap();
+        cleanup_recording_directory(&conn, &dir);
+        assert!(!temp.exists());
+        for name in files {
+            assert!(dir.join(name).exists(), "removed recoverable {name}");
+            fs::remove_file(dir.join(name)).unwrap();
+        }
+        fs::remove_dir(dir).unwrap();
     }
 }
 
@@ -122,6 +328,16 @@ fn read_camera_video_path(metadata_path: &str) -> Option<String> {
         .get("cameraVideoPath")
         .and_then(|path| path.as_str())
         .map(ToOwned::to_owned)
+}
+
+fn write_project_document(path: &std::path::Path, json: &str) -> std::io::Result<()> {
+    use std::io::Write;
+    let temporary = path.with_extension("json.tmp");
+    let mut file = fs::File::create(&temporary)?;
+    file.write_all(json.as_bytes())?;
+    file.sync_all()?;
+    drop(file);
+    fs::rename(temporary, path)
 }
 
 fn ensure_project_document(project: &Project) -> ProjectIntegrity {
@@ -152,7 +368,7 @@ fn ensure_project_document(project: &Project) -> ProjectIntegrity {
                             })
                         });
                         if let Ok(json_str) = serde_json::to_string_pretty(&value) {
-                            if fs::write(&document_path, json_str).is_ok() {
+                            if write_project_document(&document_path, &json_str).is_ok() {
                                 migrated_document = true;
                             }
                         }
@@ -268,34 +484,29 @@ pub fn get_project_document(id: &str) -> Result<Value> {
     let project = get_project(id)?;
     let raw = fs::read_to_string(&project.metadata_path)
         .map_err(|_| rusqlite::Error::QueryReturnedNoRows)?;
-    serde_json::from_str(&raw).map_err(|_| rusqlite::Error::InvalidQuery)
+    let document: ProjectDocument =
+        serde_json::from_str(&raw).map_err(|_| rusqlite::Error::InvalidQuery)?;
+    serde_json::to_value(document).map_err(|_| rusqlite::Error::InvalidQuery)
 }
 
 pub fn save_project_editor_state(id: &str, editor: Value) -> Result<()> {
     let project = get_project(id)?;
-    let mut document = get_project_document(id)?;
-    if document.get("documentVersion").is_none() {
-        let _ = ensure_project_document(&project);
-        document = get_project_document(id)?;
-    }
-    if let Some(obj) = document.as_object_mut() {
-        obj.insert("editor".to_string(), editor);
-        obj.insert(
-            "updatedAt".to_string(),
-            json!(chrono::Local::now().to_rfc3339()),
-        );
-        obj.insert(
-            "integrity".to_string(),
-            json!({
-                "checkedAt": chrono::Local::now().to_rfc3339(),
-                "missingVideo": !PathBuf::from(&project.raw_video_path).exists(),
-                "missingDocument": false,
-            }),
-        );
-    }
+    let mut document: ProjectDocument = serde_json::from_value(get_project_document(id)?)
+        .map_err(|_| rusqlite::Error::InvalidQuery)?;
+    let checked_at = chrono::Local::now().to_rfc3339();
+    document.editor = editor;
+    document.updated_at = Some(checked_at.clone());
+    document.integrity = Some(DocumentIntegrity {
+        checked_at: Some(checked_at),
+        missing_video: !PathBuf::from(&project.raw_video_path).exists(),
+        missing_document: false,
+        ok: None,
+        migrated_document: None,
+    });
     let json_str =
         serde_json::to_string_pretty(&document).map_err(|_| rusqlite::Error::InvalidQuery)?;
-    fs::write(&project.metadata_path, json_str).map_err(|_| rusqlite::Error::InvalidQuery)?;
+    write_project_document(std::path::Path::new(&project.metadata_path), &json_str)
+        .map_err(|_| rusqlite::Error::InvalidQuery)?;
     Ok(())
 }
 

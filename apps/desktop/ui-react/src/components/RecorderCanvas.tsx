@@ -1,6 +1,6 @@
 /**
  * @file RecorderCanvas.tsx
- * @description Interactive Recorder Canvas Component for foOm Screen Recorder.
+ * @description Interactive Recorder Canvas Component for foOom Screen Recorder.
  * Captures user pointer, click, scroll, and keystroke telemetry and feeds them into the IntentBus.
  */
 

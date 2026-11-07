@@ -1,3 +1,5 @@
+import { loadSoundtrack, type Soundtrack } from "@/lib/soundtrack";
+import type { PaddingEdges } from "@/lib/canvasPadding";
 import type {
 	AnnotationRegion,
 	CropRegion,
@@ -22,6 +24,7 @@ const ENCODER_FLUSH_TIMEOUT_MS = 20_000;
 
 export interface VideoExporterConfig extends ExportConfig {
 	videoUrl: string;
+	soundtrack?: Soundtrack;
 	webcamVideoUrl?: string;
 	wallpaper: string;
 	zoomRegions: ZoomRegion[];
@@ -33,6 +36,7 @@ export interface VideoExporterConfig extends ExportConfig {
 	motionBlurAmount?: number;
 	borderRadius?: number;
 	padding?: number;
+	paddingEdges?: PaddingEdges;
 	videoPadding?: number;
 	cropRegion: CropRegion;
 	webcamLayoutPreset?: WebcamLayoutPreset;
@@ -91,22 +95,29 @@ function isDefaultCrop(cropRegion: CropRegion) {
 
 export function isSourceCopyFastPathEligible(
 	config: VideoExporterConfig,
-	videoInfo: { width: number; height: number },
+	videoInfo: { width: number; height: number; frameRate?: number },
 ) {
 	return getSourceCopyFastPathBlockers(config, videoInfo).length === 0;
 }
 
 export function getSourceCopyFastPathBlockers(
 	config: VideoExporterConfig,
-	videoInfo: { width: number; height: number },
+	videoInfo: { width: number; height: number; frameRate?: number },
 ) {
 	const blockers: string[] = [];
+	if (
+		videoInfo.frameRate !== undefined &&
+		Math.abs(config.frameRate - videoInfo.frameRate) > 0.01
+	) {
+		blockers.push("output frame rate differs from source");
+	}
 
 	if (config.width !== videoInfo.width || config.height !== videoInfo.height) {
 		blockers.push(
 			`output-size ${config.width}x${config.height} differs from source ${videoInfo.width}x${videoInfo.height}`,
 		);
 	}
+	if (config.soundtrack) blockers.push("imported audio is present");
 	if (config.webcamVideoUrl) blockers.push("webcam overlay is enabled");
 	if (hasActiveTimeRegions(config.trimRegions)) blockers.push("trim regions are present");
 	if (hasActiveSpeedRegions(config.speedRegions)) blockers.push("speed regions are present");
@@ -115,7 +126,7 @@ export function getSourceCopyFastPathBlockers(
 		blockers.push("annotation regions are present");
 	if (hasNativeCursorOverlay(config)) blockers.push("editable cursor overlay is enabled");
 	if (!isDefaultCrop(config.cropRegion)) blockers.push("crop is not default");
-	if ((config.padding ?? 0) > SOURCE_COPY_EPSILON) blockers.push("padding is not zero");
+	if ((config.padding ?? 0) > SOURCE_COPY_EPSILON || Object.values(config.paddingEdges ?? {}).some(v => v > SOURCE_COPY_EPSILON)) blockers.push("padding is not zero");
 	if ((config.videoPadding ?? 0) > SOURCE_COPY_EPSILON) blockers.push("video padding is not zero");
 	if ((config.borderRadius ?? 0) > SOURCE_COPY_EPSILON) blockers.push("roundness is not zero");
 	if (config.showShadow || config.shadowIntensity > SOURCE_COPY_EPSILON) {
@@ -243,6 +254,7 @@ export class VideoExporter {
 				motionBlurAmount: this.config.motionBlurAmount,
 				borderRadius: this.config.borderRadius,
 				padding: this.config.padding,
+				paddingEdges: this.config.paddingEdges,
 				cropRegion: this.config.cropRegion,
 				cursorRecordingData: this.config.cursorRecordingData,
 				cursorScale: this.config.cursorScale,
@@ -274,12 +286,15 @@ export class VideoExporter {
 			await this.initializeEncoder(encoderPreference);
 
 			const sourceDemuxer = streamingDecoder.getDemuxer();
-			const audioExportCodec =
-				videoInfo.hasAudio && sourceDemuxer
+			const audioExportCodec = this.config.soundtrack
+				? await AudioProcessor.selectSupportedExportCodec(48000, 2)
+				: videoInfo.hasAudio && sourceDemuxer
 					? await AudioProcessor.selectSupportedExportCodecForSource(sourceDemuxer)
 					: null;
+			if (this.config.soundtrack && !audioExportCodec) throw new Error("This device cannot encode the imported audio for MP4.");
 			if (videoInfo.hasAudio && !audioExportCodec) {
 				console.warn("[VideoExporter] No supported audio export codec, exporting video-only.");
+				onWarning("Audio could not be encoded on this device. The exported video has no audio.");
 			}
 
 			const hasAudio = Boolean(audioExportCodec);
@@ -458,6 +473,9 @@ export class VideoExporter {
 			}
 
 			await Promise.all(this.muxingPromises);
+			if (this.fatalEncoderError) {
+				throw this.fatalEncoderError;
+			}
 
 			this.reportProgress({
 				currentFrame: totalFrames,
@@ -472,19 +490,31 @@ export class VideoExporter {
 				if (demuxer) {
 					console.log("[VideoExporter] Processing audio track...");
 					this.audioProcessor = new AudioProcessor();
-					await this.audioProcessor.process(
-						demuxer,
-						muxer,
-						this.config.videoUrl,
-						this.config.trimRegions,
-						this.config.speedRegions,
-						videoInfo.duration,
-						audioExportCodec,
-					);
+					let musicUrl: string | undefined;
+					let sourceUrl: string | undefined;
+					try {
+						const soundtrack = this.config.soundtrack;
+						if (soundtrack || this.config.speedRegions?.length) {
+							const blob = await this.loadSourceBlob();
+							if (!blob) throw new Error("Could not read recording while rendering audio.");
+							sourceUrl = URL.createObjectURL(blob);
+						}
+						if (soundtrack) musicUrl = await loadSoundtrack(soundtrack);
+						await this.audioProcessor.process(
+							demuxer, muxer, sourceUrl ?? this.config.videoUrl, this.config.trimRegions,
+							this.config.speedRegions, videoInfo.duration, audioExportCodec,
+							musicUrl && soundtrack ? { url: musicUrl, volume: soundtrack.volume } : undefined,
+						);
+					} finally {
+						if (musicUrl) URL.revokeObjectURL(musicUrl);
+						if (sourceUrl) URL.revokeObjectURL(sourceUrl);
+					}
 				}
 			}
 
+			if (this.cancelled) return { success: false, error: "Export cancelled" };
 			const blob = await muxer.finalize();
+			if (this.cancelled) return { success: false, error: "Export cancelled" };
 			return { success: true, blob, warnings: warnings.length > 0 ? warnings : undefined };
 		} finally {
 			stopWebcamDecode = true;
@@ -551,6 +581,9 @@ export class VideoExporter {
 						}
 					} catch (error) {
 						console.error("Muxing error:", error);
+						this.fatalEncoderError = error instanceof Error ? error : new Error(`Video muxing failed: ${String(error)}`);
+						this.streamingDecoder?.cancel();
+						this.webcamDecoder?.cancel();
 					}
 				})();
 
@@ -657,13 +690,14 @@ export class VideoExporter {
 	}
 
 	private getEncoderPreferences(): HardwareAcceleration[] {
-		if (typeof navigator !== "undefined" && /\bWindows\b/i.test(navigator.userAgent)) {
-			return ["prefer-software", "prefer-hardware"];
-		}
 		return ["prefer-hardware", "prefer-software"];
 	}
 
-	private async trySourceCopyFastPath(videoInfo: { width: number; height: number }) {
+	private async trySourceCopyFastPath(videoInfo: {
+		width: number;
+		height: number;
+		frameRate?: number;
+	}) {
 		const blockers = getSourceCopyFastPathBlockers(this.config, videoInfo);
 		if (blockers.length > 0) {
 			console.info("[VideoExporter] source-copy fast path disabled", {

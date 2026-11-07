@@ -1,4 +1,4 @@
-# ZoOmly Design System
+# foOom Design System
 
 ## Visual Theme
 

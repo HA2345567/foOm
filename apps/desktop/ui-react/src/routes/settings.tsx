@@ -11,6 +11,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { useState, useEffect, useCallback } from "react";
 import { toast } from "sonner";
+import "./settings.css";
 import {
   Keyboard,
   Volume2,
@@ -28,6 +29,7 @@ import {
   DEFAULT_SHORTCUTS,
   FIXED_SHORTCUTS,
   findConflict,
+  findGlobalRecordingShortcutConflict,
   formatBinding,
   SHORTCUT_ACTIONS,
   SHORTCUT_LABELS,
@@ -56,6 +58,7 @@ function SettingsRoute() {
   const [defaultSystemAudio, setDefaultSystemAudio] = useState(false);
   const [defaultWebcam, setDefaultWebcam] = useState(false);
   const [defaultCursorMode, setDefaultCursorMode] = useState("editable-overlay");
+  const [saveError, setSaveError] = useState<string | null>(null);
 
   useEffect(() => {
     // Load General settings from localStorage
@@ -68,22 +71,38 @@ function SettingsRoute() {
       );
     } catch (e) {
       console.error("Failed to load general settings", e);
+      setSaveError("Saved preferences could not be loaded. Your recording defaults are shown below.");
     }
   }, []);
 
   const saveGeneralSetting = (key: string, value: string | boolean) => {
     try {
       localStorage.setItem(key, String(value));
+      setSaveError(null);
       toast.success("Setting updated");
+      return true;
     } catch (e) {
+      setSaveError("This setting could not be saved. Try again before starting a recording.");
       toast.error("Failed to save setting");
+      return false;
     }
   };
 
   // --- Shortcuts State (Using ShortcutsContext) ---
-  const { shortcuts, isMac, setShortcuts, persistShortcuts } = useShortcuts();
+  const {
+    shortcuts,
+    globalRecordingShortcut,
+    isMac,
+    setShortcuts,
+    persistShortcuts,
+    persistGlobalRecordingShortcut,
+  } = useShortcuts();
   const [draftShortcuts, setDraftShortcuts] = useState<ShortcutsConfig>(shortcuts);
+  const [draftGlobalRecordingShortcut, setDraftGlobalRecordingShortcut] =
+    useState<ShortcutBinding>(globalRecordingShortcut);
   const [captureFor, setCaptureFor] = useState<ShortcutAction | null>(null);
+  const [isCapturingGlobalShortcut, setIsCapturingGlobalShortcut] = useState(false);
+  const [supportsGlobalRecordingShortcut, setSupportsGlobalRecordingShortcut] = useState(false);
   const [conflict, setConflict] = useState<{
     forAction: ShortcutAction;
     pending: ShortcutBinding;
@@ -92,10 +111,37 @@ function SettingsRoute() {
       | { type: "fixed"; label: string };
   } | null>(null);
 
+  useEffect(() => {
+    if (activeTab !== "shortcuts") {
+      setCaptureFor(null);
+      setIsCapturingGlobalShortcut(false);
+      setConflict(null);
+    }
+  }, [activeTab]);
+
   // Keep draft in sync with shortcuts when loaded
   useEffect(() => {
     setDraftShortcuts(shortcuts);
   }, [shortcuts]);
+
+  useEffect(() => {
+    setDraftGlobalRecordingShortcut(globalRecordingShortcut);
+  }, [globalRecordingShortcut]);
+
+  useEffect(() => {
+    let cancelled = false;
+    void window.foomNative
+      ?.getPlatform()
+      .then((platform) => {
+        if (!cancelled) setSupportsGlobalRecordingShortcut(platform === "win32");
+      })
+      .catch(() => {
+        if (!cancelled) setSupportsGlobalRecordingShortcut(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   // Listen for keydown when capturing shortcuts
   useEffect(() => {
@@ -140,6 +186,46 @@ function SettingsRoute() {
     return () => window.removeEventListener("keydown", handleCapture, { capture: true });
   }, [captureFor, draftShortcuts]);
 
+  useEffect(() => {
+    if (!isCapturingGlobalShortcut) return;
+
+    const handleCapture = (e: KeyboardEvent) => {
+      e.preventDefault();
+      e.stopPropagation();
+      if (e.key === "Escape") {
+        setIsCapturingGlobalShortcut(false);
+        return;
+      }
+      if (MODIFIER_KEYS.has(e.key)) return;
+
+      const binding: ShortcutBinding = {
+        key: e.key.toLowerCase(),
+        ...(e.ctrlKey || (isMac && e.metaKey) ? { ctrl: true } : {}),
+        ...(e.shiftKey ? { shift: true } : {}),
+        ...(e.altKey ? { alt: true } : {}),
+      };
+      setIsCapturingGlobalShortcut(false);
+
+      if (!binding.ctrl && !binding.shift && !binding.alt) {
+        toast.error("Use at least one modifier (Ctrl, Shift, or Alt) for a global shortcut.");
+        return;
+      }
+      const conflict = findGlobalRecordingShortcutConflict(binding, draftShortcuts);
+      if (conflict?.type === "fixed") {
+        toast.error(`Reserved shortcut: conflicts with '${conflict.label}'`);
+        return;
+      }
+      if (conflict?.type === "configurable") {
+        toast.error(`This combination is already assigned to '${SHORTCUT_LABELS[conflict.action]}'.`);
+        return;
+      }
+      setDraftGlobalRecordingShortcut(binding);
+    };
+
+    window.addEventListener("keydown", handleCapture, { capture: true });
+    return () => window.removeEventListener("keydown", handleCapture, { capture: true });
+  }, [isCapturingGlobalShortcut, isMac, draftShortcuts]);
+
   const handleSwap = useCallback(() => {
     if (!conflict || conflict.conflictWith.type !== "configurable") return;
     const { forAction, pending, conflictWith } = conflict;
@@ -153,13 +239,39 @@ function SettingsRoute() {
   }, [conflict]);
 
   const handleSaveShortcuts = useCallback(async () => {
-    setShortcuts(draftShortcuts);
-    await persistShortcuts(draftShortcuts);
-    toast.success("Shortcuts saved successfully");
-  }, [draftShortcuts, setShortcuts, persistShortcuts]);
+    try {
+      if (supportsGlobalRecordingShortcut) {
+        const conflict = findGlobalRecordingShortcutConflict(
+          draftGlobalRecordingShortcut,
+          draftShortcuts,
+        );
+        if (conflict) {
+          const message = conflict.type === "fixed"
+            ? `Reserved shortcut: conflicts with '${conflict.label}'`
+            : `This combination is already assigned to '${SHORTCUT_LABELS[conflict.action]}'.`;
+          toast.error(message);
+          return;
+        }
+        await persistGlobalRecordingShortcut(draftGlobalRecordingShortcut);
+      }
+      await persistShortcuts(draftShortcuts);
+      setShortcuts(draftShortcuts);
+      toast.success("Shortcuts saved successfully");
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Failed to register shortcuts.");
+    }
+  }, [
+    draftGlobalRecordingShortcut,
+    draftShortcuts,
+    persistGlobalRecordingShortcut,
+    persistShortcuts,
+    setShortcuts,
+    supportsGlobalRecordingShortcut,
+  ]);
 
   const handleResetShortcuts = useCallback(() => {
     setDraftShortcuts({ ...DEFAULT_SHORTCUTS });
+    setDraftGlobalRecordingShortcut({ key: "r", ctrl: true, shift: true });
     toast.info("Shortcuts reset to defaults");
   }, []);
 
@@ -178,27 +290,33 @@ function SettingsRoute() {
     }
   };
 
+  const hasShortcutChanges = JSON.stringify(draftShortcuts) !== JSON.stringify(shortcuts) ||
+    JSON.stringify(draftGlobalRecordingShortcut) !== JSON.stringify(globalRecordingShortcut);
+
   return (
-    <div className="flex h-screen w-screen overflow-hidden bg-[#09090b] text-[#f5f5f7] font-sans">
+    <div className="settings-studio">
       {/* Left Sidebar */}
-      <div className="w-64 border-r border-white/5 bg-[#0e0e11] flex flex-col justify-between">
+      <aside className="settings-sidebar">
         <div>
           {/* Header */}
-          <div className="p-6 flex items-center gap-3 border-b border-white/5">
+          <div className="settings-brand">
             <button
               onClick={navigateBack}
               className="p-1.5 rounded-lg bg-white/5 hover:bg-white/10 text-white/80 transition-colors"
               title="Back to Editor"
+              aria-label="Back to workspace"
             >
               <ChevronLeft size={16} />
             </button>
-            <span className="font-semibold text-base tracking-tight font-brand">Settings</span>
+            <div><span className="settings-wordmark">foOom<span>●</span></span><p className="settings-brand-caption">Your recording studio</p></div>
           </div>
 
           {/* Navigation tabs */}
-          <nav className="p-4 space-y-1">
+          <nav className="settings-navigation" aria-label="Settings sections">
+            <p className="settings-nav-label">PREFERENCES</p>
             <button
               onClick={() => setActiveTab("general")}
+              aria-current={activeTab === "general" ? "page" : undefined}
               className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all ${
                 activeTab === "general"
                   ? "bg-white/10 text-white shadow-sm"
@@ -210,6 +328,7 @@ function SettingsRoute() {
             </button>
             <button
               onClick={() => setActiveTab("shortcuts")}
+              aria-current={activeTab === "shortcuts" ? "page" : undefined}
               className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all ${
                 activeTab === "shortcuts"
                   ? "bg-white/10 text-white shadow-sm"
@@ -221,6 +340,7 @@ function SettingsRoute() {
             </button>
             <button
               onClick={() => setActiveTab("about")}
+              aria-current={activeTab === "about" ? "page" : undefined}
               className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all ${
                 activeTab === "about"
                   ? "bg-white/10 text-white shadow-sm"
@@ -234,22 +354,25 @@ function SettingsRoute() {
         </div>
 
         {/* Version footer */}
-        <div className="p-6 border-t border-white/5 text-[11px] text-zinc-500">
-          foOm Studio v0.2.0 (Beta)
+        <div className="settings-sidebar-footer">
+          <span className="settings-status-dot" /> Local by default
+          <p>foOom · v0.2.0 beta</p>
         </div>
-      </div>
+      </aside>
 
       {/* Main Settings Panel */}
-      <div className="flex-1 flex flex-col bg-[#08080a] overflow-y-auto">
-        <div className="max-w-3xl w-full mx-auto p-10 space-y-8">
+      <main className="settings-main">
+        <header className="settings-topbar"><span>Workspace <span className="settings-crumb-separator">/</span> Settings</span><span className="settings-local-badge"><span className="settings-status-dot" /> {activeTab === "shortcuts" && hasShortcutChanges ? "Unsaved shortcut changes" : "On this device"}</span></header>
+        <div className="settings-content space-y-8">
+          {saveError && <div role="alert" className="settings-error">{saveError}</div>}
           {activeTab === "general" && (
             <div className="space-y-6">
               <div>
                 <h2 className="text-xl font-bold tracking-tight text-white mb-1">
-                  General Preferences
+                  A studio that feels like you.
                 </h2>
                 <p className="text-xs text-zinc-400">
-                  Configure default hardware and recording session options.
+                  Set up your recording defaults once. Stay in your flow every time.
                 </p>
               </div>
 
@@ -267,10 +390,10 @@ function SettingsRoute() {
                     </p>
                   </div>
                   <Switch
+                    aria-label="Enable microphone by default"
                     checked={defaultMic}
                     onCheckedChange={(checked) => {
-                      setDefaultMic(checked);
-                      saveGeneralSetting("foom-setting-default-mic", checked);
+                      if (saveGeneralSetting("foom-setting-default-mic", checked)) setDefaultMic(checked);
                     }}
                   />
                 </div>
@@ -288,10 +411,10 @@ function SettingsRoute() {
                     </p>
                   </div>
                   <Switch
+                    aria-label="Enable webcam by default"
                     checked={defaultWebcam}
                     onCheckedChange={(checked) => {
-                      setDefaultWebcam(checked);
-                      saveGeneralSetting("foom-setting-default-webcam", checked);
+                      if (saveGeneralSetting("foom-setting-default-webcam", checked)) setDefaultWebcam(checked);
                     }}
                   />
                 </div>
@@ -308,10 +431,10 @@ function SettingsRoute() {
                     </p>
                   </div>
                   <Switch
+                    aria-label="Capture system audio by default"
                     checked={defaultSystemAudio}
                     onCheckedChange={(checked) => {
-                      setDefaultSystemAudio(checked);
-                      saveGeneralSetting("foom-setting-default-system-audio", checked);
+                      if (saveGeneralSetting("foom-setting-default-system-audio", checked)) setDefaultSystemAudio(checked);
                     }}
                   />
                 </div>
@@ -331,14 +454,13 @@ function SettingsRoute() {
                   <Select
                     value={defaultCursorMode}
                     onValueChange={(val) => {
-                      setDefaultCursorMode(val);
-                      saveGeneralSetting("foom-setting-default-cursor-mode", val);
+                      if (saveGeneralSetting("foom-setting-default-cursor-mode", val)) setDefaultCursorMode(val);
                     }}
                   >
-                    <SelectTrigger className="w-56 bg-zinc-900 border-zinc-800 text-zinc-100 text-xs">
+                    <SelectTrigger aria-label="Default cursor mode" className="w-56 bg-zinc-900 border-zinc-800 text-zinc-100 text-xs">
                       <SelectValue placeholder="Select Cursor Mode" />
                     </SelectTrigger>
-                    <SelectContent className="bg-zinc-900 border-zinc-800 text-zinc-100 text-xs">
+                    <SelectContent className="settings-select-content bg-zinc-900 border-zinc-800 text-zinc-100 text-xs">
                       <SelectItem value="editable-overlay">Editable Smart Overlay</SelectItem>
                       <SelectItem value="system">System (Standard Capture)</SelectItem>
                     </SelectContent>
@@ -378,15 +500,16 @@ function SettingsRoute() {
                               type="button"
                               onClick={() => {
                                 setConflict(null);
+                                setIsCapturingGlobalShortcut(false);
                                 setCaptureFor(isCapturing ? null : action);
                               }}
                               className={[
                                 "px-3 py-1.5 rounded-lg text-xs font-mono border transition-all min-w-[110px] text-center select-none cursor-pointer",
                                 isCapturing
-                                  ? "bg-[#34B27B]/20 border-[#34B27B] text-[#34B27B] animate-pulse"
+                                  ? "bg-white/15 border-white/50 text-white animate-pulse"
                                   : hasConflict
                                     ? "bg-amber-500/10 border-amber-500/50 text-amber-400"
-                                    : "bg-white/5 border-white/10 text-zinc-200 hover:border-[#34B27B]/50 hover:text-[#34B27B]",
+                                    : "bg-white/5 border-white/10 text-zinc-200 hover:border-white/40 hover:text-white",
                               ].join(" ")}
                             >
                               {isCapturing
@@ -427,6 +550,46 @@ function SettingsRoute() {
                       );
                     })}
                   </div>
+                </div>
+
+                <div className="pt-4 border-t border-white/5 space-y-3">
+                  <div>
+                    <h3 className="text-xs font-semibold text-zinc-500 uppercase tracking-wider mb-1">
+                      Global Recording Shortcut
+                    </h3>
+                    <p className="text-xs text-zinc-400">
+                      Toggle recording from any app with a registered Windows shortcut. The
+                      shortcut only detects this exact combination; it does not record other
+                      keystrokes.
+                    </p>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm text-zinc-300">Start / Stop Recording</span>
+                    <button
+                      type="button"
+                      disabled={!supportsGlobalRecordingShortcut}
+                      onClick={() => { setCaptureFor(null); setIsCapturingGlobalShortcut((capturing) => !capturing); }}
+                      className={[
+                        "px-3 py-1.5 rounded-lg text-xs font-mono border transition-all min-w-[110px] text-center select-none",
+                        !supportsGlobalRecordingShortcut
+                          ? "bg-white/5 border-white/5 text-zinc-600 cursor-not-allowed"
+                          : isCapturingGlobalShortcut
+                            ? "bg-white/15 border-white/50 text-white animate-pulse cursor-pointer"
+                            : "bg-white/5 border-white/10 text-zinc-200 hover:border-white/40 hover:text-white cursor-pointer",
+                      ].join(" ")}
+                    >
+                      {!supportsGlobalRecordingShortcut
+                        ? "Windows only"
+                        : isCapturingGlobalShortcut
+                          ? "Press keys..."
+                          : formatBinding(draftGlobalRecordingShortcut, isMac)}
+                    </button>
+                  </div>
+                  {!supportsGlobalRecordingShortcut && (
+                    <p className="text-xs text-amber-400">
+                      Global recording shortcuts are not implemented on macOS/Linux yet.
+                    </p>
+                  )}
                 </div>
 
                 {/* Fixed shortcuts list */}
@@ -477,7 +640,7 @@ function SettingsRoute() {
             <div className="space-y-6">
               <div>
                 <h2 className="text-xl font-bold tracking-tight text-white mb-1">
-                  About foOm Studio
+                  Made for your next great demo.
                 </h2>
                 <p className="text-xs text-zinc-400">
                   Application build and local installation details.
@@ -485,15 +648,16 @@ function SettingsRoute() {
               </div>
 
               <div className="bg-[#101015]/60 border border-white/5 rounded-2xl p-8 space-y-6 text-center flex flex-col items-center">
-                <div className="w-16 h-16 rounded-2xl bg-white/5 border border-white/10 flex items-center justify-center mb-2">
-                  <span className="font-brand text-3xl font-black bg-gradient-to-r from-emerald-400 to-teal-500 bg-clip-text text-transparent">
-                    fO
-                  </span>
-                </div>
+                <img
+                  src="/app-icon.png"
+                  alt=""
+                  aria-hidden="true"
+                  className="w-16 h-16 rounded-2xl mb-2 shadow-lg"
+                />
 
                 <div className="space-y-1">
-                  <h3 className="text-lg font-bold text-white">foOm Cinematic Studio</h3>
-                  <p className="text-xs text-zinc-500">v0.2.0-beta.windows-x64</p>
+                  <h3 className="text-lg font-bold text-white">foOom Studio</h3>
+                  <p className="text-xs text-zinc-500">Version 0.2.0 · Desktop beta</p>
                 </div>
 
                 <div className="bg-white/[0.03] border border-white/5 rounded-xl px-6 py-4 max-w-sm w-full text-center">
@@ -508,14 +672,14 @@ function SettingsRoute() {
                 </div>
 
                 <p className="text-xs text-zinc-500 max-w-md">
-                  Copyright 2026 Harsh Bhardwaj. All rights reserved. foOm automatically applies
+                  Copyright 2026 Harsh Bhardwaj. Licensed under the MIT License. foOom automatically applies
                   smart zoom, focus, and cinematic overlays to screen recordings.
                 </p>
               </div>
             </div>
           )}
         </div>
-      </div>
+      </main>
     </div>
   );
 }

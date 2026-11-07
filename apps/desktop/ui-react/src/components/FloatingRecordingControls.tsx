@@ -1,6 +1,6 @@
 /**
  * @file FloatingRecordingControls.tsx
- * @description Screen Studio-Style Floating Glass Recording Toolbar for foOm Screen Recorder.
+ * @description Screen Studio-Style Floating Glass Recording Toolbar for foOom Screen Recorder.
  *
  * Performance Contract:
  * - Glass morphism uses backdrop-filter blur capped at max 40px (backdrop-blur-2xl).
@@ -230,7 +230,7 @@ export const FloatingRecordingControls: React.FC<FloatingRecordingControlsProps>
             <button
               onClick={onToggleWebcam}
               className={`p-2 rounded-xl transition-all relative ${
-                webcamEnabled ? "bg-emerald-500/20 text-emerald-300 border border-emerald-500/30" : "text-neutral-400 hover:text-white"
+                webcamEnabled ? "bg-white/15 text-white border border-white/25" : "text-neutral-400 hover:text-white"
               }`}
               title="Toggle Webcam Overlay"
             >
@@ -283,7 +283,7 @@ export const FloatingRecordingControls: React.FC<FloatingRecordingControlsProps>
             <div className="flex items-center gap-2">
               <button
                 onClick={onResume}
-                className="p-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white transition-all"
+                className="p-2.5 rounded-xl bg-white/90 hover:bg-white text-[#0a0a0b] transition-all"
                 title="Resume (Space)"
               >
                 <Play className="w-4 h-4 fill-white" />

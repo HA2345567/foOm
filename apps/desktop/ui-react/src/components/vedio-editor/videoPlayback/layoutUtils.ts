@@ -1,6 +1,6 @@
+import { layoutWithPadding, type PaddingEdges } from "@/lib/canvasPadding";
 import { Application, Graphics, Sprite } from "pixi.js";
 import {
-	computeCompositeLayout,
 	type RenderRect,
 	type Size,
 	type StyledRenderRect,
@@ -19,6 +19,7 @@ interface LayoutParams {
 	lockedVideoDimensions?: { width: number; height: number } | null;
 	borderRadius?: number;
 	padding?: number;
+	paddingEdges?: PaddingEdges;
 	webcamDimensions?: Size | null;
 	webcamLayoutPreset?: WebcamLayoutPreset;
 	webcamSizePreset?: WebcamSizePreset;
@@ -83,23 +84,15 @@ export function layoutVideoContent(params: LayoutParams): LayoutResult | null {
 	const cropEndX = cropStartX + croppedVideoWidth;
 	const cropEndY = cropStartY + croppedVideoHeight;
 
-	// Padding is a percent (0-100); 50 matches the original VIEWPORT_SCALE of 0.8.
-	// Vertical stack is full-bleed, so it ignores padding.
-	const effectivePadding = webcamLayoutPreset === "vertical-stack" ? 0 : padding;
-	const paddingScale = 1.0 - (effectivePadding / 100) * 0.4;
-	const maxDisplayWidth = width * paddingScale;
-	const maxDisplayHeight = height * paddingScale;
-
-	const compositeLayout = computeCompositeLayout({
+	const compositeLayout = layoutWithPadding({
 		canvasSize: { width, height },
-		maxContentSize: { width: maxDisplayWidth, height: maxDisplayHeight },
 		screenSize: { width: croppedVideoWidth, height: croppedVideoHeight },
 		webcamSize: webcamDimensions,
 		layoutPreset: webcamLayoutPreset,
 		webcamSizePreset,
 		webcamPosition,
 		webcamMaskShape,
-	});
+	}, padding, params.paddingEdges);
 
 	if (!compositeLayout) {
 		return null;

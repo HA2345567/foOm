@@ -1,6 +1,6 @@
 /**
  * @file email-system.ts
- * @description Email notification pipeline for foOm waitlist & launch announcements.
+ * @description Email notification pipeline for foOom waitlist & launch announcements.
  *
  * NOTE: Provides Nodemailer template helpers with rate-limit protections.
  */
@@ -26,8 +26,8 @@ export function generateWaitlistHtml(name: string, position: number): string {
 </head>
 <body>
   <div class="card">
-    <div class="logo">foOm</div>
-    <h2>🚀 You're on the foOm waitlist, ${name}!</h2>
+    <div class="logo">foOom</div>
+    <h2>🚀 You're on the foOom waitlist, ${name}!</h2>
     <p>We turn raw screen recordings into cinematic demos automatically with smart spring autozoom.</p>
     <div class="badge">Waitlist Spot #${position}</div>
     <p>Features included in your early access pass:</p>
@@ -58,10 +58,10 @@ export function generateLaunchHtml(name: string): string {
 </head>
 <body>
   <div class="card">
-    <div class="hero-banner">🔥 foOm IS OFFICIALLY LIVE</div>
+    <div class="hero-banner">🔥 foOom IS OFFICIALLY LIVE</div>
     <h2>You're first in, ${name}!</h2>
-    <p>Download foOm for Windows or Mac now and record your first cinematic demo in seconds.</p>
-    <a href="https://foom.app/download" class="btn">Download foOm Desktop App</a>
+    <p>Download foOom for Windows or Mac now and record your first cinematic demo in seconds.</p>
+    <a href="https://foom.app/download" class="btn">Download foOom Desktop App</a>
   </div>
 </body>
 </html>
@@ -82,7 +82,7 @@ export async function blastLaunchAnnouncement(
   for (const user of recipients) {
     try {
       const html = generateLaunchHtml(user.name);
-      await sendFn(user.email, `🔥 foOm is LIVE — you're first in, ${user.name}`, html);
+      await sendFn(user.email, `🔥 foOom is LIVE — you're first in, ${user.name}`, html);
       sent++;
     } catch {
       failed++;

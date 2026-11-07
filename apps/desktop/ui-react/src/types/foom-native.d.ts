@@ -4,9 +4,14 @@ type ProcessedDesktopSource = {
   thumbnail?: string | null;
   display_id?: string;
   appIcon?: string | null;
+  type?: "display" | "window" | "region";
+  bounds?: { x: number; y: number; width: number; height: number };
+  region?: { x: number; y: number; width: number; height: number };
 };
 
 interface Window {
+  __FOOM_LAST_RESULT?: import("../hooks/useScreenRecording").RecordingResult;
+  webkitAudioContext?: typeof AudioContext;
   /**
    * Tauri-backed native bridge installed by tauriCompat.ts.
    * The bridge is a dynamic object assembled at runtime, so the actual

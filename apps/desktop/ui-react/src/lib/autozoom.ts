@@ -1,6 +1,6 @@
 /**
  * @file autozoom.ts
- * @description Unified Smart Autozoom Engine for foOm Screen Recorder.
+ * @description Unified Smart Autozoom Engine for foOom Screen Recorder.
  * Provides spring-physics autozoom in live recording mode and post-recording processing.
  *
  * NOTE: Autozoom uses spring physics and click/scroll/pause tracking.
@@ -34,7 +34,18 @@ export interface ZoomState {
   mode: "overview" | "zoomed";
   priority: number; // Current active trigger priority
   lastChangeTime: number;
+  holdUntil?: number;
 }
+
+const INTENT_HOLD_MS: Record<IntentSignal["type"], number> = {
+  click: 1_800,
+  pointer: 0,
+  type_burst: 1_200,
+  scroll_out: 0,
+  pause: 1_600,
+  hint: 1_200,
+  manual: Number.POSITIVE_INFINITY,
+};
 
 export interface IntentSignal {
   type: "click" | "pointer" | "type_burst" | "scroll_out" | "pause" | "hint" | "manual";
@@ -86,7 +97,7 @@ export function createInitialZoomState(): ZoomState {
     vScale: 0,
     mode: "overview",
     priority: 0,
-    lastChangeTime: 0,
+    lastChangeTime: -1,
   };
 }
 
@@ -104,18 +115,72 @@ export function fuseIntent(
   state: ZoomState,
   now: number,
   enabled: boolean = true
-): { targetX: number; targetY: number; targetScale: number; priority: number } {
+): { targetX: number; targetY: number; targetScale: number; priority: number; timestamp?: number; holdUntil?: number } {
   if (!enabled || signals.length === 0) {
+    if (enabled && state.priority > 0 && (state.holdUntil ?? 0) > now) {
+      return {
+        targetX: state.targetX,
+        targetY: state.targetY,
+        targetScale: state.targetScale,
+        priority: state.priority,
+      };
+    }
     return { targetX: 0.5, targetY: 0.5, targetScale: 1.0, priority: 0 };
   }
 
-  // Sort by highest priority, then recency
-  const sorted = [...signals].sort((a, b) => {
-    if (b.priority !== a.priority) return b.priority - a.priority;
-    return b.timestamp - a.timestamp;
-  });
+  const ordered = signals
+    .filter(
+      (signal) =>
+        Number.isFinite(signal.timestamp) &&
+        signal.timestamp <= now &&
+        signal.type !== "pointer" &&
+        (signal.type !== "type_burst" || (signal.x !== undefined && signal.y !== undefined)),
+    )
+    .sort((a, b) => {
+      if (b.priority !== a.priority) return b.priority - a.priority;
+      return b.timestamp - a.timestamp;
+    });
+  const newestSignal = ordered.reduce<IntentSignal | undefined>(
+    (newest, signal) => (!newest || signal.timestamp > newest.timestamp ? signal : newest),
+    undefined,
+  );
 
+  // A fresh zoom-out gesture must cancel a latched click/type zoom even when
+  // the old zoom signal has a numerically higher priority.
+  if (
+    newestSignal?.type === "scroll_out" &&
+    newestSignal.timestamp > state.lastChangeTime
+  ) {
+    return {
+      targetX: 0.5,
+      targetY: 0.5,
+      targetScale: 1.0,
+      priority: 0,
+      timestamp: newestSignal.timestamp,
+      holdUntil: newestSignal.timestamp,
+    };
+  }
+
+  // Use the strongest signal received since the previous intent. Older bus
+  // entries are kept only to bridge frame timing; they must not re-trigger.
+  const sorted = ordered.filter((signal) => signal.timestamp > state.lastChangeTime);
   const top = sorted[0];
+  if (!top) {
+    if (state.priority > 0 && (state.holdUntil ?? 0) > now) {
+      return {
+        targetX: state.targetX,
+        targetY: state.targetY,
+        targetScale: state.targetScale,
+        priority: state.priority,
+      };
+    }
+    return { targetX: 0.5, targetY: 0.5, targetScale: 1.0, priority: 0 };
+  }
+
+  const signalMeta = {
+    timestamp: top.timestamp,
+    holdUntil: top.timestamp + INTENT_HOLD_MS[top.type],
+  };
 
   // If a manual or high priority signal came in
   if (top.priority >= 100) {
@@ -124,6 +189,7 @@ export function fuseIntent(
       targetY: top.y ?? 0.5,
       targetScale: top.scale ?? 1.8,
       priority: top.priority,
+      ...signalMeta,
     };
   }
 
@@ -134,6 +200,7 @@ export function fuseIntent(
       targetY: top.y,
       targetScale: top.scale ?? 1.85,
       priority: 10,
+      ...signalMeta,
     };
   }
 
@@ -144,6 +211,7 @@ export function fuseIntent(
       targetY: 0.5,
       targetScale: 1.0,
       priority: 7,
+      ...signalMeta,
     };
   }
 
@@ -154,6 +222,7 @@ export function fuseIntent(
       targetY: top.y,
       targetScale: top.scale ?? 1.5,
       priority: 8,
+      ...signalMeta,
     };
   }
 
@@ -164,6 +233,7 @@ export function fuseIntent(
       targetY: top.y,
       targetScale: top.scale ?? 1.4,
       priority: 5,
+      ...signalMeta,
     };
   }
 
@@ -176,12 +246,19 @@ export function fuseIntent(
         targetY: top.y,
         targetScale: 1.4,
         priority: 1,
+        ...signalMeta,
       };
     }
   }
 
   // Default overview state
-  return { targetX: 0.5, targetY: 0.5, targetScale: 1.0, priority: 0 };
+  return {
+    targetX: 0.5,
+    targetY: 0.5,
+    targetScale: 1.0,
+    priority: 0,
+    ...signalMeta,
+  };
 }
 
 /**
@@ -226,6 +303,11 @@ export function tickEngine(
   state.targetX = fused.targetX;
   state.targetY = fused.targetY;
   state.targetScale = fused.targetScale;
+  state.priority = fused.priority;
+  if (fused.timestamp !== undefined) {
+    state.lastChangeTime = fused.timestamp;
+    state.holdUntil = fused.holdUntil ?? fused.timestamp;
+  }
 
   // Step spring integration
   const [nx, nvx] = stepSpring(state.currentX, state.vx, state.targetX, preset.k, dt);
@@ -293,9 +375,9 @@ export function renderFrame(
   const destY = padding;
 
   // Source cropping bounds based on current zoom
-  const srcAny = source as any;
-  const sourceW = Number(srcAny.width || srcAny.videoWidth || srcAny.displayWidth || outW);
-  const sourceH = Number(srcAny.height || srcAny.videoHeight || srcAny.displayHeight || outH);
+  const dimensions = source as Partial<Record<"width" | "height" | "videoWidth" | "videoHeight" | "displayWidth" | "displayHeight", unknown>>;
+  const sourceW = Number(dimensions.width || dimensions.videoWidth || dimensions.displayWidth || outW);
+  const sourceH = Number(dimensions.height || dimensions.videoHeight || dimensions.displayHeight || outH);
 
   const cropW = sourceW / state.currentScale;
   const cropH = sourceH / state.currentScale;
@@ -375,25 +457,35 @@ export function generateZoomKeyframes(
   const stepMs = 1000 / 120; // 120Hz simulation step
   const preset = SPRING_PRESETS[opts?.presetName || "silk"];
 
+  const orderedEvents = [...events].sort((a, b) => a.timestamp - b.timestamp);
+  const intentBus: IntentSignal[] = [];
   let eventIdx = 0;
   for (let t = 0; t <= durationMs; t += stepMs) {
-    const bus: IntentSignal[] = [];
-    while (eventIdx < events.length && events[eventIdx].timestamp <= t) {
-      const ev = events[eventIdx];
-      bus.push({
-        type: ev.type as any,
-        x: ev.x,
-        y: ev.y,
-        priority: ev.type === "click" ? 10 : 5,
-        timestamp: ev.timestamp,
-      });
+    while (eventIdx < orderedEvents.length && orderedEvents[eventIdx].timestamp <= t) {
+      const ev = orderedEvents[eventIdx];
+      const type = ev.type;
+      if (type === "click" || type === "pointer" || type === "type_burst" || type === "scroll_out" || type === "pause" || type === "hint" || type === "manual") {
+        intentBus.push({
+          type,
+          x: ev.x,
+          y: ev.y,
+          priority: type === "manual" ? 100 : type === "click" ? 10 : type === "type_burst" ? 8 : type === "scroll_out" ? 7 : type === "pause" ? 5 : type === "hint" ? 1 : 2,
+          timestamp: ev.timestamp,
+        });
+      }
       eventIdx++;
     }
 
-    const fused = fuseIntent(bus, state, t, true);
+    const fused = fuseIntent(intentBus, state, t, true);
     state.targetX = fused.targetX;
     state.targetY = fused.targetY;
     state.targetScale = fused.targetScale;
+    state.priority = fused.priority;
+    if (fused.timestamp !== undefined) {
+      state.lastChangeTime = fused.timestamp;
+      state.holdUntil = fused.holdUntil ?? fused.timestamp;
+    }
+    intentBus.length = 0;
 
     const dt = stepMs / 1000;
     const [nx, nvx] = stepSpring(state.currentX, state.vx, state.targetX, preset.k, dt);

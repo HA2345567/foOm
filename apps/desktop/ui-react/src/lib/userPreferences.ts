@@ -1,7 +1,6 @@
 import {
   DEFAULT_EDITOR_LAYOUT_SETTINGS,
   DEFAULT_EXPORT_SETTINGS,
-  LEGACY_OVERSIZED_EDITOR_PADDING,
   MAX_EDITOR_PADDING,
 } from "@/components/video-editor/editorDefaults";
 import type { ExportFormat, ExportQuality } from "@/lib/exporter";
@@ -21,7 +20,7 @@ const VALID_ASPECT_RATIOS: readonly string[] = [
 ];
 
 export interface UserPreferences {
-  trayLayout: "horizontal" | "vertical";
+  trayLayout: "horizontal" | "vertical" | "top" | "right" | "bottom" | "left";
   /** Default padding % */
   padding: number;
   /** Default aspect ratio */
@@ -73,15 +72,14 @@ export function loadUserPreferences(): UserPreferences {
 
   return {
     trayLayout:
-      raw.trayLayout === "horizontal" || raw.trayLayout === "vertical"
-        ? (raw.trayLayout as "horizontal" | "vertical")
+      ["horizontal", "vertical", "top", "right", "bottom", "left"].includes(String(raw.trayLayout))
+        ? (raw.trayLayout as UserPreferences["trayLayout"])
         : DEFAULT_PREFS.trayLayout,
     padding:
       typeof raw.padding === "number" &&
       Number.isFinite(raw.padding) &&
       raw.padding >= 0 &&
-      raw.padding <= MAX_EDITOR_PADDING &&
-      raw.padding !== LEGACY_OVERSIZED_EDITOR_PADDING
+      raw.padding <= MAX_EDITOR_PADDING
         ? raw.padding
         : DEFAULT_PREFS.padding,
     aspectRatio:

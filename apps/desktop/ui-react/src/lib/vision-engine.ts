@@ -1,6 +1,6 @@
 /**
  * @file vision-engine.ts
- * @description Frame Analysis Engine for foOm Screen Recorder.
+ * @description Frame Analysis Engine for foOom Screen Recorder.
  * Analyzes video pixels for motion to determine focal points for smart autozoom.
  *
  * NOTE: VisionEngine is pure JS and MUST run inside a Web Worker (vision-worker.ts).

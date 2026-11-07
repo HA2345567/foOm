@@ -1,3 +1,6 @@
+import type { Soundtrack } from "@/lib/soundtrack";
+import type { PaddingEdges } from "@/lib/canvasPadding";
+import { MAC_ARROW_OPTIONS } from "@/lib/cursor/macCursors";
 import * as SliderPrimitive from "@radix-ui/react-slider";
 import {
   Captions,
@@ -8,7 +11,9 @@ import {
   ImagePlus,
   Lock,
   AudioLines,
+  Layers,
   MousePointer2,
+  Scan,
   Share2,
   Sparkles,
   Trash2,
@@ -18,6 +23,7 @@ import {
   Volume2,
   VolumeX,
   WandSparkles,
+  Waves,
   X,
   ZoomIn,
 } from "lucide-react";
@@ -27,7 +33,9 @@ import { Button } from "@/components/ui/button";
 import {
   Select,
   SelectContent,
+  SelectGroup,
   SelectItem,
+  SelectLabel,
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
@@ -56,6 +64,7 @@ import ColorPicker from "../ui/color-picker";
 import { AnnotationSettingsPanel } from "./AnnotationSettingsPanel";
 import { BlurSettingsPanel } from "./BlurSettingsPanel";
 import { BACKGROUND_IMAGE_ACCEPT, isSupportedBackgroundImageType } from "./backgroundImageUpload";
+import { PaddingControl } from "./PaddingControl";
 import { CropControl } from "./CropControl";
 import { parseCustomPlaybackSpeedInput } from "./customPlaybackSpeed";
 import {
@@ -65,7 +74,6 @@ import {
   DEFAULT_GIF_SETTINGS,
   DEFAULT_SOURCE_DIMENSIONS,
   DEFAULT_WEBCAM_SETTINGS,
-  MAX_EDITOR_PADDING,
 } from "./editorDefaults";
 import { KeyboardShortcutsHelp } from "./KeyboardShortcutsHelp";
 import type {
@@ -73,7 +81,6 @@ import type {
   AnnotationType,
   BlurData,
   CropRegion,
-  CursorStyle,
   FigureData,
   PlaybackSpeed,
   Rotation3DPreset,
@@ -272,7 +279,9 @@ interface SettingsPanelProps {
   onBorderRadiusChange?: (radius: number) => void;
   onBorderRadiusCommit?: () => void;
   padding?: number;
+  paddingEdges?: PaddingEdges;
   onPaddingChange?: (padding: number) => void;
+  onPaddingEdgesChange?: (edges: PaddingEdges) => void;
   onPaddingCommit?: () => void;
   cropRegion?: CropRegion;
   onCropChange?: (region: CropRegion) => void;
@@ -341,8 +350,8 @@ interface SettingsPanelProps {
   onShowCursorChange?: (show: boolean) => void;
   cursorSize?: number;
   onCursorSizeChange?: (size: number) => void;
-  cursorStyle?: CursorStyle;
-  onCursorStyleChange?: (style: CursorStyle) => void;
+  cursorStyle?: string;
+  onCursorStyleChange?: (style: string) => void;
   cursorSmoothing?: number;
   onCursorSmoothingChange?: (smoothing: number) => void;
   cursorMotionBlur?: number;
@@ -354,6 +363,10 @@ interface SettingsPanelProps {
   hasCursorData?: boolean;
   showCursorSettings?: boolean;
   onAddZoom?: () => void;
+  soundtrack?: Soundtrack | null;
+  onSoundtrackChange?: (track: Soundtrack | null) => void;
+  onGenerateCaptions?: () => void;
+  isGeneratingCaptions?: boolean;
   onAddCaption?: () => void;
   onAddBlur?: () => void;
   onSelectZoom?: (id: string | null) => void;
@@ -466,6 +479,8 @@ export function SettingsPanel({
   onBorderRadiusCommit,
   padding = DEFAULT_EDITOR_LAYOUT_SETTINGS.padding,
   onPaddingChange,
+  paddingEdges,
+  onPaddingEdgesChange,
   onPaddingCommit,
   cropRegion,
   onCropChange,
@@ -522,14 +537,14 @@ export function SettingsPanel({
   onWebcamPositionCommit,
   webcamMirrored = false,
   onWebcamMirroredChange,
-  webcamReactiveZoom = false,
+  webcamReactiveZoom = DEFAULT_WEBCAM_SETTINGS.reactiveZoom,
   onWebcamReactiveZoomChange,
   onSaveDiagnostic,
   showCursor = DEFAULT_CURSOR_SETTINGS.show,
   onShowCursorChange,
   cursorSize = DEFAULT_CURSOR_SETTINGS.size,
   onCursorSizeChange,
-  cursorStyle = "arrow",
+  cursorStyle = "default",
   onCursorStyleChange,
   cursorSmoothing = DEFAULT_CURSOR_SETTINGS.smoothing,
   onCursorSmoothingChange,
@@ -542,6 +557,7 @@ export function SettingsPanel({
   hasCursorData = false,
   showCursorSettings = true,
   onAddZoom,
+  soundtrack, onSoundtrackChange, onGenerateCaptions, isGeneratingCaptions,
   onAddCaption,
   onAddBlur,
   onSelectZoom,
@@ -771,10 +787,9 @@ export function SettingsPanel({
     { id: "audio", label: "Audio", icon: AudioLines, disabled: !videoElement },
     { id: "export", label: "Export", icon: Download, disabled: !videoElement },
   ];
-   const activeModeLabel =
-    [...panelModes, { id: "zoom", label: "Zoom" }].find(
-      (mode) => mode.id === activePanelMode,
-    )?.label ?? "Canvas";
+  const activeModeLabel =
+    [...panelModes, { id: "zoom", label: "Zoom" }].find((mode) => mode.id === activePanelMode)
+      ?.label ?? "Canvas";
   const handleCloseInspector = () => {
     onSelectZoom?.(null);
     onSelectTrim?.(null);
@@ -895,8 +910,11 @@ export function SettingsPanel({
 
   return (
     <div className="editor-inspector-shell flex min-w-0 flex-col h-full overflow-hidden">
-      <div className="flex flex-row-reverse min-h-0 flex-1">
-        <div className="settings-mode-rail flex w-12 shrink-0 flex-col items-center gap-2 border-l border-white/[0.05] px-1.5 py-3">
+      <div className="studio-inspector-layout flex min-h-0 flex-1">
+        <div
+          className="settings-mode-rail studio-inspector-tabs flex shrink-0 items-center gap-1"
+          aria-label="Composition tools"
+        >
           {panelModes.map((mode) => {
             const Icon = mode.icon;
             const isActive = activePanelMode === mode.id && !hasTimelineSelection;
@@ -905,6 +923,8 @@ export function SettingsPanel({
                 key={mode.id}
                 type="button"
                 title={mode.label}
+                aria-label={mode.label}
+                aria-pressed={isActive}
                 disabled={mode.disabled}
                 onClick={() => {
                   if (mode.disabled) return;
@@ -920,12 +940,14 @@ export function SettingsPanel({
                 )}
               >
                 <Icon className="h-4 w-4" />
+                <span className="studio-inspector-tab-label">
+                  {mode.label === "Timeline Tools" ? "Tools" : mode.label}
+                </span>
               </button>
             );
           })}
-
         </div>
-        <div className="flex-1 overflow-y-auto overflow-x-hidden custom-scrollbar p-4 pb-4">
+        <div className="studio-inspector-content min-h-0 flex-1 overflow-y-auto overflow-x-hidden custom-scrollbar p-4 pb-4">
           <div className="mb-4 flex items-center justify-between px-1">
             <span className="text-[14px] font-display font-semibold tracking-wide text-slate-50">
               {activeModeLabel}
@@ -1532,7 +1554,7 @@ export function SettingsPanel({
                             Reactive Zoom
                           </span>
                           <p className="mt-1 text-[11px] text-slate-500">
-                            Auto-scale/position webcam to zoom focuses.
+                            Keep the webcam anchored and gently shrink it during screen zooms.
                           </p>
                         </div>
                         <Switch
@@ -1547,91 +1569,55 @@ export function SettingsPanel({
               )}
 
               {activePanelMode === "background" && (
-                <div className="space-y-3">
-                  <div className="foom-inspector-card flex items-center justify-between py-3.5">
-                    <div className="text-[10px] font-semibold uppercase tracking-wider text-slate-400">
-                      {t("effects.blurBg")}
-                    </div>
+                <div className="foom-canvas-panel space-y-4">
+                  <div className="foom-canvas-blur-card flex items-center justify-between gap-3">
+                    <span className="text-[11px] font-medium text-zinc-200">{t("effects.blurBg")}</span>
                     <Switch
                       checked={showBlur}
                       onCheckedChange={onBlurChange}
-                      className="data-[state=checked]:bg-[#D4D4D8] scale-90 cursor-pointer"
+                      className="data-[state=checked]:bg-zinc-400 cursor-pointer"
+                      aria-label={t("effects.blurBg")}
                     />
                   </div>
 
-                  <div className="foom-inspector-card space-y-3.5">
-                    <span className="text-[10px] font-semibold uppercase tracking-wider text-slate-400 block mb-1">
-                      Canvas Styling
-                    </span>
-                    <div className="space-y-3">
-                      <div className="space-y-1">
-                        <div className="flex items-center justify-between text-[10px] font-medium text-slate-300">
-                          <span>{t("effects.padding")}</span>
-                          <span className="font-mono text-slate-500">
-                            {webcamLayoutPreset === "vertical-stack" ? "—" : `${padding}%`}
-                          </span>
-                        </div>
-                        <Slider
-                          value={[webcamLayoutPreset === "vertical-stack" ? 0 : padding]}
-                          onValueChange={(values) => onPaddingChange?.(values[0])}
-                          onValueCommit={() => onPaddingCommit?.()}
-                          min={0}
-                          max={MAX_EDITOR_PADDING}
-                          step={1}
-                          disabled={webcamLayoutPreset === "vertical-stack"}
-                          className="w-full [&_[role=slider]]:bg-[#D4D4D8] [&_[role=slider]]:border-[#D4D4D8] [&_[role=slider]]:h-3 [&_[role=slider]]:w-3"
-                        />
+                  <div className="foom-canvas-style-card">
+                    <div className="mb-4 flex items-center justify-between gap-3">
+                      <div>
+                        <h3 className="text-[12px] font-semibold text-zinc-100">Canvas styling</h3>
+                        <p className="mt-1 text-[10px] text-zinc-500">Shape the frame around your screen.</p>
                       </div>
-                      <div className="space-y-1">
-                        <div className="flex items-center justify-between text-[10px] font-medium text-slate-300">
-                          <span>{t("effects.roundness")}</span>
-                          <span className="font-mono text-slate-500">{borderRadius}px</span>
+                      <span className="foom-canvas-style-glyph" aria-hidden="true">Aa</span>
+                    </div>
+                    <div className="space-y-4">
+                      <PaddingControl label={t("effects.padding")} value={padding} edges={paddingEdges}
+                        disabled={webcamLayoutPreset === "vertical-stack"} onChange={onPaddingChange}
+                        onEdgesChange={onPaddingEdgesChange} onCommit={onPaddingCommit} />
+                      <div className="foom-canvas-control">
+                        <div className="foom-canvas-control-heading">
+                          <span className="foom-canvas-control-label"><Scan size={14} aria-hidden="true" />{t("effects.roundness")}</span>
+                          <output>{borderRadius}px</output>
                         </div>
-                        <Slider
-                          value={[borderRadius]}
-                          onValueChange={(values) => onBorderRadiusChange?.(values[0])}
-                          onValueCommit={() => onBorderRadiusCommit?.()}
-                          min={0}
-                          max={64}
-                          step={0.5}
-                          className="w-full [&_[role=slider]]:bg-[#D4D4D8] [&_[role=slider]]:border-[#D4D4D8] [&_[role=slider]]:h-3 [&_[role=slider]]:w-3"
-                        />
+                        <Slider value={[borderRadius]} onValueChange={(values) => onBorderRadiusChange?.(values[0])}
+                          onValueCommit={() => onBorderRadiusCommit?.()} min={0} max={64} step={0.5}
+                          className="foom-canvas-slider" aria-label={t("effects.roundness")} />
                       </div>
-                      <div className="space-y-1">
-                        <div className="flex items-center justify-between text-[10px] font-medium text-slate-300">
-                          <span>{t("effects.shadow")}</span>
-                          <span className="font-mono text-slate-500">
-                            {Math.round(shadowIntensity * 100)}%
-                          </span>
+                      <div className="foom-canvas-control">
+                        <div className="foom-canvas-control-heading">
+                          <span className="foom-canvas-control-label"><Layers size={14} aria-hidden="true" />{t("effects.shadow")}</span>
+                          <output>{Math.round(shadowIntensity * 100)}%</output>
                         </div>
-                        <Slider
-                          value={[shadowIntensity]}
-                          onValueChange={(values) => onShadowChange?.(values[0])}
-                          onValueCommit={() => onShadowCommit?.()}
-                          min={0}
-                          max={1}
-                          step={0.01}
-                          className="w-full [&_[role=slider]]:bg-[#D4D4D8] [&_[role=slider]]:border-[#D4D4D8] [&_[role=slider]]:h-3 [&_[role=slider]]:w-3"
-                        />
+                        <Slider value={[shadowIntensity]} onValueChange={(values) => onShadowChange?.(values[0])}
+                          onValueCommit={() => onShadowCommit?.()} min={0} max={1} step={0.01}
+                          className="foom-canvas-slider" aria-label={t("effects.shadow")} />
                       </div>
-                      <div className="space-y-1">
-                        <div className="flex items-center justify-between text-[10px] font-medium text-slate-300">
-                          <span>{t("effects.motionBlur")}</span>
-                          <span className="font-mono text-slate-500">
-                            {motionBlurAmount === 0
-                              ? t("effects.off")
-                              : motionBlurAmount.toFixed(2)}
-                          </span>
+                      <div className="foom-canvas-control">
+                        <div className="foom-canvas-control-heading">
+                          <span className="foom-canvas-control-label"><Waves size={14} aria-hidden="true" />{t("effects.motionBlur")}</span>
+                          <output>{motionBlurAmount === 0 ? t("effects.off") : motionBlurAmount.toFixed(2)}</output>
                         </div>
-                        <Slider
-                          value={[motionBlurAmount]}
-                          onValueChange={(values) => onMotionBlurChange?.(values[0])}
-                          onValueCommit={() => onMotionBlurCommit?.()}
-                          min={0}
-                          max={1}
-                          step={0.01}
-                          className="w-full [&_[role=slider]]:bg-[#D4D4D8] [&_[role=slider]]:border-[#D4D4D8] [&_[role=slider]]:h-3 [&_[role=slider]]:w-3"
-                        />
+                        <Slider value={[motionBlurAmount]} onValueChange={(values) => onMotionBlurChange?.(values[0])}
+                          onValueCommit={() => onMotionBlurCommit?.()} min={0} max={1} step={0.01}
+                          className="foom-canvas-slider" aria-label={t("effects.motionBlur")} />
                       </div>
                     </div>
                   </div>
@@ -1653,7 +1639,7 @@ export function SettingsPanel({
                       <Button
                         type="button"
                         onClick={onAddZoom}
-                        className="h-9 gap-1.5 rounded-lg bg-[#8B5CF6]/12 text-[#C4B5FD] border border-[#8B5CF6]/20 hover:bg-[#8B5CF6]/20 text-[10px] font-semibold"
+                        className="h-9 gap-1.5 rounded-lg border border-white/10 bg-white/[0.06] text-zinc-200 hover:bg-white/[0.12] text-[10px] font-semibold"
                       >
                         <ZoomIn className="h-3.5 w-3.5" />
                         Zoom
@@ -1666,6 +1652,7 @@ export function SettingsPanel({
                         <Crop className="h-3.5 w-3.5" />
                         Crop
                       </Button>
+                      <Button type="button" onClick={onAddBlur} variant="outline" size="sm">Add blur</Button>
                     </div>
                   </div>
                 </div>
@@ -1700,40 +1687,48 @@ export function SettingsPanel({
                   </div>
 
                   {showCursor && (
-                    <div className="foom-inspector-card space-y-3">
-                      <span className="block text-[10px] font-semibold uppercase tracking-wider text-slate-400">
-                        Cursor Style
-                      </span>
-                      <div className="grid grid-cols-2 gap-2">
-                        {[
-                          { value: "arrow" as const, label: "Arrow Cursor" },
-                          { value: "normal" as const, label: "Normal Black" },
-                        ].map((option) => {
-                          const isActive = cursorStyle === option.value;
+                    <div className="foom-inspector-card space-y-3.5">
+                      <div className="flex items-start justify-between gap-3">
+                        <div>
+                          <span className="block text-[11px] font-semibold text-zinc-100">Arrow cursor</span>
+                          <span className="mt-1 block text-[10px] text-zinc-500">Choose a look for your recorded pointer.</span>
+                        </div>
+                        <button
+                          type="button"
+                          aria-pressed={cursorStyle === "default" || cursorStyle === "arrow"}
+                          onClick={() => onCursorStyleChange?.("default")}
+                          className={`shrink-0 rounded-lg border px-2.5 py-1.5 text-[10px] font-medium transition-colors ${
+                            cursorStyle === "default" || cursorStyle === "arrow"
+                              ? "border-zinc-500 bg-zinc-700 text-white"
+                              : "border-white/10 bg-white/[0.03] text-slate-400 hover:bg-white/[0.07] hover:text-white"
+                          }`}
+                        >
+                          Original
+                        </button>
+                      </div>
+                      <div className="grid grid-cols-3 gap-2" role="radiogroup" aria-label="Arrow cursor style">
+                        {MAC_ARROW_OPTIONS.map(({ id, label, asset }) => {
+                          const selected = cursorStyle === id;
                           return (
                             <button
-                              key={option.value}
+                              key={id}
                               type="button"
-                              onClick={() => onCursorStyleChange?.(option.value)}
-                              className={cn(
-                                "flex h-16 flex-col items-start justify-between rounded-lg border p-2 text-left transition-colors",
-                                isActive
-                                  ? "border-[#D4D4D8]/70 bg-white/[0.12] text-white"
-                                  : "border-white/8 bg-white/[0.04] text-slate-400 hover:border-white/16 hover:bg-white/[0.07]",
-                              )}
-                              aria-pressed={isActive}
+                              role="radio"
+                              aria-checked={selected}
+                              aria-label={`${label} arrow cursor`}
+                              title={`${label} arrow cursor`}
+                              onClick={() => onCursorStyleChange?.(id)}
+                              className={`flex min-h-[76px] w-full flex-col items-center justify-center gap-1 rounded-lg border transition-colors ${
+                                selected
+                                  ? "border-zinc-500 bg-zinc-700/70 shadow-[inset_0_0_0_1px_rgba(255,255,255,0.08)]"
+                                  : "border-white/10 bg-white/[0.025] hover:border-white/20 hover:bg-white/[0.06]"
+                              }`}
                             >
-                              <span className="flex h-6 w-6 items-center justify-center rounded bg-white/90">
-                                <MousePointer2
-                                  className={cn(
-                                    "h-[18px] w-[18px] fill-black stroke-black",
-                                    option.value === "normal" && "-rotate-[18deg]",
-                                  )}
-                                  strokeWidth={2.4}
-                                />
+                              <span className="flex h-10 w-10 items-center justify-center rounded-lg bg-black/20">
+                                <img src={asset.imageDataUrl} alt="" aria-hidden="true" className="h-8 w-8 object-contain drop-shadow-md" />
                               </span>
-                              <span className="text-[10px] font-semibold leading-tight">
-                                {option.label}
+                              <span className={`text-[10px] ${selected ? "text-white" : "text-slate-400"}`}>
+                                {label}
                               </span>
                             </button>
                           );
@@ -1821,84 +1816,47 @@ export function SettingsPanel({
               {activePanelMode === "captions" && (
                 <div className="space-y-3">
                   <div className="foom-inspector-card space-y-3">
-                    <div>
-                      <span className="text-[10px] font-semibold uppercase tracking-wider text-slate-400 block">
-                        Captions & Callouts
-                      </span>
-                      <p className="mt-1 text-[11px] leading-relaxed text-slate-500">
-                        Add real timeline-backed text or blur regions. They render in preview and
-                        export with the annotation layer.
-                      </p>
-                    </div>
+                    <h3 className="text-xs font-semibold text-white">Captions</h3>
+                    <p className="text-[11px] text-slate-400">Add a caption at the playhead or generate captions from the recording.</p>
                     <div className="grid grid-cols-2 gap-2">
-                      <Button
-                        type="button"
-                        onClick={onAddCaption}
-                        className="h-9 gap-1.5 rounded-lg bg-[#8B5CF6]/12 text-[#C4B5FD] border border-[#8B5CF6]/20 hover:bg-[#8B5CF6]/20 text-[10px] font-semibold"
-                      >
-                        <Captions className="h-3.5 w-3.5" />
-                        Add Text
-                      </Button>
-                      <Button
-                        type="button"
-                        onClick={onAddBlur}
-                        className="h-9 gap-1.5 rounded-lg bg-white/5 text-slate-300 border border-white/10 hover:bg-white/10 text-[10px] font-semibold"
-                      >
-                        <Sparkles className="h-3.5 w-3.5" />
-                        Add Blur
-                      </Button>
+                      <Button size="sm" onClick={onAddCaption} disabled={!videoElement}>Add caption</Button>
+                      <Button size="sm" variant="outline" onClick={onGenerateCaptions} disabled={!videoElement || isGeneratingCaptions}>{isGeneratingCaptions ? "Generating…" : "Auto captions"}</Button>
                     </div>
                   </div>
-
-                  <div className="foom-inspector-card">
-                    <div className="mb-2 flex items-center justify-between">
-                      <span className="text-[10px] font-semibold uppercase tracking-wider text-slate-400">
-                        Active Regions
-                      </span>
-                      <span className="font-mono text-[10px] text-slate-500">
-                        {annotationRegions.length + blurRegions.length}
-                      </span>
-                    </div>
-                    <div className="space-y-1.5">
-                      {annotationRegions.length === 0 && blurRegions.length === 0 ? (
-                        <div className="rounded-lg border border-white/5 bg-white/[0.03] px-3 py-2 text-[11px] text-slate-500">
-                          No caption or callout regions yet.
-                        </div>
-                      ) : (
-                        <>
-                          {annotationRegions.map((region) => (
-                            <div
-                              key={region.id}
-                              className="flex items-center justify-between rounded-lg border border-white/5 bg-white/[0.03] px-2.5 py-2 text-[11px]"
-                            >
-                              <span className="truncate text-slate-300">
-                                {region.textContent || region.content || "Text"}
-                              </span>
-                              <span className="font-mono text-slate-500">
-                                {(region.startMs / 1000).toFixed(1)}s
-                              </span>
-                            </div>
-                          ))}
-                          {blurRegions.map((region) => (
-                            <div
-                              key={region.id}
-                              className="flex items-center justify-between rounded-lg border border-white/5 bg-white/[0.03] px-2.5 py-2 text-[11px]"
-                            >
-                              <span className="truncate text-slate-300">Blur region</span>
-                              <span className="font-mono text-slate-500">
-                                {(region.startMs / 1000).toFixed(1)}s
-                              </span>
-                            </div>
-                          ))}
-                        </>
-                      )}
-                    </div>
+                  <div className="foom-inspector-card space-y-2">
+                    <h3 className="text-[10px] uppercase tracking-wider text-slate-400">Caption list</h3>
+                    {annotationRegions.filter(region => region.type === "text").length === 0 && <p className="text-[11px] text-slate-500">Captions will appear here in playback order.</p>}
+                    {annotationRegions.filter(region => region.type === "text").sort((a,b) => a.startMs - b.startMs).map(region => (
+                      <button type="button" key={region.id} onClick={() => onSelectAnnotation?.(region.id)} className="flex w-full items-center gap-2 rounded-lg bg-white/5 p-2 text-left text-xs hover:bg-white/10">
+                        <span className="shrink-0 font-mono text-slate-400">{(region.startMs / 1000).toFixed(1)}s</span>
+                        <span className="truncate">{region.textContent || region.content || "Caption"}</span>
+                      </button>
+                    ))}
                   </div>
                 </div>
               )}
 
               {activePanelMode === "audio" && (
                 <div className="space-y-3">
+                  <div className="foom-inspector-card space-y-3">
+                    <h3 className="text-xs font-semibold">Imported audio</h3>
+                    <p className="text-[11px] text-slate-400">Mix music or narration with the recording. The track starts at 0:00 and follows your timeline edits.</p>
+                    {soundtrack && <p className="truncate text-xs" title={soundtrack.name}>{soundtrack.name}</p>}
+                    <div className="flex gap-2">
+                      <Button size="sm" variant="outline" onClick={async () => {
+                        try {
+                          const result = await window.electronAPI.openVideoFilePicker("audio");
+                          if (result.canceled) return;
+                          if (!result.success || !result.path) throw new Error(result.error || "Audio import failed");
+                          onSoundtrackChange?.({ path: result.path, name: result.name || result.path.split(/[\\/]/).pop() || "Audio", volume: soundtrack?.volume ?? 0.5 });
+                        } catch (error) { toast.error(String(error)); }
+                      }}>{soundtrack ? "Replace audio" : "Import audio"}</Button>
+                      {soundtrack && <Button size="sm" variant="ghost" onClick={() => onSoundtrackChange?.(null)}>Remove</Button>}
+                    </div>
+                    {soundtrack && <label className="block text-xs">Track volume · {Math.round(soundtrack.volume * 100)}%
+                      <input aria-label="Imported audio volume" type="range" min="0" max="100" className="mt-2 w-full accent-zinc-300" value={Math.round(soundtrack.volume * 100)} onChange={event => onSoundtrackChange?.({ ...soundtrack, volume: Number(event.target.value) / 100 })}/>
+                    </label>}
+                  </div>
                   <div className="foom-inspector-card flex items-center justify-between gap-3">
                     <div>
                       <span className="text-[10px] font-semibold uppercase tracking-wider text-slate-400 block">
@@ -1921,11 +1879,12 @@ export function SettingsPanel({
                           Background Sound Removal
                         </span>
                         <p className="mt-1 text-[11px] text-slate-500">
-                          Non-AI DSP cleanup for rumble, hiss, and low room noise in MP4 exports.
+                          Background sound removal is not available in the current export engine.
                         </p>
                       </div>
                       <Switch
-                        checked={noiseReductionEnabled}
+                        checked={false}
+                        disabled
                         onCheckedChange={onNoiseReductionEnabledChange}
                         className="data-[state=checked]:bg-[#D4D4D8]"
                       />
@@ -1933,11 +1892,7 @@ export function SettingsPanel({
                     <div className="space-y-1.5">
                       <div className="flex items-center justify-between text-[10px] font-medium text-slate-300">
                         <span>Cleanup Amount</span>
-                        <span className="font-mono text-slate-500">
-                          {noiseReductionEnabled
-                            ? `${Math.round(noiseReductionAmount * 100)}%`
-                            : "Off"}
-                        </span>
+                        <span className="font-mono text-slate-500">Unavailable</span>
                       </div>
                       <Slider
                         value={[noiseReductionAmount]}
@@ -1945,7 +1900,7 @@ export function SettingsPanel({
                         min={0}
                         max={1}
                         step={0.01}
-                        disabled={!noiseReductionEnabled}
+                        disabled
                         className="w-full [&_[role=slider]]:bg-[#D4D4D8] [&_[role=slider]]:border-[#D4D4D8] [&_[role=slider]]:h-3 [&_[role=slider]]:w-3"
                       />
                     </div>
@@ -2135,13 +2090,15 @@ export function SettingsPanel({
 
                         <div className="flex items-center justify-between py-1 border-t border-white/5 pt-2">
                           <div>
-                            <label className="text-xs font-semibold text-slate-200">Loop Animation</label>
+                            <label className="text-xs font-semibold text-slate-200">
+                              Loop Animation
+                            </label>
                             <p className="text-[10px] text-slate-500">GIF will play continuously</p>
                           </div>
                           <Switch
                             checked={gifLoop}
                             onCheckedChange={onGifLoopChange}
-                            className="data-[state=checked]:bg-[#34B27B] scale-90"
+                            className="data-[state=checked]:bg-[#e4e4e7] scale-90"
                           />
                         </div>
                       </div>
@@ -2161,153 +2118,162 @@ export function SettingsPanel({
               )}
 
               {activePanelMode === "background" && (
-                <div className="space-y-3">
-                  <div className="foom-inspector-card">
+                <div className="foom-canvas-background-card">
+                  <div className="mb-3 flex items-center justify-between">
+                    <div>
+                      <h3 className="text-[12px] font-semibold text-zinc-100">Background</h3>
+                      <p className="mt-1 text-[10px] text-zinc-500">Choose a backdrop for your canvas.</p>
+                    </div>
+                    <span className="foom-canvas-background-current" title="Current background">
+                      {selected === "transparent" ? "Clear" : "Style"}
+                    </span>
+                  </div>
+                  <div className="foom-inspector-card foom-canvas-background-inner">
                     <Tabs defaultValue="wallpaper" className="w-full">
-                      <TabsList className="mb-3 bg-white/5 border border-white/5 p-0.5 w-full grid grid-cols-4 h-7 rounded-lg">
+                      <TabsList className="foom-canvas-tabs mb-4 grid w-full grid-cols-4 rounded-xl p-1">
                         <TabsTrigger
                           value="wallpaper"
-                          className="data-[state=active]:bg-[#D4D4D8] data-[state=active]:text-[#09090b] text-slate-400 text-[9px] py-1 rounded-md transition-all cursor-pointer"
+                          className="foom-canvas-tab"
                         >
                           Wallpapers
                         </TabsTrigger>
                         <TabsTrigger
                           value="gradient"
-                          className="data-[state=active]:bg-[#D4D4D8] data-[state=active]:text-[#09090b] text-slate-400 text-[9px] py-1 rounded-md transition-all cursor-pointer"
+                          className="foom-canvas-tab"
                         >
                           {t("background.gradient")}
                         </TabsTrigger>
                         <TabsTrigger
                           value="color"
-                          className="data-[state=active]:bg-[#D4D4D8] data-[state=active]:text-[#09090b] text-slate-400 text-[9px] py-1 rounded-md transition-all cursor-pointer"
+                          className="foom-canvas-tab"
                         >
                           {t("background.color")}
                         </TabsTrigger>
                         <TabsTrigger
                           value="image"
-                          className="data-[state=active]:bg-[#D4D4D8] data-[state=active]:text-[#09090b] text-slate-400 text-[9px] py-1 rounded-md transition-all cursor-pointer"
+                          className="foom-canvas-tab"
                         >
                           {t("background.image")}
                         </TabsTrigger>
                       </TabsList>
 
-                        <TabsContent value="wallpaper" className="mt-0">
-                          <div className="grid grid-cols-4 gap-2.5">
-                            {WALLPAPER_PATHS.map((canonicalPath, i) => {
-                              const previewUrl = wallpaperPreviewUrls[i] ?? canonicalPath;
-                              const isSelected = selected === canonicalPath;
-                              return (
-                                <div
-                                  key={canonicalPath}
-                                  className={cn(
-                                    "aspect-square w-full rounded-lg border overflow-hidden cursor-pointer transition-all duration-150 shadow-sm",
-                                    isSelected
-                                      ? "border-[#D4D4D8] ring-1 ring-[#D4D4D8]/30"
-                                      : "border-white/10 hover:border-[#D4D4D8]/40 opacity-80 hover:opacity-100 bg-white/5",
-                                  )}
-                                  style={{
-                                    backgroundImage: `url(${previewUrl})`,
-                                    backgroundSize: "cover",
-                                    backgroundPosition: "center",
-                                  }}
-                                  onClick={() => onWallpaperChange(canonicalPath)}
-                                  role="button"
-                                />
-                              );
-                            })}
-                          </div>
-                        </TabsContent>
+                      <TabsContent value="wallpaper" className="mt-0">
+                        <div className="grid grid-cols-3 gap-2.5">
+                          {WALLPAPER_PATHS.map((canonicalPath, i) => {
+                            const previewUrl = wallpaperPreviewUrls[i] ?? canonicalPath;
+                            const isSelected = selected === canonicalPath;
+                            return (
+                              <div
+                                key={canonicalPath}
+                                className={cn(
+                                  "aspect-square w-full rounded-lg border overflow-hidden cursor-pointer transition-all duration-150 shadow-sm",
+                                  isSelected
+                                    ? "border-[#D4D4D8] ring-1 ring-[#D4D4D8]/30"
+                                    : "border-white/10 hover:border-[#D4D4D8]/40 opacity-80 hover:opacity-100 bg-white/5",
+                                )}
+                                style={{
+                                  backgroundImage: `url(${previewUrl})`,
+                                  backgroundSize: "cover",
+                                  backgroundPosition: "center",
+                                }}
+                                onClick={() => onWallpaperChange(canonicalPath)}
+                                role="button"
+                              />
+                            );
+                          })}
+                        </div>
+                      </TabsContent>
 
-                        <TabsContent value="image" className="mt-0 space-y-3">
-                          <input
-                            type="file"
-                            ref={fileInputRef}
-                            onChange={handleImageUpload}
-                            accept={BACKGROUND_IMAGE_ACCEPT}
-                            className="hidden"
-                          />
-                          <Button
-                            onClick={() => fileInputRef.current?.click()}
-                            variant="outline"
-                            className="w-full gap-2 bg-white/5 text-slate-200 border-white/10 hover:bg-[#D4D4D8] hover:text-[#09090b] hover:border-[#D4D4D8] transition-all h-7 text-[10px] cursor-pointer"
-                          >
-                            <Upload className="w-3 h-3" />
-                            {t("background.uploadCustom")}
-                          </Button>
+                      <TabsContent value="image" className="mt-0 space-y-3">
+                        <input
+                          type="file"
+                          ref={fileInputRef}
+                          onChange={handleImageUpload}
+                          accept={BACKGROUND_IMAGE_ACCEPT}
+                          className="hidden"
+                        />
+                        <Button
+                          onClick={() => fileInputRef.current?.click()}
+                          variant="outline"
+                          className="w-full gap-2 bg-white/5 text-slate-200 border-white/10 hover:bg-[#D4D4D8] hover:text-[#09090b] hover:border-[#D4D4D8] transition-all h-7 text-[10px] cursor-pointer"
+                        >
+                          <Upload className="w-3 h-3" />
+                          {t("background.uploadCustom")}
+                        </Button>
 
-                          <div className="grid grid-cols-4 gap-2.5">
-                            {customImages.map((imageUrl, idx) => {
-                              const isSelected = selected === imageUrl;
-                              return (
-                                <div
-                                  key={`custom-${idx}`}
-                                  className={cn(
-                                    "aspect-square w-full rounded-lg border overflow-hidden cursor-pointer transition-all duration-150 relative group shadow-sm",
-                                    isSelected
-                                      ? "border-[#D4D4D8] ring-1 ring-[#D4D4D8]/30"
-                                      : "border-white/10 hover:border-[#D4D4D8]/40 opacity-80 hover:opacity-100 bg-white/5",
-                                  )}
-                                  style={{
-                                    backgroundImage: `url(${imageUrl})`,
-                                    backgroundSize: "cover",
-                                    backgroundPosition: "center",
-                                  }}
-                                  onClick={() => onWallpaperChange(imageUrl)}
-                                  role="button"
+                        <div className="grid grid-cols-3 gap-2.5">
+                          {customImages.map((imageUrl, idx) => {
+                            const isSelected = selected === imageUrl;
+                            return (
+                              <div
+                                key={`custom-${idx}`}
+                                className={cn(
+                                  "aspect-square w-full rounded-lg border overflow-hidden cursor-pointer transition-all duration-150 relative group shadow-sm",
+                                  isSelected
+                                    ? "border-[#D4D4D8] ring-1 ring-[#D4D4D8]/30"
+                                    : "border-white/10 hover:border-[#D4D4D8]/40 opacity-80 hover:opacity-100 bg-white/5",
+                                )}
+                                style={{
+                                  backgroundImage: `url(${imageUrl})`,
+                                  backgroundSize: "cover",
+                                  backgroundPosition: "center",
+                                }}
+                                onClick={() => onWallpaperChange(imageUrl)}
+                                role="button"
+                              >
+                                <button
+                                  onClick={(e) => handleRemoveCustomImage(imageUrl, e)}
+                                  className="absolute top-0.5 right-0.5 w-3 h-3 bg-red-500/90 hover:bg-red-500 rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity z-10 cursor-pointer"
                                 >
-                                  <button
-                                    onClick={(e) => handleRemoveCustomImage(imageUrl, e)}
-                                    className="absolute top-0.5 right-0.5 w-3 h-3 bg-red-500/90 hover:bg-red-500 rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity z-10 cursor-pointer"
-                                  >
-                                    <X className="w-2 h-2 text-white" />
-                                  </button>
-                                </div>
-                              );
-                            })}
-                          </div>
-                        </TabsContent>
+                                  <X className="w-2 h-2 text-white" />
+                                </button>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </TabsContent>
 
-                        <TabsContent value="color" className="mt-0">
-                          <ColorPicker
-                            selectedColor={selectedColor}
-                            colorPalette={colorPalette}
-                            translations={{
-                              colorWheel: t("background.colorWheel"),
-                              colorPalette: t("background.colorPalette"),
-                            }}
-                            onUpdateColor={(color) => {
-                              setSelectedColor(color);
-                              onWallpaperChange(color);
-                            }}
-                          />
-                        </TabsContent>
+                      <TabsContent value="color" className="mt-0">
+                        <ColorPicker
+                          selectedColor={selectedColor}
+                          colorPalette={colorPalette}
+                          translations={{
+                            colorWheel: t("background.colorWheel"),
+                            colorPalette: t("background.colorPalette"),
+                          }}
+                          onUpdateColor={(color) => {
+                            setSelectedColor(color);
+                            onWallpaperChange(color);
+                          }}
+                        />
+                      </TabsContent>
 
-                        <TabsContent value="gradient" className="mt-0">
-                          <div className="grid grid-cols-4 gap-2.5">
-                            {BG_GRADIENT_PATHS.map((canonicalPath, i) => {
-                              const previewUrl = gradientPreviewUrls[i] ?? canonicalPath;
-                              const isSelected = selected === canonicalPath;
-                              return (
-                                <div
-                                  key={canonicalPath}
-                                  className={cn(
-                                    "aspect-square w-full rounded-lg border overflow-hidden cursor-pointer transition-all duration-150 shadow-sm",
-                                    isSelected
-                                      ? "border-[#D4D4D8] ring-1 ring-[#D4D4D8]/30"
-                                      : "border-white/10 hover:border-[#D4D4D8]/40 opacity-80 hover:opacity-100 bg-white/5",
-                                  )}
-                                  style={{
-                                    backgroundImage: `url(${previewUrl})`,
-                                    backgroundSize: "cover",
-                                    backgroundPosition: "center",
-                                  }}
-                                  onClick={() => onWallpaperChange(canonicalPath)}
-                                  role="button"
-                                />
-                              );
-                            })}
-                          </div>
-                        </TabsContent>
+                      <TabsContent value="gradient" className="mt-0">
+                        <div className="grid grid-cols-3 gap-2.5">
+                          {BG_GRADIENT_PATHS.map((canonicalPath, i) => {
+                            const previewUrl = gradientPreviewUrls[i] ?? canonicalPath;
+                            const isSelected = selected === canonicalPath;
+                            return (
+                              <div
+                                key={canonicalPath}
+                                className={cn(
+                                  "aspect-square w-full rounded-lg border overflow-hidden cursor-pointer transition-all duration-150 shadow-sm",
+                                  isSelected
+                                    ? "border-[#D4D4D8] ring-1 ring-[#D4D4D8]/30"
+                                    : "border-white/10 hover:border-[#D4D4D8]/40 opacity-80 hover:opacity-100 bg-white/5",
+                                )}
+                                style={{
+                                  backgroundImage: `url(${previewUrl})`,
+                                  backgroundSize: "cover",
+                                  backgroundPosition: "center",
+                                }}
+                                onClick={() => onWallpaperChange(canonicalPath)}
+                                role="button"
+                              />
+                            );
+                          })}
+                        </div>
+                      </TabsContent>
                     </Tabs>
                   </div>
                 </div>
@@ -2439,8 +2405,6 @@ export function SettingsPanel({
           </div>
         </>
       )}
-
-
     </div>
   );
 }

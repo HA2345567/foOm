@@ -1,5 +1,7 @@
-import { WebDemuxer } from "web-demuxer";
+import { followSoundtrack } from "@/lib/soundtrack";
+import { ALL_FORMATS, BlobSource, EncodedPacketSink, Input } from "mediabunny";
 import type { SpeedRegion, TrimRegion } from "@/components/video-editor/types";
+import { normalizeTrimRegions } from "./trimRegions";
 import type { ExportAudioMuxerCodec, VideoMuxer } from "./muxer";
 
 const AUDIO_BITRATE = 128_000;
@@ -188,14 +190,12 @@ export class AudioProcessor {
 	}
 
 	static async selectSupportedExportCodecForSource(
-		demuxer: WebDemuxer,
+		input: Input,
 	): Promise<ExportAudioCodec | null> {
-		let audioConfig: AudioDecoderConfig;
-		try {
-			audioConfig = await demuxer.getDecoderConfig("audio");
-		} catch {
-			return null;
-		}
+		const audioTrack = await input.getPrimaryAudioTrack();
+		if (!audioTrack) return null;
+		const audioConfig = await audioTrack.getDecoderConfig();
+		if (!audioConfig) return null;
 
 		const codecCheck = await AudioDecoder.isConfigSupported(audioConfig);
 		if (!codecCheck.supported) {
@@ -214,28 +214,35 @@ export class AudioProcessor {
 	 * regions use the pitch-preserving rendered timeline pipeline.
 	 */
 	async process(
-		demuxer: WebDemuxer,
+		input: Input,
 		muxer: VideoMuxer,
 		videoUrl: string,
 		trimRegions: TrimRegion[] | undefined,
 		speedRegions: SpeedRegion[] | undefined,
 		validatedDurationSec: number,
 		exportCodec: ExportAudioCodec,
+		soundtrack?: { url: string; volume: number },
 	): Promise<void> {
-		const sortedTrims = trimRegions ? [...trimRegions].sort((a, b) => a.startMs - b.startMs) : [];
+		const sortedTrims = normalizeTrimRegions(trimRegions, validatedDurationSec * 1000);
 		const sortedSpeedRegions = speedRegions
 			? [...speedRegions]
-					.filter((region) => region.endMs - region.startMs > MIN_SPEED_REGION_DELTA_MS)
+					.filter(
+						(region) =>
+							Number.isFinite(region.speed) &&
+							region.speed > 0 &&
+							region.endMs - region.startMs > MIN_SPEED_REGION_DELTA_MS,
+					)
 					.sort((a, b) => a.startMs - b.startMs)
 			: [];
 
 		// Speed edits need timeline playback to preserve pitch.
-		if (sortedSpeedRegions.length > 0) {
+		if (soundtrack || sortedSpeedRegions.length > 0) {
 			const renderedAudioBlob = await this.renderPitchPreservedTimelineAudio(
 				videoUrl,
 				sortedTrims,
 				sortedSpeedRegions,
 				validatedDurationSec,
+				soundtrack,
 			);
 			if (!this.cancelled && renderedAudioBlob.size > 0) {
 				await this.muxRenderedAudioBlob(renderedAudioBlob, muxer, exportCodec);
@@ -248,22 +255,25 @@ export class AudioProcessor {
 		// streamingDecoder.decodeAll's read window so both paths read the same distance past
 		// the validated duration boundary.
 		const readEndSec = validatedDurationSec + 0.5;
-		await this.processTrimOnlyAudio(demuxer, muxer, sortedTrims, readEndSec, exportCodec);
+		await this.processTrimOnlyAudio(input, muxer, sortedTrims, readEndSec, exportCodec);
 	}
 
 	// Trim-only path, used for projects without speed regions.
 	private async processTrimOnlyAudio(
-		demuxer: WebDemuxer,
+		input: Input,
 		muxer: VideoMuxer,
 		sortedTrims: TrimRegion[],
 		readEndSec?: number,
 		exportCodec?: ExportAudioCodec,
 	): Promise<void> {
-		let audioConfig: AudioDecoderConfig;
-		try {
-			audioConfig = await demuxer.getDecoderConfig("audio");
-		} catch {
+		const audioTrack = await input.getPrimaryAudioTrack();
+		if (!audioTrack) {
 			console.warn("[AudioProcessor] No audio track found, skipping");
+			return;
+		}
+		const audioConfig = await audioTrack.getDecoderConfig();
+		if (!audioConfig) {
+			console.warn("[AudioProcessor] Audio codec configuration is unavailable, skipping");
 			return;
 		}
 
@@ -286,31 +296,19 @@ export class AudioProcessor {
 			typeof readEndSec === "number" && Number.isFinite(readEndSec)
 				? Math.max(0, readEndSec)
 				: undefined;
-		const audioStream =
-			safeReadEndSec !== undefined
-				? demuxer.read("audio", 0, safeReadEndSec)
-				: demuxer.read("audio");
-		const reader = audioStream.getReader();
+		const audioPacketSink = new EncodedPacketSink(audioTrack);
 
-		try {
-			while (!this.cancelled) {
-				const { done, value: chunk } = await reader.read();
-				if (done || !chunk) break;
+		for await (const packet of audioPacketSink.packets()) {
+			if (this.cancelled) break;
 
-				const timestampMs = chunk.timestamp / 1000;
-				if (this.isInTrimRegion(timestampMs, sortedTrims)) continue;
+			const timestampMs = packet.timestamp * 1000;
+			if (safeReadEndSec !== undefined && packet.timestamp > safeReadEndSec) continue;
+			if (this.isInTrimRegion(timestampMs, sortedTrims)) continue;
 
-				decoder.decode(chunk);
+			decoder.decode(packet.toEncodedAudioChunk());
 
-				while (decoder.decodeQueueSize > DECODE_BACKPRESSURE_LIMIT && !this.cancelled) {
-					await new Promise((resolve) => setTimeout(resolve, 1));
-				}
-			}
-		} finally {
-			try {
-				await reader.cancel();
-			} catch {
-				/* reader already closed */
+			while (decoder.decodeQueueSize > DECODE_BACKPRESSURE_LIMIT && !this.cancelled) {
+				await new Promise((resolve) => setTimeout(resolve, 1));
 			}
 		}
 
@@ -408,8 +406,9 @@ export class AudioProcessor {
 		trimRegions: TrimRegion[],
 		speedRegions: SpeedRegion[],
 		validatedDurationSec: number,
+		soundtrack?: { url: string; volume: number },
 	): Promise<Blob> {
-		const media = document.createElement("audio");
+		const media = document.createElement("video");
 		media.src = videoUrl;
 		media.preload = "auto";
 
@@ -432,11 +431,23 @@ export class AudioProcessor {
 		const destinationNode = audioContext.createMediaStreamDestination();
 		sourceNode.connect(destinationNode);
 
+		const music = soundtrack ? new Audio() : null;
+		let stopMusic: (() => void) | undefined;
+		let musicFailure: Error | undefined;
 		let rafId: number | null = null;
 		let recorder: MediaRecorder | null = null;
 		let recordedBlobPromise: Promise<Blob> | null = null;
 
 		try {
+			if (music && soundtrack) {
+				music.src = soundtrack.url;
+				await this.waitForLoadedMetadata(music);
+				const musicNode = audioContext.createMediaElementSource(music);
+				const gain = audioContext.createGain();
+				gain.gain.value = soundtrack.volume;
+				musicNode.connect(gain).connect(destinationNode);
+				stopMusic = followSoundtrack(media, music, error => { musicFailure = error; });
+			}
 			if (audioContext.state === "suspended") {
 				await audioContext.resume();
 			}
@@ -492,6 +503,7 @@ export class AudioProcessor {
 				};
 
 				const tick = () => {
+					if (musicFailure || music?.error) { cleanup(); reject(musicFailure ?? new Error("Imported audio playback failed")); return; }
 					if (this.cancelled) {
 						cleanup();
 						resolve();
@@ -579,6 +591,8 @@ export class AudioProcessor {
 			if (recorder && recorder.state !== "inactive") {
 				recorder.stop();
 			}
+			stopMusic?.();
+			if (music) { music.removeAttribute("src"); music.load(); }
 			destinationNode.stream.getTracks().forEach((track) => track.stop());
 			sourceNode.disconnect();
 			destinationNode.disconnect();
@@ -608,15 +622,14 @@ export class AudioProcessor {
 		if (this.cancelled) return;
 
 		const file = new File([blob], "speed-audio.webm", { type: blob.type || "audio/webm" });
-		const wasmUrl = new URL("./wasm/web-demuxer.wasm", window.location.href).href;
-		const demuxer = new WebDemuxer({ wasmFilePath: wasmUrl });
+		const input = new Input({ source: new BlobSource(file), formats: ALL_FORMATS });
 
 		try {
-			await demuxer.load(file);
-			await this.processTrimOnlyAudio(demuxer, muxer, [], undefined, exportCodec);
+			await input.getFormat();
+			await this.processTrimOnlyAudio(input, muxer, [], undefined, exportCodec);
 		} finally {
 			try {
-				demuxer.destroy();
+				input.dispose();
 			} catch {
 				/* ignore */
 			}

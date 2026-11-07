@@ -1,5 +1,47 @@
 import { describe, expect, it } from "vitest";
-import { shouldFailDecodeEndedEarly, validateDuration } from "./streamingDecoder";
+import {
+	StreamingVideoDecoder,
+	shouldFailDecodeEndedEarly,
+	validateDuration,
+} from "./streamingDecoder";
+
+describe("export timeline metrics", () => {
+	function decoder() {
+		const instance = new StreamingVideoDecoder();
+		Object.assign(instance, { metadata: { duration: 10 } });
+		return instance;
+	}
+
+	it("removes the union of nested cuts once", () => {
+		expect(
+			decoder().getExportMetrics(30, [
+				{ id: "outer", startMs: 1000, endMs: 7000 },
+				{ id: "inner", startMs: 2000, endMs: 3000 },
+			]),
+		).toEqual({ effectiveDuration: 4, totalFrames: 120 });
+	});
+
+	it("does not export past the source for out-of-bounds cuts", () => {
+		expect(decoder().getExportMetrics(30, [{ id: "cut", startMs: 15000, endMs: 20000 }])).toEqual({
+			effectiveDuration: 10,
+			totalFrames: 300,
+		});
+	});
+
+	it("uses the first active speed for overlapping edits and ignores zero speeds", () => {
+		expect(
+			decoder().getExportMetrics(
+				30,
+				[],
+				[
+					{ id: "first", startMs: 1000, endMs: 6000, speed: 2 },
+					{ id: "nested", startMs: 2000, endMs: 4000, speed: 4 },
+					{ id: "invalid", startMs: 7000, endMs: 8000, speed: 0 },
+				],
+			),
+		).toEqual({ effectiveDuration: 7.5, totalFrames: 225 });
+	});
+});
 
 describe("validateDuration", () => {
 	it("returns scanned duration when container reports Infinity", () => {

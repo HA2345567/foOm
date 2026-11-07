@@ -66,8 +66,6 @@ function getSupportedSystemLocale(): Locale | null {
     const baseLanguage = candidate.split("-")[0]?.toLowerCase();
     if (!baseLanguage) continue;
 
-    if (baseLanguage === "zh" && availableLocales.includes("zh-CN")) return "zh-CN";
-
     const baseMatch = availableLocales.find((locale) => locale.toLowerCase() === baseLanguage);
     if (baseMatch) return baseMatch;
   }

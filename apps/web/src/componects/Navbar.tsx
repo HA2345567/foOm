@@ -18,11 +18,11 @@ export function Navbar() {
       <div className="mx-auto max-w-7xl px-6 flex items-center justify-between h-16">
         {/* Logo */}
         <Link to="/" className="flex items-center gap-3 group">
-          <div className="w-10 h-10 flex items-center justify-center transition-all duration-500 group-hover:-translate-y-0.5 relative overflow-hidden">
-            <Logo className="w-9 h-9 text-[#f5f5f7] relative z-10" />
+          <div className="flex h-10 items-center justify-center transition-all duration-500 group-hover:-translate-y-0.5 relative overflow-hidden">
+            <Logo className="h-7 relative z-10" />
           </div>
           <span className="font-brand text-[24px] font-semibold tracking-[-0.03em] text-foreground">
-            foOm
+            foOom
           </span>
         </Link>
 

@@ -82,7 +82,7 @@ export default function ColorPicker(props: ColorPickerProps) {
           className="w-full h-9 justify-start gap-2 bg-white/5 border-white/10 hover:bg-white/10 px-2"
           onClick={() => setColorMode("wheel")}
           style={{
-            backgroundColor: colorMode === "wheel" ? "#34B27B" : "transparent",
+            backgroundColor: colorMode === "wheel" ? "rgba(255,255,255,0.12)" : "transparent",
           }}
         >
           <span className="text-xs text-slate-300 truncate flex-1 text-left">
@@ -95,7 +95,7 @@ export default function ColorPicker(props: ColorPickerProps) {
           className="w-full h-9 justify-start gap-2 bg-white/5 border-white/10 hover:bg-white/10 px-2"
           onClick={() => setColorMode("palette")}
           style={{
-            backgroundColor: colorMode === "palette" ? "#34B27B" : "transparent",
+            backgroundColor: colorMode === "palette" ? "rgba(255,255,255,0.12)" : "transparent",
           }}
         >
           <span className="text-xs text-slate-300 truncate flex-1 text-left">
@@ -124,7 +124,7 @@ export default function ColorPicker(props: ColorPickerProps) {
           <Input
             type="text"
             value={hexInput}
-            className="w-full h-9 rounded-md border border-white/10 bg-white/5 px-2 text-xs text-slate-200 outline-none focus:border-[#34B27B]/50 focus:ring-1 focus:ring-[#34B27B]/30 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+            className="w-full h-9 rounded-md border border-white/10 bg-white/5 px-2 text-xs text-slate-200 outline-none focus:border-white/40 focus:ring-1 focus:ring-white/30 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
             onChange={handleColorInputChange}
           />
         </>

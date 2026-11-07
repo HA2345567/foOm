@@ -1,5 +1,6 @@
-import type { Rectangle } from "electron";
 import type { CursorCaptureMode } from "./recordingSession";
+
+type Rectangle = { x: number; y: number; width: number; height: number };
 
 export type NativeMacSourceType = "display" | "window";
 

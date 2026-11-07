@@ -1,3 +1,4 @@
+import type { PaddingEdges } from "@/lib/canvasPadding";
 import GIF from "gif.js";
 import type {
 	AnnotationRegion,
@@ -42,6 +43,7 @@ interface GifExporterConfig {
 	motionBlurAmount?: number;
 	borderRadius?: number;
 	padding?: number;
+	paddingEdges?: PaddingEdges;
 	videoPadding?: number;
 	cropRegion: CropRegion;
 	webcamLayoutPreset?: WebcamLayoutPreset;
@@ -157,6 +159,7 @@ export class GifExporter {
 				motionBlurAmount: this.config.motionBlurAmount,
 				borderRadius: this.config.borderRadius,
 				padding: this.config.padding,
+				paddingEdges: this.config.paddingEdges,
 				cropRegion: this.config.cropRegion,
 				cursorRecordingData: this.config.cursorRecordingData,
 				cursorScale: this.config.cursorScale,
@@ -216,7 +219,7 @@ export class GifExporter {
 			console.log("[GifExporter] Frame rate:", this.config.frameRate, "FPS");
 			console.log("[GifExporter] Frame delay:", frameDelay, "ms");
 			console.log("[GifExporter] Loop:", this.config.loop ? "infinite" : "once");
-			console.log("[GifExporter] Using streaming decode (web-demuxer + VideoDecoder)");
+			console.log("[GifExporter] Using streaming decode (MediaBunny + VideoDecoder)");
 
 			let frameIndex = 0;
 			webcamFrameQueue = this.config.webcamVideoUrl ? new TimestampedVideoFrameQueue() : null;

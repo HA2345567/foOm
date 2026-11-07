@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import sampleVideoUrl from "../../../tests/fixtures/sample.webm?url";
+const sampleVideoUrl = "/foom-demovedio.mp4";
 import { BackgroundLoadError } from "../wallpaper";
 import type { ExportProgress } from "./types";
 import { VideoExporter } from "./videoExporter";
@@ -15,7 +15,16 @@ describe("VideoExporter (real browser)", () => {
 			frameRate: 15,
 			bitrate: 1_000_000,
 			wallpaper: "#1a1a2e",
-			zoomRegions: [],
+			zoomRegions: [
+				{
+					id: "autozoom-browser-smoke",
+					startMs: 500,
+					endMs: 2_500,
+					depth: 2,
+					focus: { cx: 0.68, cy: 0.42 },
+					source: "auto",
+				},
+			],
 			showShadow: false,
 			shadowIntensity: 0,
 			showBlur: false,
@@ -49,7 +58,7 @@ describe("VideoExporter (real browser)", () => {
 			height: 180,
 			frameRate: 15,
 			bitrate: 1_000_000,
-			wallpaper: "/wallpapers/wallpaper1.jpg",
+			wallpaper: "/wallp/01.jpg",
 			zoomRegions: [],
 			showShadow: false,
 			shadowIntensity: 0,

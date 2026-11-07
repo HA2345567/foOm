@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import sampleVideoUrl from "../../../tests/fixtures/sample.webm?url";
+const sampleVideoUrl = "/foom-demovedio.mp4";
 import { BackgroundLoadError } from "../wallpaper";
 import { GifExporter } from "./gifExporter";
 import type { ExportProgress } from "./types";
@@ -50,7 +50,7 @@ describe("GifExporter (real browser)", () => {
 			frameRate: 15,
 			loop: true,
 			sizePreset: "medium",
-			wallpaper: "/wallpapers/wallpaper1.jpg",
+			wallpaper: "/wallp/01.jpg",
 			zoomRegions: [],
 			showShadow: false,
 			shadowIntensity: 0,

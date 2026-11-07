@@ -466,7 +466,7 @@ export function AnnotationOverlay({
 							)}
 							{isSelected && shape !== "freehand" && (
 								<div
-									className="absolute inset-0 pointer-events-none border-2 border-[#34B27B]/80"
+									className="absolute inset-0 pointer-events-none border-2 border-white/60"
 									style={{ borderRadius: shapeBorderRadius }}
 								/>
 							)}
@@ -573,7 +573,7 @@ export function AnnotationOverlay({
 				"cursor-move",
 				isSelected &&
 					annotation.type !== "blur" &&
-					"ring-2 ring-[#34B27B] ring-offset-2 ring-offset-transparent",
+					"ring-2 ring-white/70 ring-offset-2 ring-offset-transparent",
 			)}
 			style={{
 				zIndex: isSelectedBoost ? zIndex + 1000 : zIndex, // keep the selected annotation on top
@@ -592,7 +592,7 @@ export function AnnotationOverlay({
 					width: "12px",
 					height: "12px",
 					backgroundColor: isSelected ? "white" : "transparent",
-					border: isSelected ? "2px solid #34B27B" : "none",
+					border: isSelected ? "2px solid #ffffff" : "none",
 					borderRadius: "50%",
 					left: "-6px",
 					top: "-6px",
@@ -602,7 +602,7 @@ export function AnnotationOverlay({
 					width: "12px",
 					height: "12px",
 					backgroundColor: isSelected ? "white" : "transparent",
-					border: isSelected ? "2px solid #34B27B" : "none",
+					border: isSelected ? "2px solid #ffffff" : "none",
 					borderRadius: "50%",
 					right: "-6px",
 					top: "-6px",
@@ -612,7 +612,7 @@ export function AnnotationOverlay({
 					width: "12px",
 					height: "12px",
 					backgroundColor: isSelected ? "white" : "transparent",
-					border: isSelected ? "2px solid #34B27B" : "none",
+					border: isSelected ? "2px solid #ffffff" : "none",
 					borderRadius: "50%",
 					left: "-6px",
 					bottom: "-6px",
@@ -622,7 +622,7 @@ export function AnnotationOverlay({
 					width: "12px",
 					height: "12px",
 					backgroundColor: isSelected ? "white" : "transparent",
-					border: isSelected ? "2px solid #34B27B" : "none",
+					border: isSelected ? "2px solid #ffffff" : "none",
 					borderRadius: "50%",
 					right: "-6px",
 					bottom: "-6px",

@@ -1,5 +1,14 @@
 import { describe, expect, it } from "vitest";
-import { computeCompositeLayout } from "./compositeLayout";
+import { computeCompositeLayout, reactiveWebcamScale } from "./compositeLayout";
+
+describe("reactiveWebcamScale", () => {
+  it("keeps the webcam pinned and legible while auto-zoom increases", () => {
+    expect(reactiveWebcamScale(1)).toBe(1);
+    expect(reactiveWebcamScale(1.5)).toBeCloseTo(1 / Math.sqrt(1.5));
+    expect(reactiveWebcamScale(3)).toBe(0.72);
+    expect(reactiveWebcamScale(6)).toBe(0.72);
+  });
+});
 
 describe("computeCompositeLayout", () => {
   it("anchors the overlay in the lower-right corner", () => {

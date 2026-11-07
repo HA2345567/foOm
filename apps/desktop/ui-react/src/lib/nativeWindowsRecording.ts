@@ -1,4 +1,4 @@
-export type NativeWindowsSourceType = "display" | "window";
+export type NativeWindowsSourceType = "display" | "window" | "region";
 
 export type NativeWindowsRecordingRequest = {
   recordingId?: number;
@@ -7,6 +7,8 @@ export type NativeWindowsRecordingRequest = {
     sourceId: string;
     displayId?: number;
     windowHandle?: string;
+    /** Selected bounds in physical desktop pixels, including negative monitor origins. */
+    region?: { x: number; y: number; width: number; height: number };
   };
   video: {
     fps: number;

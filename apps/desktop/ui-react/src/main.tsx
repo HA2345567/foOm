@@ -9,43 +9,7 @@ import "./styles.css";
 
 installTauriCompatBridge();
 
-// On fresh app launch, clear any unsaved recording session to start clean and free up disk space.
-const isFreshLaunch = !sessionStorage.getItem("foom-session-initialized");
-if (isFreshLaunch) {
-  sessionStorage.setItem("foom-session-initialized", "true");
-
-  const rawSession = localStorage.getItem("foom-current-recording-session");
-  const projectPath = localStorage.getItem("foom-current-project-path");
-
-  // Only delete files if the session is unsaved (projectPath is null/empty)
-  if (rawSession && !projectPath) {
-    try {
-      const session = JSON.parse(rawSession);
-      const videoPath = session?.screenVideoPath;
-      if (videoPath) {
-        const fileName = videoPath.split(/[\\/]/).pop() ?? "";
-        const match = fileName.match(/^(proj_[^.]+)/);
-        const projectId = match ? match[1] : videoPath;
-        if (window.foomNative && typeof window.foomNative.deleteRecording === "function") {
-          void window.foomNative.deleteRecording(projectId);
-        } else if ("__TAURI_INTERNALS__" in window || "__TAURI__" in window) {
-          import("@tauri-apps/api/core").then(({ invoke }) => {
-            void invoke("delete_recording", { id: projectId }).catch(() => undefined);
-          }).catch(() => undefined);
-        }
-      }
-    } catch (e) {
-      console.error("Failed to clean up stale recording session:", e);
-    }
-  }
-
-  // Clear all temporary recording/project keys from localStorage
-  localStorage.removeItem("foom-current-recording-session");
-  localStorage.removeItem("foom-current-video-path");
-  localStorage.removeItem("foom-current-project-file");
-  localStorage.removeItem("foom-current-project-path");
-}
-
+// Preserve recording and project state so recordings can be recovered after a restart.
 const router = getRouter();
 const currentRecordingSessionKey = "foom-current-recording-session";
 const currentVideoPathKey = "foom-current-video-path";

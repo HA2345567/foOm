@@ -31,7 +31,6 @@ async function getCachedPlatform() {
 }
 
 const TARGET_FRAME_RATE = 60;
-const MIN_FRAME_RATE = 30;
 const TARGET_WIDTH = 3840;
 const TARGET_HEIGHT = 2160;
 const FOUR_K_PIXELS = TARGET_WIDTH * TARGET_HEIGHT;
@@ -52,7 +51,6 @@ const CODEC_ALIGNMENT = 2;
 
 const RECORDER_TIMESLICE_MS = 1000;
 const BITS_PER_MEGABIT = 1_000_000;
-const CHROME_MEDIA_SOURCE = "desktop";
 const RECORDING_FILE_PREFIX = "recording-";
 const VIDEO_FILE_EXTENSION = ".webm";
 const WEBCAM_FILE_SUFFIX = "-webcam";
@@ -65,8 +63,10 @@ const WEBCAM_TARGET_FRAME_RATE = 30;
 
 type UseScreenRecorderReturn = {
   recording: boolean;
+  finalizing: boolean;
   paused: boolean;
   elapsedSeconds: number;
+  countdownValue: number | null;
   toggleRecording: () => void;
   togglePaused: () => void;
   canPauseRecording: boolean;
@@ -93,6 +93,8 @@ type UseScreenRecorderReturn = {
 type RecorderHandle = {
   recorder: MediaRecorder;
   recordedBlobPromise: Promise<Blob>;
+  isNativeSidecarStreamed?: () => boolean;
+  nativeSidecarError?: () => string | null;
 };
 
 type NativeWindowsRecordingHandle = {
@@ -100,6 +102,8 @@ type NativeWindowsRecordingHandle = {
   finalizing: boolean;
   paused: boolean;
   webcamRecorder: RecorderHandle | null;
+  microphoneRecorder: RecorderHandle | null;
+  cursorCaptureMode: CursorCaptureMode;
 };
 
 type NativeMacRecordingHandle = {
@@ -205,31 +209,72 @@ function createBrowserCursorTelemetryRecorder(startedAtMs: number): BrowserCurso
   };
 }
 
-function createRecorderHandle(stream: MediaStream, options: MediaRecorderOptions): RecorderHandle {
+function createRecorderHandle(
+  stream: MediaStream,
+  options: MediaRecorderOptions,
+  nativeSidecar?: { kind: "webcam" },
+): RecorderHandle {
   const recorder = new MediaRecorder(stream, options);
   const chunks: Blob[] = [];
   const mimeType = options.mimeType || "video/webm";
+  const appendSidecarChunk = window.foomNative?.appendRecordingSidecarChunk;
+  const streamSidecar = Boolean(nativeSidecar && typeof appendSidecarChunk === "function");
+  let sidecarSequence = 0;
+  let sidecarError: string | null = null;
+  let sidecarWriteChain = Promise.resolve();
+  const sidecarStartedAt = Date.now();
   const recordedBlobPromise = new Promise<Blob>((resolve, reject) => {
     recorder.ondataavailable = (event: BlobEvent) => {
       if (event.data && event.data.size > 0) {
-        chunks.push(event.data);
+        if (!streamSidecar || !nativeSidecar || sidecarError) {
+          if (!streamSidecar) chunks.push(event.data);
+          return;
+        }
+
+        const sequence = sidecarSequence++;
+        const timestampMs = Math.max(0, Date.now() - sidecarStartedAt);
+        sidecarWriteChain = sidecarWriteChain
+          .then(async () => {
+            const result = await appendSidecarChunk.call(
+              window.foomNative,
+              nativeSidecar.kind,
+              await event.data.arrayBuffer(),
+              timestampMs,
+              sequence,
+            );
+            if (result?.success === false) {
+              throw new Error(result.error ?? "Could not write webcam recording data.");
+            }
+          })
+          .catch((error) => {
+            sidecarError = error instanceof Error ? error.message : String(error);
+          });
       }
     };
     recorder.onerror = () => {
       reject(new Error("Recording failed"));
     };
     recorder.onstop = () => {
-      resolve(new Blob(chunks, { type: mimeType }));
+      void sidecarWriteChain.then(() => resolve(new Blob(chunks, { type: mimeType })));
     };
   });
 
   recorder.start(RECORDER_TIMESLICE_MS);
-  return { recorder, recordedBlobPromise };
+  // A recorder may fail before the user stops. Keep its rejection observed until
+  // finalization can report it and still save the screen capture.
+  void recordedBlobPromise.catch(() => {});
+  return {
+    recorder,
+    recordedBlobPromise,
+    isNativeSidecarStreamed: () => streamSidecar,
+    nativeSidecarError: () => sidecarError,
+  };
 }
 
 export function useScreenRecorder(): UseScreenRecorderReturn {
   const t = useScopedT("editor");
   const [recording, setRecording] = useState(false);
+  const [finalizing, setFinalizing] = useState(false);
   const [paused, setPaused] = useState(false);
   const [elapsedSeconds, setElapsedSeconds] = useState(0);
   const [microphoneEnabled, setMicrophoneEnabled] = useState(() => {
@@ -285,8 +330,10 @@ export function useScreenRecorder(): UseScreenRecorderReturn {
   const discardRecordingId = useRef<number | null>(null);
   const restarting = useRef(false);
   const countdownRunId = useRef(0);
+  const startingRecording = useRef(false);
   const startRecordCountdownRef = useRef<(() => Promise<void>) | null>(null);
   const [countdownActive, setCountdownActive] = useState(false);
+  const [countdownValue, setCountdownValue] = useState<number | null>(null);
   const webcamReady = useRef(false);
   const webcamAcquireId = useRef(0);
   const canPauseRecording =
@@ -479,6 +526,13 @@ export function useScreenRecorder(): UseScreenRecorderReturn {
     };
   }, [webcamEnabled, webcamDeviceId, t]);
 
+  const openEditorForSavedTake = useCallback(async () => {
+    const result = await window.foomNative.switchToEditor();
+    if (result?.success === false) {
+      throw new Error(result.error ?? result.message ?? "Could not open the editor.");
+    }
+  }, []);
+
   const finalizeRecording = useCallback(
     (
       activeScreenRecorder: RecorderHandle,
@@ -490,6 +544,7 @@ export function useScreenRecorder(): UseScreenRecorderReturn {
         return;
       }
       finalizingRecordingId.current = activeRecordingId;
+      setFinalizing(true);
 
       if (screenRecorder.current === activeScreenRecorder) {
         screenRecorder.current = null;
@@ -518,15 +573,25 @@ export function useScreenRecorder(): UseScreenRecorderReturn {
             return;
           }
           if (screenBlob.size === 0) {
+            toast.error("The recording ended without any video data.");
+            void window.foomNative?.hudOverlayShow?.();
             return;
           }
 
           const fixedScreenBlob = await fixWebmDuration(screenBlob, duration);
           let fixedWebcamBlob: Blob | null = null;
           if (activeWebcamRecorder) {
-            const webcamBlob = await activeWebcamRecorder.recordedBlobPromise.catch(() => null);
+            const webcamBlob = await activeWebcamRecorder.recordedBlobPromise.catch((error) => {
+              console.warn("Failed to finalize webcam recording:", error);
+              toast.error("Webcam video could not be saved. Saving the screen recording without it.");
+              return null;
+            });
             if (webcamBlob && webcamBlob.size > 0) {
-              fixedWebcamBlob = await fixWebmDuration(webcamBlob, duration);
+              fixedWebcamBlob = await fixWebmDuration(webcamBlob, duration).catch((error) => {
+                console.warn("Could not normalize webcam video duration:", error);
+                toast.error("Webcam timing could not be adjusted. Saving its original video.");
+                return webcamBlob;
+              });
             }
           }
 
@@ -551,19 +616,32 @@ export function useScreenRecorder(): UseScreenRecorderReturn {
 
           if (!result.success) {
             console.error("Failed to store recording session:", result.message);
+            toast.error(result.message ?? "Could not save the recording.");
+            void window.foomNative?.hudOverlayShow?.();
             return;
           }
 
           if (result.session) {
-            await window.foomNative.setCurrentRecordingSession(result.session);
+            const currentSessionResult = await window.foomNative.setCurrentRecordingSession(result.session);
+            if (currentSessionResult?.success === false) {
+              throw new Error(currentSessionResult.error ?? currentSessionResult.message ?? "Could not load the saved take.");
+            }
           } else if (result.path) {
-            await window.foomNative.setCurrentVideoPath(result.path);
+            const currentVideoResult = await window.foomNative.setCurrentVideoPath(result.path);
+            if (currentVideoResult?.success === false) {
+              throw new Error(currentVideoResult.error ?? currentVideoResult.message ?? "Could not load the saved video.");
+            }
+          } else {
+            throw new Error("Recording finished, but no video file was created.");
           }
 
-          await window.foomNative.switchToEditor();
+          await openEditorForSavedTake();
         } catch (error) {
           console.error("Error saving recording:", error);
+          toast.error(error instanceof Error ? error.message : "Could not save the recording.");
+          void window.foomNative?.hudOverlayShow?.();
         } finally {
+          setFinalizing(false);
           if (finalizingRecordingId.current === activeRecordingId) {
             finalizingRecordingId.current = null;
           }
@@ -573,7 +651,7 @@ export function useScreenRecorder(): UseScreenRecorderReturn {
         }
       })();
     },
-    [cursorCaptureMode, teardownMedia],
+    [cursorCaptureMode, openEditorForSavedTake, teardownMedia],
   );
 
   const finalizeNativeWindowsRecording = useCallback(
@@ -584,6 +662,7 @@ export function useScreenRecorder(): UseScreenRecorderReturn {
       }
 
       activeNativeRecording.finalizing = true;
+      setFinalizing(true);
       const activeWebcamRecorder = activeNativeRecording.webcamRecorder;
       const duration = Math.max(0, getRecordingDurationMs());
       if (
@@ -602,6 +681,7 @@ export function useScreenRecorder(): UseScreenRecorderReturn {
 
       const clearNativeRecordingState = () => {
         nativeWindowsRecording.current = null;
+        teardownMedia();
         setRecording(false);
         setPaused(false);
         setElapsedSeconds(0);
@@ -610,18 +690,42 @@ export function useScreenRecorder(): UseScreenRecorderReturn {
       };
 
       try {
+        const microphoneRecorder = activeNativeRecording.microphoneRecorder;
+        if (microphoneRecorder && microphoneRecorder.recorder.state !== "inactive") {
+          microphoneRecorder.recorder.stop();
+        }
+        const microphoneBlob =
+          microphoneRecorder && !discard
+            ? await microphoneRecorder.recordedBlobPromise.catch((error) => {
+                console.error("Failed to finalize microphone recording:", error);
+                toast.error("Microphone recording failed. Saving the screen recording without it.");
+                return null;
+              })
+            : null;
         let fixedWebcamBlob: Blob | null = null;
         if (activeWebcamRecorder && !discard) {
           const webcamBlob = await activeWebcamRecorder.recordedBlobPromise.catch(() => null);
-          if (webcamBlob && webcamBlob.size > 0) {
-            fixedWebcamBlob = await fixWebmDuration(webcamBlob, duration);
+          if (activeWebcamRecorder.isNativeSidecarStreamed?.()) {
+            const sidecarError = activeWebcamRecorder.nativeSidecarError?.();
+            if (sidecarError) {
+              await window.foomNative.discardRecordingSidecar("webcam");
+              console.error("Failed to stream webcam recording:", sidecarError);
+              toast.error("Webcam video could not be saved. Opening the screen recording without it.");
+            }
+          } else if (webcamBlob && webcamBlob.size > 0) {
+            fixedWebcamBlob = await fixWebmDuration(webcamBlob, duration).catch(() => webcamBlob);
           }
         }
 
         const result = await window.foomNative.stopNativeWindowsRecording({
           discard,
-          cameraVideoData: fixedWebcamBlob ? await fixedWebcamBlob.arrayBuffer() : null,
-          cameraMimeType: fixedWebcamBlob?.type || null,
+          micAudioData: microphoneBlob?.size ? await microphoneBlob.arrayBuffer() : null,
+          cameraVideoData:
+            fixedWebcamBlob && !activeWebcamRecorder?.isNativeSidecarStreamed?.()
+              ? await fixedWebcamBlob.arrayBuffer()
+              : null,
+          cameraMimeType:
+            fixedWebcamBlob?.type || activeWebcamRecorder?.recorder.mimeType || null,
           cameraShape: null,
         });
         if (discard || result.discarded) {
@@ -645,37 +749,45 @@ export function useScreenRecorder(): UseScreenRecorderReturn {
             screenVideoPath: nativeScreenPath,
             createdAt: activeNativeRecording.recordingId,
             durationMs: storedSession.durationMs ?? duration,
-            cursorCaptureMode,
+            cursorCaptureMode: activeNativeRecording.cursorCaptureMode,
           };
         }
 
         clearNativeRecordingState();
         if (storedSession) {
-          await window.foomNative.setCurrentRecordingSession(storedSession);
+          const currentSessionResult = await window.foomNative.setCurrentRecordingSession(storedSession);
+          if (currentSessionResult?.success === false) {
+            throw new Error(currentSessionResult.error ?? currentSessionResult.message ?? "Could not load the saved take.");
+          }
         } else if (result.path) {
-          await window.foomNative.setCurrentVideoPath(result.path);
+          const currentVideoResult = await window.foomNative.setCurrentVideoPath(result.path);
+          if (currentVideoResult?.success === false) {
+            throw new Error(currentVideoResult.error ?? currentVideoResult.message ?? "Could not load the saved video.");
+          }
         } else {
           toast.error("Recording finished, but no video file was created.");
           activeNativeRecording.finalizing = false;
           return true;
         }
 
-        await window.foomNative.switchToEditor();
+        await openEditorForSavedTake();
         return true;
       } catch (error) {
         console.error("Error saving native Windows recording:", error);
         toast.error(
           error instanceof Error ? error.message : "Failed to save native Windows recording",
         );
+        void window.foomNative.hudOverlayShow?.();
         activeNativeRecording.finalizing = false;
         return true;
       } finally {
+        setFinalizing(false);
         if (discardRecordingId.current === activeNativeRecording.recordingId) {
           discardRecordingId.current = null;
         }
       }
     },
-    [cursorCaptureMode, getRecordingDurationMs],
+    [cursorCaptureMode, getRecordingDurationMs, openEditorForSavedTake, teardownMedia],
   );
 
   const finalizeNativeMacRecording = useCallback(
@@ -686,6 +798,7 @@ export function useScreenRecorder(): UseScreenRecorderReturn {
       }
 
       activeNativeRecording.finalizing = true;
+      setFinalizing(true);
       const duration = Math.max(0, getRecordingDurationMs());
       const activeWebcamRecorder = webcamRecorder.current;
       if (activeWebcamRecorder && webcamRecorder.current === activeWebcamRecorder) {
@@ -757,34 +870,51 @@ export function useScreenRecorder(): UseScreenRecorderReturn {
 
         clearNativeRecordingState();
         if (result.session) {
-          await window.foomNative.setCurrentRecordingSession(result.session);
+          const currentSessionResult = await window.foomNative.setCurrentRecordingSession(result.session);
+          if (currentSessionResult?.success === false) {
+            throw new Error(currentSessionResult.error ?? currentSessionResult.message ?? "Could not load the saved take.");
+          }
         } else if (result.path) {
-          await window.foomNative.setCurrentVideoPath(result.path);
+          const currentVideoResult = await window.foomNative.setCurrentVideoPath(result.path);
+          if (currentVideoResult?.success === false) {
+            throw new Error(currentVideoResult.error ?? currentVideoResult.message ?? "Could not load the saved video.");
+          }
         } else {
           toast.error("Recording finished, but no video file was created.");
           activeNativeRecording.finalizing = false;
           return true;
         }
 
-        await window.foomNative.switchToEditor();
+        await openEditorForSavedTake();
         return true;
       } catch (error) {
         console.error("Error saving native macOS recording:", error);
         toast.error(
           error instanceof Error ? error.message : "Failed to save native macOS recording",
         );
+        void window.foomNative.hudOverlayShow?.();
         activeNativeRecording.finalizing = false;
         return true;
       } finally {
+        setFinalizing(false);
         if (discardRecordingId.current === activeNativeRecording.recordingId) {
           discardRecordingId.current = null;
         }
       }
     },
-    [cursorCaptureMode, getRecordingDurationMs],
+    [cursorCaptureMode, getRecordingDurationMs, openEditorForSavedTake],
   );
 
-  const stopRecording = useRef(() => {
+  const nativeFinalizers = useRef({
+    windows: finalizeNativeWindowsRecording,
+    mac: finalizeNativeMacRecording,
+  });
+  nativeFinalizers.current = {
+    windows: finalizeNativeWindowsRecording,
+    mac: finalizeNativeMacRecording,
+  };
+  const stopRecording = useRef<() => void>(() => {});
+  stopRecording.current = () => {
     if (nativeWindowsRecording.current) {
       void finalizeNativeWindowsRecording(false);
       return;
@@ -832,15 +962,7 @@ export function useScreenRecorder(): UseScreenRecorderReturn {
         }
       }
     }
-  });
-
-  const safeHideCountdownOverlay = useCallback(async (runId: number) => {
-    try {
-      await window.foomNative.hideCountdownOverlay(runId);
-    } catch (error) {
-      console.warn("Failed to hide countdown overlay:", error);
-    }
-  }, []);
+  };
 
   const safeHideRecordingOverlayBeforeCapture = useCallback(async () => {
     try {
@@ -869,18 +991,16 @@ export function useScreenRecorder(): UseScreenRecorderReturn {
     }
 
     return () => {
-      const activeRunId = countdownRunId.current;
       if (cleanup) cleanup();
       countdownRunId.current += 1;
-      void safeHideCountdownOverlay(activeRunId);
       allowAutoFinalize.current = false;
       restarting.current = false;
       discardRecordingId.current = null;
       if (nativeWindowsRecording.current) {
-        void finalizeNativeWindowsRecording(true);
+        void nativeFinalizers.current.windows(true);
       }
       if (nativeMacRecording.current) {
-        void finalizeNativeMacRecording(true);
+        void nativeFinalizers.current.mac(true);
       }
 
       if (
@@ -907,12 +1027,7 @@ export function useScreenRecorder(): UseScreenRecorderReturn {
       webcamRecorder.current = null;
       teardownMedia();
     };
-  }, [
-    teardownMedia,
-    safeHideCountdownOverlay,
-    finalizeNativeWindowsRecording,
-    finalizeNativeMacRecording,
-  ]);
+  }, [teardownMedia]);
 
   useEffect(() => {
     if (!window.foomNative?.onSourceSelected) return;
@@ -937,11 +1052,10 @@ export function useScreenRecorder(): UseScreenRecorderReturn {
   }, []);
 
   const cancelCountdown = () => {
-    const activeRunId = countdownRunId.current;
     countdownRunId.current += 1;
     setCountdownActive(false);
+    setCountdownValue(null);
     setRecording(false);
-    void safeHideCountdownOverlay(activeRunId);
     void safeShowRecordingOverlayAfterCaptureStart();
   };
 
@@ -971,6 +1085,9 @@ export function useScreenRecorder(): UseScreenRecorderReturn {
     selectedSource: ProcessedDesktopSource,
     countdownRunToken?: number,
   ) => {
+    let browserMicrophoneRecorder: RecorderHandle | null = null;
+    let browserWebcamRecorder: RecorderHandle | null = null;
+    let nativeStarted = false;
     try {
       const platform = await getCachedPlatform();
       if (platform !== "win32") {
@@ -1002,7 +1119,7 @@ export function useScreenRecorder(): UseScreenRecorderReturn {
 
       const activeRecordingId = Date.now();
       const displayId = Number(selectedSource.display_id);
-      const sourceType = selectedSource.id.startsWith("window:") ? "window" : "display";
+      const sourceType = selectedSource.type === "region" ? "region" : selectedSource.id.startsWith("window:") ? "window" : "display";
       const windowHandle = parseWindowHandleFromSourceId(selectedSource.id);
       if (webcamEnabled) {
         await waitForWebcamReady();
@@ -1010,14 +1127,28 @@ export function useScreenRecorder(): UseScreenRecorderReturn {
           return true;
         }
       }
-      const browserWebcamRecorder =
-        webcamEnabled && webcamStream.current
-          ? createRecorderHandle(webcamStream.current, {
-              mimeType: selectMimeType(),
-              videoBitsPerSecond: BITRATE_BASE,
-            })
-          : null;
-      if (webcamEnabled && !browserWebcamRecorder) {
+      if (microphoneEnabled) {
+        try {
+          microphoneStream.current = await navigator.mediaDevices.getUserMedia({
+            audio: {
+              ...(microphoneDeviceId ? { deviceId: { exact: microphoneDeviceId } } : {}),
+              echoCancellation: true,
+              noiseSuppression: true,
+              autoGainControl: true,
+            },
+            video: false,
+          });
+        } catch (error) {
+          console.warn("Failed to get microphone access:", error);
+          toast.error(t("recording.microphoneDenied"));
+          setMicrophoneEnabled(false);
+        }
+      }
+      if (!isCountdownRunActive(countdownRunToken)) {
+        teardownMedia();
+        return true;
+      }
+      if (webcamEnabled && !webcamStream.current) {
         stopWebcamPreviewStream();
       }
       const request: NativeWindowsRecordingRequest = {
@@ -1025,6 +1156,7 @@ export function useScreenRecorder(): UseScreenRecorderReturn {
         source: {
           type: sourceType,
           sourceId: selectedSource.id,
+          ...(selectedSource.region ? { region: selectedSource.region } : {}),
           ...(Number.isFinite(displayId) ? { displayId } : {}),
           ...(windowHandle ? { windowHandle } : {}),
         },
@@ -1045,7 +1177,7 @@ export function useScreenRecorder(): UseScreenRecorderReturn {
           },
         },
         webcam: {
-          enabled: webcamEnabled && !browserWebcamRecorder,
+          enabled: false,
           deviceId: webcamDeviceId,
           deviceName: webcamDeviceName,
           width: 0,
@@ -1058,13 +1190,30 @@ export function useScreenRecorder(): UseScreenRecorderReturn {
       };
       const result = await window.foomNative.startNativeWindowsRecording(request);
       if (!result.success || !result.recordingId) {
-        if (
-          browserWebcamRecorder?.recorder.state === "recording" ||
-          browserWebcamRecorder?.recorder.state === "paused"
-        ) {
-          browserWebcamRecorder.recorder.stop();
-        }
         throw new Error(result.error ?? "Native Windows capture failed.");
+      }
+      nativeStarted = true;
+      if (!isCountdownRunActive(countdownRunToken)) {
+        await window.foomNative.stopNativeWindowsRecording({ discard: true });
+        nativeStarted = false;
+        teardownMedia();
+        return true;
+      }
+      browserWebcamRecorder =
+        webcamEnabled && webcamStream.current
+          ? createRecorderHandle(webcamStream.current, {
+              mimeType: selectMimeType(),
+              videoBitsPerSecond: BITRATE_BASE,
+            }, { kind: "webcam" })
+          : null;
+      if (microphoneStream.current) {
+        const mimeType = ["audio/webm;codecs=opus", "audio/webm"].find((type) =>
+          MediaRecorder.isTypeSupported(type),
+        );
+        browserMicrophoneRecorder = createRecorderHandle(microphoneStream.current, {
+          ...(mimeType ? { mimeType } : {}),
+          audioBitsPerSecond: AUDIO_BITRATE_VOICE,
+        });
       }
 
       recordingId.current = result.recordingId;
@@ -1073,17 +1222,29 @@ export function useScreenRecorder(): UseScreenRecorderReturn {
         finalizing: false,
         paused: false,
         webcamRecorder: browserWebcamRecorder,
+        microphoneRecorder: browserMicrophoneRecorder,
+        cursorCaptureMode,
       };
       webcamRecorder.current = browserWebcamRecorder;
       accumulatedDurationMs.current = 0;
       segmentStartedAt.current = Date.now();
       allowAutoFinalize.current = true;
       setRecording(true);
+      setFinalizing(false);
       setPaused(false);
       setElapsedSeconds(0);
+      // Keep the stop control reachable. The native shell excludes this HUD from
+      // captured frames while leaving it visible on the desktop.
       await safeShowRecordingOverlayAfterCaptureStart();
       return true;
     } catch (error) {
+      for (const handle of [browserMicrophoneRecorder, browserWebcamRecorder]) {
+        if (handle && handle.recorder.state !== "inactive") handle.recorder.stop();
+      }
+      if (nativeStarted) {
+        await window.foomNative.stopNativeWindowsRecording({ discard: true }).catch(console.error);
+      }
+      teardownMedia();
       console.error("Native Windows capture failed:", error);
       throw error;
     }
@@ -1230,6 +1391,7 @@ export function useScreenRecorder(): UseScreenRecorderReturn {
       segmentStartedAt.current = Date.now();
       allowAutoFinalize.current = true;
       setRecording(true);
+      setFinalizing(false);
       setPaused(false);
       setElapsedSeconds(0);
       await safeShowRecordingOverlayAfterCaptureStart();
@@ -1241,97 +1403,113 @@ export function useScreenRecorder(): UseScreenRecorderReturn {
   };
 
   const startRecordCountdown = async () => {
-    if (countdownActive || recording) {
+    if (startingRecording.current || countdownActive || recording) {
       return;
     }
 
     const runId = countdownRunId.current + 1;
     countdownRunId.current = runId;
-
-    // Optimistically hide the overlay immediately (feels instant!)
-    let overlayHiddenBeforeStart = false;
+    startingRecording.current = true;
+    setCountdownActive(true);
     try {
-      setRecording(true);
-      setPaused(false);
-      setElapsedSeconds(0);
-      setCountdownActive(false);
-      await safeHideCountdownOverlay(runId);
+      // Keep the floating controls visible while the countdown is running.
+      let overlayHiddenBeforeStart = false;
+      try {
+        setRecording(true);
+        setPaused(false);
+        setElapsedSeconds(0);
+        setCountdownValue(3);
+      } catch (e) {
+        console.warn("Failed to prepare the recording countdown:", e);
+      }
+
+      if (!isCountdownRunActive(runId)) {
+        if (overlayHiddenBeforeStart) {
+          setRecording(false);
+          await safeShowRecordingOverlayAfterCaptureStart();
+        }
+        return;
+      }
+
+      let selectedSource: ProcessedDesktopSource | null = null;
+      try {
+        selectedSource = await window.foomNative.getSelectedSource();
+      } catch (error) {
+        console.warn("Failed to read selected source before countdown:", error);
+      }
+
+      if (!isCountdownRunActive(runId)) {
+        if (overlayHiddenBeforeStart) {
+          setRecording(false);
+          await safeShowRecordingOverlayAfterCaptureStart();
+        }
+        return;
+      }
+
+      if (!selectedSource) {
+        if (countdownRunId.current === runId) {
+          setCountdownActive(false);
+        }
+        setCountdownValue(null);
+        setRecording(false);
+        if (overlayHiddenBeforeStart) {
+          await safeShowRecordingOverlayAfterCaptureStart();
+        }
+        toast.error(t("recording.selectSource"));
+        return;
+      }
+
+      try {
+        const platform = await getCachedPlatform();
+        if (platform === "darwin" && cursorCaptureMode === "editable-overlay") {
+          const access = await window.foomNative.requestNativeMacCursorAccess();
+          if (!access.granted) {
+            setCountdownValue(null);
+            setRecording(false);
+            if (overlayHiddenBeforeStart) {
+              await safeShowRecordingOverlayAfterCaptureStart();
+            }
+            toast.info(t("recording.accessibilityAllowAndRetry"));
+            return;
+          }
+        }
+      } catch (error) {
+        console.warn("Failed to preflight macOS cursor accessibility before countdown:", error);
+      }
+
+      if (!isCountdownRunActive(runId)) {
+        if (overlayHiddenBeforeStart) {
+          setRecording(false);
+          await safeShowRecordingOverlayAfterCaptureStart();
+        }
+        return;
+      }
+
+      // Keep the countdown in the floating toolbar. Do not create a separate
+      // full-screen transparent window over the user's desktop.
+      for (let value = 3; value >= 1; value -= 1) {
+        if (!isCountdownRunActive(runId)) return;
+        setCountdownValue(value);
+        await new Promise((resolve) => window.setTimeout(resolve, 1000));
+      }
+
+      if (!isCountdownRunActive(runId)) return;
+      setCountdownValue(null);
+
       await safeHideRecordingOverlayBeforeCapture();
       overlayHiddenBeforeStart = true;
-    } catch (e) {
-      console.warn("Failed to hide overlay on record start:", e);
-    }
 
-    if (!isCountdownRunActive(runId)) {
-      if (overlayHiddenBeforeStart) {
-        setRecording(false);
-        await safeShowRecordingOverlayAfterCaptureStart();
+      try {
+        await startRecording(runId, selectedSource);
+      } catch (error) {
+        // Catch block of startRecording handles resetting state & restoring overlay
       }
-      return;
-    }
-
-    let selectedSource: ProcessedDesktopSource | null = null;
-    try {
-      selectedSource = await window.foomNative.getSelectedSource();
-    } catch (error) {
-      console.warn("Failed to read selected source before countdown:", error);
-    }
-
-    if (!isCountdownRunActive(runId)) {
-      if (overlayHiddenBeforeStart) {
-        setRecording(false);
-        await safeShowRecordingOverlayAfterCaptureStart();
-      }
-      return;
-    }
-
-    if (!selectedSource) {
+    } finally {
+      startingRecording.current = false;
       if (countdownRunId.current === runId) {
         setCountdownActive(false);
+        setCountdownValue(null);
       }
-      if (overlayHiddenBeforeStart) {
-        setRecording(false);
-        await safeShowRecordingOverlayAfterCaptureStart();
-      }
-      alert(t("recording.selectSource"));
-      return;
-    }
-
-    try {
-      const platform = await getCachedPlatform();
-      if (platform === "darwin" && cursorCaptureMode === "editable-overlay") {
-        const access = await window.foomNative.requestNativeMacCursorAccess();
-        if (!access.granted) {
-          if (overlayHiddenBeforeStart) {
-            setRecording(false);
-            await safeShowRecordingOverlayAfterCaptureStart();
-          }
-          toast.info(t("recording.accessibilityAllowAndRetry"));
-          return;
-        }
-      }
-    } catch (error) {
-      console.warn("Failed to preflight macOS cursor accessibility before countdown:", error);
-    }
-
-    if (!isCountdownRunActive(runId)) {
-      if (overlayHiddenBeforeStart) {
-        setRecording(false);
-        await safeShowRecordingOverlayAfterCaptureStart();
-      }
-      return;
-    }
-
-    setCountdownActive(false);
-    await safeHideCountdownOverlay(runId);
-    // Give the overlay a short moment to disappear before capture starts without
-    // making the user wait through a visible countdown.
-    await new Promise((resolve) => window.setTimeout(resolve, 120));
-
-    try {
-      await startRecording(runId, selectedSource);
-    } catch (error) {
-      // Catch block of startRecording handles resetting state & restoring overlay
     }
   };
   startRecordCountdownRef.current = startRecordCountdown;
@@ -1343,7 +1521,7 @@ export function useScreenRecorder(): UseScreenRecorderReturn {
     try {
       const selectedSource = preselectedSource || (await window.foomNative.getSelectedSource());
       if (!selectedSource) {
-        alert(t("recording.selectSource"));
+        toast.error(t("recording.selectSource"));
         return;
       }
 
@@ -1360,61 +1538,37 @@ export function useScreenRecorder(): UseScreenRecorderReturn {
       }
 
       let screenMediaStream: MediaStream;
-      const platform = await getCachedPlatform();
 
-      if (platform === "win32") {
-        // getDisplayMedia + setDisplayMediaRequestHandler (main.ts) supplies the
-        // pre-selected source. Editable cursor mode excludes the system cursor so
-        // the editor can render a replacement; system mode bakes it into the video.
+      if (!navigator.mediaDevices.getDisplayMedia) {
+        throw new Error("Screen capture is not supported by this platform's WebView.");
+      }
+
+      // Windows' native display-media request handler supplies the preselected
+      // source. Other platforms use the OS/browser picker rather than Chromium's
+      // non-standard chromeMediaSource getUserMedia constraints.
+      const displayMediaOptions: DisplayMediaStreamOptions = {
+        video: {
+          cursor:
+            window.foomNative?.isBrowserPreview || cursorCaptureMode === "system"
+              ? "always"
+              : "never",
+          width: { max: TARGET_WIDTH },
+          height: { max: TARGET_HEIGHT },
+          frameRate: { ideal: TARGET_FRAME_RATE },
+        } as MediaTrackConstraints,
+        audio: systemAudioEnabled,
+      };
+      try {
+        screenMediaStream = await navigator.mediaDevices.getDisplayMedia(displayMediaOptions);
+      } catch (captureError) {
+        if (!systemAudioEnabled) throw captureError;
+
+        console.warn("System audio capture failed, retrying with video only:", captureError);
+        toast.error(t("recording.systemAudioUnavailable"));
         screenMediaStream = await navigator.mediaDevices.getDisplayMedia({
-          video: {
-            cursor:
-              window.foomNative?.isBrowserPreview || cursorCaptureMode === "system"
-                ? "always"
-                : "never",
-            width: { max: TARGET_WIDTH },
-            height: { max: TARGET_HEIGHT },
-            frameRate: { ideal: TARGET_FRAME_RATE },
-          } as MediaTrackConstraints,
-          audio: systemAudioEnabled,
-        } as DisplayMediaStreamOptions);
-      } else {
-        const videoConstraints = {
-          mandatory: {
-            chromeMediaSource: CHROME_MEDIA_SOURCE,
-            chromeMediaSourceId: selectedSource.id,
-            maxWidth: TARGET_WIDTH,
-            maxHeight: TARGET_HEIGHT,
-            maxFrameRate: TARGET_FRAME_RATE,
-            minFrameRate: MIN_FRAME_RATE,
-          },
-        };
-
-        if (systemAudioEnabled) {
-          try {
-            screenMediaStream = await navigator.mediaDevices.getUserMedia({
-              audio: {
-                mandatory: {
-                  chromeMediaSource: CHROME_MEDIA_SOURCE,
-                  chromeMediaSourceId: selectedSource.id,
-                },
-              },
-              video: videoConstraints,
-            } as unknown as MediaStreamConstraints);
-          } catch (audioErr) {
-            console.warn("System audio capture failed, falling back to video-only:", audioErr);
-            toast.error(t("recording.systemAudioUnavailable"));
-            screenMediaStream = await navigator.mediaDevices.getUserMedia({
-              audio: false,
-              video: videoConstraints,
-            } as unknown as MediaStreamConstraints);
-          }
-        } else {
-          screenMediaStream = await navigator.mediaDevices.getUserMedia({
-            audio: false,
-            video: videoConstraints,
-          } as unknown as MediaStreamConstraints);
-        }
+          ...displayMediaOptions,
+          audio: false,
+        });
       }
       screenStream.current = screenMediaStream;
 
@@ -1634,6 +1788,12 @@ export function useScreenRecorder(): UseScreenRecorderReturn {
               throw new Error(result.error ?? "Failed to resume native Windows recording");
             }
             activeNativeWindowsRecording.paused = false;
+            for (const handle of [
+              activeNativeWindowsRecording.webcamRecorder,
+              activeNativeWindowsRecording.microphoneRecorder,
+            ]) {
+              if (handle?.recorder.state === "paused") handle.recorder.resume();
+            }
             segmentStartedAt.current = Date.now();
             setPaused(false);
             return;
@@ -1645,6 +1805,12 @@ export function useScreenRecorder(): UseScreenRecorderReturn {
             throw new Error(result.error ?? "Failed to pause native Windows recording");
           }
           activeNativeWindowsRecording.paused = true;
+          for (const handle of [
+            activeNativeWindowsRecording.webcamRecorder,
+            activeNativeWindowsRecording.microphoneRecorder,
+          ]) {
+            if (handle?.recorder.state === "recording") handle.recorder.pause();
+          }
           accumulatedDurationMs.current = pausedAtMs;
           segmentStartedAt.current = null;
           setElapsedSeconds(Math.floor(accumulatedDurationMs.current / 1000));
@@ -1736,14 +1902,24 @@ export function useScreenRecorder(): UseScreenRecorderReturn {
     }
   };
 
-  const toggleRecording = () => {
-    if (recording) {
-      stopRecording.current();
-      return;
+  const openRecordingSourceSelector = async () => {
+    try {
+      const result = await window.foomNative.openSourceSelector();
+      if (result?.opened === false) throw new Error(result.reason || "Could not open capture source selection. Try again.");
+    } catch (error) {
+      localStorage.removeItem("foom-start-recording-after-select");
+      toast.error(error instanceof Error ? error.message : "Could not open capture source selection. Try again.");
     }
+  };
 
+  const toggleRecording = () => {
+    if (finalizing) return;
     if (countdownActive) {
       cancelCountdown();
+      return;
+    }
+    if (recording) {
+      stopRecording.current();
       return;
     }
 
@@ -1766,7 +1942,7 @@ export function useScreenRecorder(): UseScreenRecorderReturn {
       }
 
       if (window.foomNative?.openSourceSelector) {
-        window.foomNative.openSourceSelector();
+        await openRecordingSourceSelector();
       } else {
         await startRecordCountdown();
       }
@@ -1774,7 +1950,7 @@ export function useScreenRecorder(): UseScreenRecorderReturn {
   };
 
   const restartRecording = async () => {
-    if (restarting.current) return;
+    if (finalizing || restarting.current) return;
 
     if (nativeWindowsRecording.current) {
       const activeRecordingId = recordingId.current;
@@ -1786,7 +1962,7 @@ export function useScreenRecorder(): UseScreenRecorderReturn {
         void window.foomNative.hudOverlayShow?.();
         if (window.foomNative?.openSourceSelector) {
           localStorage.setItem("foom-start-recording-after-select", "true");
-          window.foomNative.openSourceSelector();
+          await openRecordingSourceSelector();
         } else {
           await startRecordCountdown();
         }
@@ -1805,7 +1981,7 @@ export function useScreenRecorder(): UseScreenRecorderReturn {
         void window.foomNative.hudOverlayShow?.();
         if (window.foomNative?.openSourceSelector) {
           localStorage.setItem("foom-start-recording-after-select", "true");
-          window.foomNative.openSourceSelector();
+          await openRecordingSourceSelector();
         } else {
           await startRecordCountdown();
         }
@@ -1873,6 +2049,7 @@ export function useScreenRecorder(): UseScreenRecorderReturn {
   }, [getRecordingDurationMs, paused, recording]);
 
   const cancelRecording = () => {
+    if (finalizing) return;
     if (nativeWindowsRecording.current) {
       const activeRecordingId = recordingId.current;
       discardRecordingId.current = activeRecordingId;
@@ -1909,8 +2086,10 @@ export function useScreenRecorder(): UseScreenRecorderReturn {
 
   return {
     recording,
+    finalizing,
     paused,
     elapsedSeconds,
+    countdownValue,
     toggleRecording,
     togglePaused,
     canPauseRecording,

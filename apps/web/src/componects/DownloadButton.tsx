@@ -53,12 +53,12 @@ export function DownloadButton({
 
   const envDownloadUrl = import.meta.env.VITE_DOWNLOAD_URL;
   const githubRepo = import.meta.env.VITE_GITHUB_REPO || "HA2345567/foOm";
-  const defaultDownloadUrl = `https://github.com/${githubRepo}/releases/latest`;
+  const defaultDownloadUrl = "/downloads/foom-setup.exe";
   const targetDownloadUrl =
     envDownloadUrl && (envDownloadUrl.startsWith("http://") || envDownloadUrl.startsWith("https://"))
       ? envDownloadUrl
       : defaultDownloadUrl;
-  const githubReleaseUrl = targetDownloadUrl;
+  const githubReleaseUrl = `https://github.com/${githubRepo}/releases/latest`;
 
   const handleDownloadClick = (e: React.MouseEvent) => {
     e.preventDefault();
@@ -113,13 +113,38 @@ export function DownloadButton({
                 <ShieldCheck className="w-6 h-6 text-emerald-400" />
               </div>
               <div>
-                <h3 className="text-lg font-bold text-white leading-tight">Production Release Binary</h3>
-                <p className="text-xs text-zinc-400 font-medium">Verified Windows Desktop Application</p>
+                <h3 className="text-lg font-bold text-white leading-tight">Windows installer</h3>
+                <p className="text-xs text-zinc-400 font-medium">Windows-first desktop build</p>
               </div>
             </div>
 
             <p className="text-zinc-300 text-sm leading-relaxed mb-6">
-              Production desktop binaries (<strong>foom-setup.exe • 288 MB</strong>) are hosted securely via GitHub Releases CDN to ensure high-speed global downloads.
+              Download the current Windows installer (<strong>foom-setup.exe • 318 MB</strong>). Native macOS and Linux capture are still in development.
+            </p>
+
+            <p className="-mt-3 mb-6 text-xs text-zinc-400">
+              The Windows installer includes FFmpeg under GPLv3. See the{" "}
+              <a
+                href="/THIRD_PARTY_NOTICES.md"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-emerald-400 underline underline-offset-2 hover:text-emerald-300"
+              >
+                third-party license details
+              </a>
+              .
+            </p>
+            <p className="-mt-4 mb-6 text-xs text-zinc-400">
+              foOom source is licensed under{" "}
+              <a
+                href="/LICENSE"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-emerald-400 underline underline-offset-2 hover:text-emerald-300"
+              >
+                MIT
+              </a>
+              .
             </p>
 
             <div className="space-y-3 mb-6">
@@ -132,7 +157,7 @@ export function DownloadButton({
               >
                 <span className="flex items-center gap-2">
                   <Download className="w-4 h-4 text-black" />
-                  Download from GitHub Releases CDN
+                  Download Windows installer
                 </span>
                 <ExternalLink className="w-4 h-4 text-zinc-600 group-hover:translate-x-0.5 transition-transform" />
               </a>

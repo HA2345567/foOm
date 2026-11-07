@@ -1,4 +1,5 @@
 import type { WebcamLayoutPreset } from "@/lib/compositeLayout";
+import type { NativeCursorType } from "@/native/contracts";
 
 export type ZoomDepth = 1 | 2 | 3 | 4 | 5 | 6;
 export type ZoomFocusMode = "manual" | "auto";
@@ -179,18 +180,11 @@ export interface CursorTelemetryPoint {
 	timeMs: number;
 	cx: number;
 	cy: number;
+	visible?: boolean;
 	interactionType?: "move" | "click" | "double-click" | "right-click" | "middle-click" | "mouseup";
-	cursorType?:
-	| "arrow"
-	| "text"
-	| "pointer"
-	| "crosshair"
-	| "open-hand"
-	| "closed-hand"
-	| "resize-ew"
-	| "resize-ns"
-	| "not-allowed";
+	cursorType?: NativeCursorType;
 }
+
 
 export interface CursorVisualSettings {
 	size: number;
@@ -200,9 +194,9 @@ export interface CursorVisualSettings {
 	clipToBounds: boolean;
 }
 
-export type CursorStyle = "arrow" | "normal";
+export type CursorStyle = "arrow" | "normal" | "default" | `mac-${string}`;
 
-export const DEFAULT_CURSOR_SIZE = 3.0;
+export const DEFAULT_CURSOR_SIZE = 1.5;
 export const DEFAULT_CURSOR_SMOOTHING = 0.67;
 export const DEFAULT_CURSOR_MOTION_BLUR = 0.35;
 export const DEFAULT_CURSOR_CLICK_BOUNCE = 2.5;

@@ -10,6 +10,7 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as VideoEditorRouteImport } from './routes/video-editor'
+import { Route as SourceSelectorRouteImport } from './routes/source-selector'
 import { Route as SettingsRouteImport } from './routes/settings'
 import { Route as RecordRouteImport } from './routes/record'
 import { Route as EditorRouteImport } from './routes/editor'
@@ -19,6 +20,11 @@ import { Route as OverlayRecordingRouteImport } from './routes/overlay.recording
 const VideoEditorRoute = VideoEditorRouteImport.update({
   id: '/video-editor',
   path: '/video-editor',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const SourceSelectorRoute = SourceSelectorRouteImport.update({
+  id: '/source-selector',
+  path: '/source-selector',
   getParentRoute: () => rootRouteImport,
 } as any)
 const SettingsRoute = SettingsRouteImport.update({
@@ -52,6 +58,7 @@ export interface FileRoutesByFullPath {
   '/editor': typeof EditorRoute
   '/record': typeof RecordRoute
   '/settings': typeof SettingsRoute
+  '/source-selector': typeof SourceSelectorRoute
   '/video-editor': typeof VideoEditorRoute
   '/overlay/recording': typeof OverlayRecordingRoute
 }
@@ -60,6 +67,7 @@ export interface FileRoutesByTo {
   '/editor': typeof EditorRoute
   '/record': typeof RecordRoute
   '/settings': typeof SettingsRoute
+  '/source-selector': typeof SourceSelectorRoute
   '/video-editor': typeof VideoEditorRoute
   '/overlay/recording': typeof OverlayRecordingRoute
 }
@@ -69,6 +77,7 @@ export interface FileRoutesById {
   '/editor': typeof EditorRoute
   '/record': typeof RecordRoute
   '/settings': typeof SettingsRoute
+  '/source-selector': typeof SourceSelectorRoute
   '/video-editor': typeof VideoEditorRoute
   '/overlay/recording': typeof OverlayRecordingRoute
 }
@@ -79,6 +88,7 @@ export interface FileRouteTypes {
     | '/editor'
     | '/record'
     | '/settings'
+    | '/source-selector'
     | '/video-editor'
     | '/overlay/recording'
   fileRoutesByTo: FileRoutesByTo
@@ -87,6 +97,7 @@ export interface FileRouteTypes {
     | '/editor'
     | '/record'
     | '/settings'
+    | '/source-selector'
     | '/video-editor'
     | '/overlay/recording'
   id:
@@ -95,6 +106,7 @@ export interface FileRouteTypes {
     | '/editor'
     | '/record'
     | '/settings'
+    | '/source-selector'
     | '/video-editor'
     | '/overlay/recording'
   fileRoutesById: FileRoutesById
@@ -104,6 +116,7 @@ export interface RootRouteChildren {
   EditorRoute: typeof EditorRoute
   RecordRoute: typeof RecordRoute
   SettingsRoute: typeof SettingsRoute
+  SourceSelectorRoute: typeof SourceSelectorRoute
   VideoEditorRoute: typeof VideoEditorRoute
   OverlayRecordingRoute: typeof OverlayRecordingRoute
 }
@@ -115,6 +128,13 @@ declare module '@tanstack/react-router' {
       path: '/video-editor'
       fullPath: '/video-editor'
       preLoaderRoute: typeof VideoEditorRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/source-selector': {
+      id: '/source-selector'
+      path: '/source-selector'
+      fullPath: '/source-selector'
+      preLoaderRoute: typeof SourceSelectorRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/settings': {
@@ -160,6 +180,7 @@ const rootRouteChildren: RootRouteChildren = {
   EditorRoute: EditorRoute,
   RecordRoute: RecordRoute,
   SettingsRoute: SettingsRoute,
+  SourceSelectorRoute: SourceSelectorRoute,
   VideoEditorRoute: VideoEditorRoute,
   OverlayRecordingRoute: OverlayRecordingRoute,
 }

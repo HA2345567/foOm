@@ -1,19 +1,19 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
-  "productName": "foOm",
+  "productName": "foOom",
   "version": "0.2.0",
   "identifier": "com.foom.desktop",
   "build": {
     "frontendDist": "../../ui-react/dist",
     "devUrl": "http://localhost:5174",
-    "beforeDevCommand": "",
-    "beforeBuildCommand": "cd ../ui-react && bun x vite build"
+    "beforeDevCommand": "bun run --cwd ../../.. prepare:desktop && bun run --cwd ../ui-react dev",
+    "beforeBuildCommand": "bun run --cwd ../../.. prepare:desktop && bun run --cwd ../ui-react build"
   },
   "app": {
     "windows": [
       {
         "label": "main",
-        "title": "foOm",
+        "title": "foOom Studio",
         "width": 1280,
         "height": 800,
         "minWidth": 900,
@@ -35,6 +35,10 @@
     }
   },
   "bundle": {
+    "resources": {
+      "../../../../LICENSE": "LICENSE",
+      "../../../../THIRD_PARTY_NOTICES.md": "THIRD_PARTY_NOTICES.md"
+    },
     "externalBin": [
       "binaries/ffmpeg"
     ],
@@ -48,9 +52,9 @@
       "icons/icon.ico"
     ],
     "publisher": "Harsh Bhardwaj",
-    "copyright": "Copyright 2026 Harsh Bhardwaj. All rights reserved.",
-    "shortDescription": "Cinematic Screen Recorder with Auto-Zoom",
-    "longDescription": "foOm is a cinematic screen recorder with AI-powered auto-zoom. Record beautiful, professional-looking videos without any editing.",
+    "copyright": "Copyright (c) 2026 Harsh Bhardwaj. Licensed under MIT.",
+    "shortDescription": "Open-source screen recorder and editor",
+    "longDescription": "foOom is an open-source-first screen recorder and focused video editor. Windows is the first supported platform; macOS and Linux capture support is under development.",
     "windows": {
       "nsis": {
         "installMode": "currentUser",

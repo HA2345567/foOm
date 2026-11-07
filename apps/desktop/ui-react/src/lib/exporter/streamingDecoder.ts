@@ -1,11 +1,12 @@
-import { WebDemuxer } from "web-demuxer";
+import { ALL_FORMATS, BlobSource, EncodedPacketSink, Input } from "mediabunny";
+import type { InputVideoTrack } from "mediabunny";
 import type { SpeedRegion, TrimRegion } from "@/components/video-editor/types";
+import { normalizeTrimRegions } from "./trimRegions";
 
 const SOURCE_LOAD_TIMEOUT_MS = 60_000;
 const EPSILON_SEC = 0.001;
 /**
  * Build a full WebCodecs-compatible AV1 codec string from the AV1CodecConfigurationRecord.
- * web-demuxer can return a bare "av01" when the WASM parser fails to read the extradata.
  * Parses the record if present, otherwise returns a safe default.
  *
  * @see https://aomediacodec.github.io/av1-isobmff/#av1codecconfigurationbox-section
@@ -69,10 +70,6 @@ const EARLY_DECODE_END_THRESHOLD_SEC = 1;
 const METADATA_TAIL_TOLERANCE_SEC = 2;
 const STREAM_DURATION_MATCH_TOLERANCE_SEC = 0.25;
 const DURATION_DIVERGENCE_THRESHOLD_SEC = 1.5;
-// Fallback upper bound for the packet scan when no reliable duration hint exists.
-// An explicit end is required (some containers are truncated without one), but a
-// hint-derived bound would cap the scan early when duration is missing or corrupt.
-const SCAN_UNBOUNDED_FALLBACK_SEC = 24 * 60 * 60;
 
 /**
  * Pick the most trustworthy duration. Chrome/Electron MediaRecorder writes WebM
@@ -157,14 +154,16 @@ type OnFrameCallback = (
 ) => Promise<void>;
 
 /**
- * Decodes video frames via web-demuxer + VideoDecoder in a single forward pass.
+ * Decodes video frames via Mediabunny packet demuxing + WebCodecs in a single forward pass.
  * Way faster than seeking an HTMLVideoElement per frame.
  *
  * Frames in trimmed regions are decoded (needed for P/B-frame state) but discarded.
  * Kept frames are resampled to the target frame rate in a streaming pass.
  */
 export class StreamingVideoDecoder {
-	private demuxer: WebDemuxer | null = null;
+	private input: Input | null = null;
+	private videoTrack: InputVideoTrack | null = null;
+	private videoPacketSink: EncodedPacketSink | null = null;
 	private decoder: VideoDecoder | null = null;
 	private cancelled = false;
 	private metadata: DecodedVideoInfo | null = null;
@@ -219,79 +218,67 @@ export class StreamingVideoDecoder {
 
 	async loadMetadata(videoUrl: string): Promise<DecodedVideoInfo> {
 		const { file } = await this.loadSourceFile(videoUrl);
-
-		// Relative URL so it resolves in both dev (http) and packaged (file://) builds
-		const wasmUrl = new URL("./wasm/web-demuxer.wasm", window.location.href).href;
-		this.demuxer = new WebDemuxer({ wasmFilePath: wasmUrl });
+		const input = new Input({ source: new BlobSource(file), formats: ALL_FORMATS });
+		this.input = input;
 		await this.withTimeout(
-			this.demuxer.load(file),
+			input.getFormat(),
 			SOURCE_LOAD_TIMEOUT_MS,
-			"Timed out while parsing the source video.",
+			"Timed out while identifying the source video format.",
 		);
-
-		const mediaInfo = await this.withTimeout(
-			this.demuxer.getMediaInfo(),
+		const [videoTrack, audioTrack] = await this.withTimeout(
+			Promise.all([input.getPrimaryVideoTrack(), input.getPrimaryAudioTrack()]),
 			SOURCE_LOAD_TIMEOUT_MS,
-			"Timed out while reading video metadata.",
+			"Timed out while reading source tracks.",
 		);
-		const videoStream = mediaInfo.streams.find((s) => s.codec_type_string === "video");
+		if (!videoTrack) throw new Error("The source file does not contain a video track.");
+		this.videoTrack = videoTrack;
+		this.videoPacketSink = new EncodedPacketSink(videoTrack);
 
-		let frameRate = 60;
-		if (videoStream?.avg_frame_rate) {
-			const parts = videoStream.avg_frame_rate.split("/");
-			if (parts.length === 2) {
-				const num = parseInt(parts[0], 10);
-				const den = parseInt(parts[1], 10);
-				if (den > 0 && num > 0) frameRate = num / den;
-			}
-		}
+		const [videoConfig, audioConfig, width, height, containerDurationValue, streamDurationValue] =
+			await this.withTimeout(
+				Promise.all([
+					videoTrack.getDecoderConfig(),
+					audioTrack?.getDecoderConfig() ?? Promise.resolve(null),
+					videoTrack.getCodedWidth(),
+					videoTrack.getCodedHeight(),
+					input.getDurationFromMetadata([videoTrack]),
+					videoTrack.getDurationFromMetadata(),
+				]),
+				SOURCE_LOAD_TIMEOUT_MS,
+				"Timed out while reading video metadata.",
+			);
+		if (!videoConfig) throw new Error("The source video codec is not supported by the demuxer.");
 
-		const audioStream = mediaInfo.streams.find((s) => s.codec_type_string === "audio");
-
-		// Scan video packets for the true content boundary; MediaRecorder (especially on
-		// Linux) writes unreliable container durations and packet timestamps are ground truth.
-		// Pass an explicit range because some containers are truncated without one.
-		// Sanitize because mediaInfo.duration can be NaN/Infinity (Chromium Linux bug), which
-		// would reach demuxer.read() as an invalid endpoint.
-		const containerDurationSec = Number.isFinite(mediaInfo.duration) ? mediaInfo.duration : 0;
-		const streamDurationSec =
-			typeof videoStream?.duration === "number" && Number.isFinite(videoStream.duration)
-				? videoStream.duration
+		const containerDuration =
+			typeof containerDurationValue === "number" && Number.isFinite(containerDurationValue)
+				? containerDurationValue
 				: 0;
-		const hintedDurationSec = Math.max(containerDurationSec, streamDurationSec, 0);
-		const scanEndSec =
-			hintedDurationSec > 0 ? hintedDurationSec + 0.5 : SCAN_UNBOUNDED_FALLBACK_SEC;
-		let maxPacketEndUs = 0;
-		const scanReader = this.demuxer.read("video", 0, scanEndSec).getReader();
-		try {
-			while (true) {
-				const { done, value } = await scanReader.read();
-				if (done || !value) break;
-				const endUs = value.timestamp + (value.duration ?? 0);
-				if (endUs > maxPacketEndUs) maxPacketEndUs = endUs;
+		const streamDuration =
+			typeof streamDurationValue === "number" && Number.isFinite(streamDurationValue)
+				? streamDurationValue
+				: 0;
+		let maxPacketEndSec = 0;
+		let packetCount = 0;
+		for await (const packet of this.videoPacketSink.packets()) {
+			const packetEndSec = packet.timestamp + packet.duration;
+			if (Number.isFinite(packetEndSec) && packetEndSec > maxPacketEndSec) {
+				maxPacketEndSec = packetEndSec;
 			}
-		} finally {
-			try {
-				await scanReader.cancel();
-			} catch {
-				/* already closed */
-			}
+			packetCount++;
 		}
-		const scannedDuration = maxPacketEndUs / 1_000_000;
-		const validatedDuration = validateDuration(mediaInfo.duration, scannedDuration);
+		const scannedDuration = maxPacketEndSec;
+		const validatedDuration = validateDuration(containerDuration, scannedDuration);
+		const frameRate = scannedDuration > 0 ? packetCount / scannedDuration : 60;
 
 		this.metadata = {
-			width: videoStream?.width || 1920,
-			height: videoStream?.height || 1080,
+			width: width || 1920,
+			height: height || 1080,
 			duration: validatedDuration,
-			streamDuration:
-				typeof videoStream?.duration === "number" && Number.isFinite(videoStream.duration)
-					? videoStream.duration
-					: undefined,
+			streamDuration: streamDuration > 0 ? streamDuration : undefined,
 			frameRate,
-			codec: videoStream?.codec_string || "unknown",
-			hasAudio: !!audioStream,
-			audioCodec: audioStream?.codec_string,
+			codec: videoConfig.codec || "unknown",
+			hasAudio: !!audioTrack && !!audioConfig,
+			audioCodec: audioConfig?.codec,
 		};
 
 		return this.metadata;
@@ -310,16 +297,17 @@ export class StreamingVideoDecoder {
 		onFrame: OnFrameCallback,
 		onWarning?: (message: string) => void,
 	): Promise<void> {
-		if (!this.demuxer || !this.metadata) {
+		if (!this.videoTrack || !this.videoPacketSink || !this.metadata) {
 			throw new Error("Must call loadMetadata() before decodeAll()");
 		}
 
-		const decoderConfig = await this.demuxer.getDecoderConfig("video");
+		const decoderConfig = await this.videoTrack.getDecoderConfig();
+		if (!decoderConfig) throw new Error("The source video codec is not supported by WebCodecs.");
 
 		console.log("[StreamingVideoDecoder] decoderConfig.codec:", decoderConfig.codec);
 		console.log("[StreamingVideoDecoder] decoderConfig.description:", decoderConfig.description);
 
-		// web-demuxer can return bare fourcc strings ("av01", "vp08", "vp09", "avc1")
+		// Some containers expose bare fourcc strings ("av01", "vp08", "vp09", "avc1")
 		// that WebCodecs rejects; normalize to forms VideoDecoder accepts.
 		if (/^av01$/i.test(decoderConfig.codec)) {
 			decoderConfig.codec = buildAV1CodecString(
@@ -430,17 +418,15 @@ export class StreamingVideoDecoder {
 			});
 		};
 
-		// One forward stream through the whole file. Pass an explicit range because
-		// some containers are truncated when no end is provided.
+		// Feed packets to the decoder in the background with backpressure. The small
+		// read tail tolerates inaccurate duration metadata and decode-order reordering.
 		const readEndSec = this.metadata.duration + 0.5;
-		const reader = this.demuxer.read("video", 0, readEndSec).getReader();
-
-		// Feed chunks to the decoder in the background with backpressure.
+		const packetIterator = this.videoPacketSink.packets();
 		const feedPromise = (async () => {
 			try {
-				while (!this.cancelled) {
-					const { done, value: chunk } = await reader.read();
-					if (done || !chunk) break;
+				for await (const packet of packetIterator) {
+					if (this.cancelled) break;
+					if (packet.timestamp > readEndSec) break;
 
 					// Backpressure on both decode queue and decoded frame backlog.
 					while (
@@ -451,7 +437,7 @@ export class StreamingVideoDecoder {
 					}
 					if (this.cancelled) break;
 
-					this.decoder!.decode(chunk);
+					this.decoder!.decode(packet.toEncodedVideoChunk());
 				}
 
 				if (!this.cancelled && this.decoder!.state === "configured") {
@@ -606,7 +592,7 @@ export class StreamingVideoDecoder {
 		}
 
 		try {
-			reader.cancel();
+			await packetIterator.return?.(undefined);
 		} catch {
 			/* already closed */
 		}
@@ -647,7 +633,7 @@ export class StreamingVideoDecoder {
 			return [{ startSec: 0, endSec: totalDuration }];
 		}
 
-		const sorted = [...trimRegions].sort((a, b) => a.startMs - b.startMs);
+		const sorted = normalizeTrimRegions(trimRegions, totalDuration * 1000);
 		const segments: Array<{ startSec: number; endSec: number }> = [];
 		let cursor = 0;
 
@@ -705,7 +691,15 @@ export class StreamingVideoDecoder {
 		const result: Array<{ startSec: number; endSec: number; speed: number }> = [];
 		for (const segment of segments) {
 			const overlapping = speedRegions
-				.filter((sr) => sr.startMs / 1000 < segment.endSec && sr.endMs / 1000 > segment.startSec)
+				.filter(
+					(sr) =>
+						Number.isFinite(sr.speed) &&
+						sr.speed > 0 &&
+						Number.isFinite(sr.startMs) &&
+						Number.isFinite(sr.endMs) &&
+						sr.startMs / 1000 < segment.endSec &&
+						sr.endMs / 1000 > segment.startSec,
+				)
 				.sort((a, b) => a.startMs - b.startMs);
 
 			if (overlapping.length === 0) {
@@ -715,8 +709,9 @@ export class StreamingVideoDecoder {
 
 			let cursor = segment.startSec;
 			for (const sr of overlapping) {
-				const srStart = Math.max(sr.startMs / 1000, segment.startSec);
+				const srStart = Math.max(sr.startMs / 1000, cursor);
 				const srEnd = Math.min(sr.endMs / 1000, segment.endSec);
+				if (srEnd <= srStart) continue;
 				if (cursor < srStart) result.push({ startSec: cursor, endSec: srStart, speed: 1 });
 				result.push({ startSec: srStart, endSec: srEnd, speed: sr.speed });
 				cursor = srEnd;
@@ -727,9 +722,9 @@ export class StreamingVideoDecoder {
 		return result.filter((s) => s.endSec - s.startSec > 0.0001);
 	}
 
-	/** Returns the underlying WebDemuxer instance, or null if not yet loaded. */
-	getDemuxer(): WebDemuxer | null {
-		return this.demuxer;
+	/** Returns the underlying parsed input, or null if not yet loaded. */
+	getDemuxer(): Input | null {
+		return this.input;
 	}
 
 	/** Signals the decoder to stop processing at the next cancellation checkpoint. */
@@ -737,7 +732,7 @@ export class StreamingVideoDecoder {
 		this.cancelled = true;
 	}
 
-	/** Cancels decoding and releases the VideoDecoder and WebDemuxer resources. */
+	/** Cancels decoding and releases the VideoDecoder and parsed input resources. */
 	destroy(): void {
 		this.cancelled = true;
 
@@ -750,13 +745,15 @@ export class StreamingVideoDecoder {
 			this.decoder = null;
 		}
 
-		if (this.demuxer) {
+		if (this.input) {
 			try {
-				this.demuxer.destroy();
+				this.input.dispose();
 			} catch {
 				/* ignore */
 			}
-			this.demuxer = null;
+			this.input = null;
+			this.videoTrack = null;
+			this.videoPacketSink = null;
 		}
 	}
 

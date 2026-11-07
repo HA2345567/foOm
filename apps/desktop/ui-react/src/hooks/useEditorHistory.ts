@@ -1,3 +1,4 @@
+import type { PaddingEdges } from "@/lib/canvasPadding";
 import { useCallback, useRef, useState } from "react";
 import {
   DEFAULT_EDITOR_APPEARANCE_SETTINGS,
@@ -32,6 +33,7 @@ export interface EditorState {
   motionBlurAmount: number;
   borderRadius: number;
   padding: number;
+  paddingEdges?: PaddingEdges;
   aspectRatio: AspectRatio;
   webcamLayoutPreset: WebcamLayoutPreset;
   webcamMaskShape: WebcamMaskShape;

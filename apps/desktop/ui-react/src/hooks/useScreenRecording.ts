@@ -1,6 +1,6 @@
 /**
  * @file useScreenRecording.ts
- * @description High-Performance Recording Lifecycle Hook for foOm Screen Recorder.
+ * @description High-Performance Recording Lifecycle Hook for foOom Screen Recorder.
  *
  * Performance Contract:
  * - rAF vs setInterval guard: rAF when active tab, setInterval when hidden tab. NEVER both.
@@ -283,7 +283,7 @@ export function useScreenRecording(config: UseScreenRecordingConfig = {}) {
 
       // 2. Reuse / Setup AudioContext
       if (!audioCtxRef.current || audioCtxRef.current.state === "closed") {
-        audioCtxRef.current = new (window.AudioContext || (window as any).webkitAudioContext)();
+        audioCtxRef.current = new (window.AudioContext || window.webkitAudioContext!)();
       }
       const audioCtx = audioCtxRef.current;
       if (audioCtx.state === "suspended") {
@@ -371,7 +371,7 @@ export function useScreenRecording(config: UseScreenRecordingConfig = {}) {
       mediaRecorderRef.current = recorder;
       recorder.start(1000); // 1s slice
       setStatus("recording");
-    } catch (err: any) {
+    } catch (err: unknown) {
       setStatus("idle");
       console.error("Failed to start recording:", err);
     }

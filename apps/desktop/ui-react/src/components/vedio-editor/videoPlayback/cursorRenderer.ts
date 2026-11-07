@@ -1,8 +1,10 @@
+import { getFixedMacCursor } from "@/lib/cursor/macCursors";
+import { PRETTY_NATIVE_CURSOR_ASSETS } from "@/lib/cursor/macCursors";
 import { Assets, BlurFilter, Container, Graphics, Sprite, Texture } from "pixi.js";
 import { MotionBlurFilter } from "pixi-filters/motion-blur";
 import type { CursorTelemetryPoint } from "../types";
 import { getAssetPath } from "@/lib/assetPath";
-import { getCursorTheme } from "@/lib/cursor/cursorThemes";
+import { getArrowCursorVariant, getCursorTheme } from "@/lib/cursor/cursorThemes";
 import type { NativeCursorType } from "@/native/contracts";
 import {
 	createSpringState,
@@ -93,7 +95,14 @@ const SUPPORTED_CURSOR_KEYS: CursorAssetKey[] = [
 	"closed-hand",
 	"resize-ew",
 	"resize-ns",
+	"resize-nesw",
+	"resize-nwse",
+	"move",
 	"not-allowed",
+	"wait",
+	"app-starting",
+	"help",
+	"up-arrow",
 ];
 
 function loadImage(dataUrl: string) {
@@ -111,7 +120,7 @@ function clamp(value: number, min: number, max: number) {
 }
 
 function getNormalizedAnchor(
-	systemAsset: SystemCursorAsset | undefined,
+	systemAsset: Pick<SystemCursorAsset, "width" | "height" | "hotspotX" | "hotspotY"> | undefined,
 	fallbackAnchor: { x: number; y: number },
 ) {
 	if (!systemAsset || systemAsset.width <= 0 || systemAsset.height <= 0) {
@@ -182,7 +191,6 @@ export async function preloadCursorAssets(themeId: string = "default") {
 	// Invalidate if theme changed
 	if (loadedThemeId !== themeId) {
 		cursorAssetsPromise = null;
-		loadedCursorAssets = {};
 	}
 
 	loadedThemeId = themeId;
@@ -209,16 +217,23 @@ export async function preloadCursorAssets(themeId: string = "default") {
 		// Retrieve custom theme if set
 		const theme = themeId && themeId !== "default" ? getCursorTheme(themeId) : null;
 
+		const fixedArrowCursor = getFixedMacCursor(themeId) ?? getArrowCursorVariant(themeId);
 		const entries = await Promise.all(
 			SUPPORTED_CURSOR_KEYS.map(async (key) => {
-				const systemAsset = systemCursors[key];
+			// Use the editor-normalized pointing hand so its visible size and hotspot
+			// stay consistent with the arrow across operating systems.
+			const systemAsset = key === "pointer" ? undefined : systemCursors[key];
+				const prettyAsset = PRETTY_NATIVE_CURSOR_ASSETS[key];
 				const uploadedAsset = uploadedCursorAssets[key];
+				const fixedCursor = key === "arrow" ? fixedArrowCursor : null;
 				
 				// Check if the theme overrides this specific cursor type (usually arrow or pointer)
 				const themedAsset = theme?.assets[key as NativeCursorType];
 				
 				let assetUrl: string | undefined;
-				if (themedAsset) {
+				if (fixedCursor) {
+					assetUrl = fixedCursor.imageDataUrl;
+				} else if (themedAsset) {
 					try {
 						assetUrl = getAssetPath(themedAsset.assetPath);
 					} catch {
@@ -226,7 +241,7 @@ export async function preloadCursorAssets(themeId: string = "default") {
 					}
 				}
 				if (!assetUrl) {
-					assetUrl = uploadedAsset?.url ?? systemAsset?.dataUrl;
+					assetUrl = uploadedAsset?.url ?? systemAsset?.dataUrl ?? prettyAsset?.imageDataUrl;
 				}
 
 				if (!assetUrl) {
@@ -240,15 +255,16 @@ export async function preloadCursorAssets(themeId: string = "default") {
 					let height: number;
 					let normalizedAnchor: { x: number; y: number };
 
-					if (themedAsset && assetUrl) {
+					const override = fixedCursor ?? themedAsset;
+					if (override && assetUrl) {
 						finalUrl = assetUrl;
 						const img = await loadImage(finalUrl);
 						width = img.naturalWidth;
 						height = img.naturalHeight;
 						// Hotspot is in the 32-logical reference
 						normalizedAnchor = {
-							x: clamp(themedAsset.hotspotX / themedAsset.width, 0, 1),
-							y: clamp(themedAsset.hotspotY / themedAsset.height, 0, 1),
+							x: clamp(override.hotspotX / override.width, 0, 1),
+							y: clamp(override.hotspotY / override.height, 0, 1),
 						};
 					} else if (uploadedAsset) {
 						const { trim, fallbackAnchor } = uploadedAsset;
@@ -272,7 +288,7 @@ export async function preloadCursorAssets(themeId: string = "default") {
 						const img = await loadImage(finalUrl);
 						width = img.naturalWidth;
 						height = img.naturalHeight;
-						normalizedAnchor = getNormalizedAnchor(systemAsset, { x: 0, y: 0 });
+						normalizedAnchor = getNormalizedAnchor(systemAsset ?? prettyAsset, { x: 0, y: 0 });
 					}
 
 					await Assets.load(finalUrl);
@@ -296,6 +312,10 @@ export async function preloadCursorAssets(themeId: string = "default") {
 			}),
 		);
 
+		if (loadedThemeId !== themeId) {
+			await cursorAssetsPromise;
+			return;
+		}
 		loadedCursorAssets = Object.fromEntries(
 			entries.filter(Boolean).map((entry) => entry!),
 		) as Partial<Record<CursorAssetKey, LoadedCursorAsset>>;
@@ -304,6 +324,7 @@ export async function preloadCursorAssets(themeId: string = "default") {
 			throw new Error("Failed to initialize the fallback arrow cursor asset");
 		}
 	})();
+	return cursorAssetsPromise;
 }
 
 /**
@@ -428,7 +449,7 @@ function getCursorViewportScale(viewport: CursorViewportRect) {
 	return Math.max(MIN_CURSOR_VIEWPORT_SCALE, viewport.width / REFERENCE_WIDTH);
 }
 
-function getCursorVisualState(samples: CursorTelemetryPoint[], timeMs: number) {
+export function getCursorVisualState(samples: CursorTelemetryPoint[], timeMs: number) {
 	const latestClick = findLatestInteractionSample(samples, timeMs);
 	const interactionType = latestClick?.interactionType;
 	const ageMs = latestClick ? Math.max(0, timeMs - latestClick.timeMs) : Number.POSITIVE_INFINITY;
@@ -441,7 +462,12 @@ function getCursorVisualState(samples: CursorTelemetryPoint[], timeMs: number) {
 		latestClick && isClickEvent && ageMs <= CLICK_ANIMATION_MS ? 1 - ageMs / CLICK_ANIMATION_MS : 0;
 
 	return {
-		cursorType: findLatestStableCursorType(samples, timeMs),
+		// A click is an interaction state of its own. The OS cursor is often still
+		// classified as an arrow on mouse-down, so render the Mac-style hand briefly
+		// while the click animation is visible, then return to the actual hover shape.
+		cursorType: isClickEvent && ageMs <= CLICK_ANIMATION_MS
+			? "pointer"
+			: findLatestStableCursorType(samples, timeMs),
 		clickBounceProgress,
 		clickProgress:
 			latestClick && isClickEvent && ageMs <= CLICK_RING_FADE_MS
@@ -659,7 +685,7 @@ export class PixiCursorOverlay {
 			samples,
 			timeMs,
 		);
-		const spriteKey = (cursorType in this.cursorSprites ? cursorType : "arrow") as CursorAssetKey;
+		const spriteKey = (this.cursorSprites[cursorType] && loadedCursorAssets[cursorType] ? cursorType : "arrow") as CursorAssetKey;
 		const asset = getCursorAsset(spriteKey);
 		const shadowSprite = this.cursorShadowSprites[spriteKey] ?? this.cursorShadowSprites.arrow!;
 		const sprite = this.cursorSprites[spriteKey] ?? this.cursorSprites.arrow!;
@@ -667,7 +693,9 @@ export class PixiCursorOverlay {
 			0.72,
 			1 - Math.sin(clickBounceProgress * Math.PI) * (0.08 * this.config.clickBounce),
 		);
-		const scaledH = h;
+		// macOS hand artwork has more transparent padding than the arrow. Enlarge
+		// its rendered box around the recorded fingertip to match visible scale.
+		const scaledH = h * (spriteKey === "pointer" ? 1.3 : 1);
 
 		this.clickRingGraphics.clear();
 		drawClickRing(this.clickRingGraphics, px, py, h, clickProgress);
@@ -809,7 +837,7 @@ export function drawCursorOnCanvas(
 	ctx.save();
 	ctx.filter = CURSOR_SVG_DROP_SHADOW_FILTER;
 
-	const drawHeight = h * bounceScale;
+	const drawHeight = h * (cursorType === "pointer" ? 1.3 : 1) * bounceScale;
 	const drawWidth = drawHeight * asset.aspectRatio;
 	const hotspotX = asset.anchorX * drawWidth;
 	const hotspotY = asset.anchorY * drawHeight;

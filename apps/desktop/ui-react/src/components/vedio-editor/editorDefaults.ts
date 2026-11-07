@@ -1,3 +1,4 @@
+import { maxCanvasPadding } from "@/lib/canvasPadding";
 import { DEFAULT_CURSOR_THEME_ID } from "@/lib/cursor/cursorThemes";
 import type { ExportFormat, ExportQuality, GifFrameRate, GifSizePreset } from "@/lib/exporter";
 import { DEFAULT_WALLPAPER } from "@/lib/wallpaper";
@@ -26,8 +27,7 @@ export const DEFAULT_SOURCE_DIMENSIONS = {
 } as const;
 
 export const DEFAULT_EDITOR_PADDING = 50;
-export const MAX_EDITOR_PADDING = 45;
-export const LEGACY_OVERSIZED_EDITOR_PADDING = 38;
+export const MAX_EDITOR_PADDING = maxCanvasPadding;
 
 export const DEFAULT_GIF_OUTPUT_DIMENSIONS = {
 	width: 1280,
@@ -65,11 +65,13 @@ export const DEFAULT_WEBCAM_SETTINGS = {
 	maskShape: DEFAULT_WEBCAM_MASK_SHAPE,
 	sizePreset: DEFAULT_WEBCAM_SIZE_PRESET,
 	position: DEFAULT_WEBCAM_POSITION,
+	reactiveZoom: true,
 } as const satisfies {
 	layoutPreset: WebcamLayoutPreset;
 	maskShape: WebcamMaskShape;
 	sizePreset: WebcamSizePreset;
 	position: WebcamPosition | null;
+	reactiveZoom: boolean;
 };
 
 export const DEFAULT_CURSOR_SETTINGS: CursorVisualSettings & { show: boolean; theme: string } = {

@@ -1,3 +1,4 @@
+import { layoutWithPadding, type PaddingEdges } from "@/lib/canvasPadding";
 import {
 	Application,
 	BlurFilter,
@@ -43,7 +44,6 @@ import {
 	type MotionBlurState,
 } from "@/components/video-editor/videoPlayback/zoomTransform";
 import {
-	computeCompositeLayout,
 	getWebcamLayoutPresetDefinition,
 	reactiveWebcamScale,
 	type Size,
@@ -84,6 +84,7 @@ interface FrameRenderConfig {
 	motionBlurAmount?: number;
 	borderRadius?: number;
 	padding?: number;
+	paddingEdges?: PaddingEdges;
 	cropRegion: CropRegion;
 	cursorRecordingData?: CursorRecordingData | null;
 	cursorScale?: number;
@@ -684,23 +685,15 @@ export class FrameRenderer {
 
 		const croppedVideoWidth = videoWidth * (cropEndX - cropStartX);
 		const croppedVideoHeight = videoHeight * (cropEndY - cropStartY);
-
-		// Padding is a percentage (0-100), where 50% ~ 0.8 scale.
-		// Vertical stack is full-bleed, so it ignores padding.
-		const effectivePadding = this.config.webcamLayoutPreset === "vertical-stack" ? 0 : padding;
-		const paddingScale = 1.0 - (effectivePadding / 100) * 0.4;
-		const viewportWidth = width * paddingScale;
-		const viewportHeight = height * paddingScale;
-		const compositeLayout = computeCompositeLayout({
+		const compositeLayout = layoutWithPadding({
 			canvasSize: { width, height },
-			maxContentSize: { width: viewportWidth, height: viewportHeight },
 			screenSize: { width: croppedVideoWidth, height: croppedVideoHeight },
 			webcamSize: webcamFrame ? this.config.webcamSize : null,
 			layoutPreset: this.config.webcamLayoutPreset,
 			webcamSizePreset: this.config.webcamSizePreset,
 			webcamPosition: this.config.webcamPosition,
 			webcamMaskShape: this.config.webcamMaskShape,
-		});
+		}, padding, this.config.paddingEdges);
 		if (!compositeLayout) return;
 
 		const screenRect = compositeLayout.screenRect;

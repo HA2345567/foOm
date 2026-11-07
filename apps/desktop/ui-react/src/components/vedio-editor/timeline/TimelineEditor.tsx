@@ -2,6 +2,7 @@ import type { Range, Span } from "dnd-timeline";
 import { useTimelineContext } from "dnd-timeline";
 import {
 	Captions,
+	Clapperboard,
 	Check,
 	ChevronDown,
 	Gauge,
@@ -407,7 +408,7 @@ function PlaybackCursor({
 			}}
 		>
 			<div
-				className="absolute top-0 bottom-0 w-[2px] bg-[#6C55FF] shadow-[0_0_18px_rgba(108,85,255,0.68)] cursor-ew-resize pointer-events-auto hover:shadow-[0_0_24px_rgba(108,85,255,0.85)] transition-shadow"
+				className="absolute top-0 bottom-0 w-[2px] bg-[#d4d4d8] shadow-[0_0_16px_rgba(212,212,216,0.36)] cursor-ew-resize pointer-events-auto hover:shadow-[0_0_22px_rgba(212,212,216,0.55)] transition-shadow"
 				style={{
 					[sideProperty]: `${offset}px`,
 				}}
@@ -421,7 +422,7 @@ function PlaybackCursor({
 					className="absolute -top-2 left-1/2 -translate-x-1/2 hover:scale-110 transition-transform"
 					style={{ width: "20px", height: "20px" }}
 				>
-					<div className="w-4 h-4 mx-auto mt-[2px] bg-[#6C55FF] rotate-45 rounded-[5px] shadow-lg shadow-[#6C55FF]/30 border border-white/30" />
+					<div className="w-4 h-4 mx-auto mt-[2px] bg-[#d4d4d8] rotate-45 rounded-[5px] shadow-lg shadow-white/20 border border-white/50" />
 				</div>
 				{isDragging && (
 					<div className="absolute -top-6 left-1/2 -translate-x-1/2 px-1.5 py-0.5 rounded bg-black/80 text-[10px] text-white/90 font-medium tabular-nums whitespace-nowrap border border-white/10 shadow-lg pointer-events-none">
@@ -539,7 +540,7 @@ function TimelineAxis({
 							<span
 								className={cn(
 									"text-[10px] font-medium tabular-nums tracking-tight",
-									marker.time === currentTimeMs ? "text-[#34B27B]" : "text-slate-500",
+									marker.time === currentTimeMs ? "text-[#d4d4d8]" : "text-slate-500",
 								)}
 							>
 								{marker.label}
@@ -774,6 +775,15 @@ function Timeline({
 				timelineRef={localTimelineRef}
 				keyframes={keyframes}
 			/>
+			<div className="relative h-12 overflow-hidden border-b border-white/10" style={{ marginLeft: sidebarWidth }}>
+				<div
+					data-testid="source-video-clip"
+					className="absolute inset-y-1 flex items-center justify-center gap-2 rounded-lg border border-white/20 bg-[#30343c] text-xs font-medium text-white"
+					style={{ left: `${-range.start / Math.max(1, range.end - range.start) * 100}%`, width: `${videoDurationMs / Math.max(1, range.end - range.start) * 100}%` }}
+				>
+					<Clapperboard size={14} /> Source video <span className="text-white/60">{(videoDurationMs / 1000).toFixed(1)}s</span>
+				</div>
+			</div>
 
 			<Row id={ZOOM_ROW_ID} isEmpty={zoomItems.length === 0} hint={t("hints.pressZoom")}>
 				{zoomItems.map((item) => (
@@ -1481,7 +1491,7 @@ export default function TimelineEditor({
 						onClick={handleAddZoom}
 						variant="ghost"
 						size="icon"
-						className="h-7 w-7 rounded-lg text-slate-400 hover:text-[#34B27B] hover:bg-[#34B27B]/10 transition-all"
+						className="h-7 w-7 rounded-lg text-slate-400 hover:text-[#d4d4d8] hover:bg-[#d4d4d8]/10 transition-all"
 						title={t("buttons.addZoom")}
 					>
 						<ZoomIn className="w-4 h-4" />
@@ -1492,8 +1502,8 @@ export default function TimelineEditor({
 						size="icon"
 						aria-pressed={autoZoomEnabled}
 						className={cn(
-							"h-7 w-7 rounded-lg transition-all hover:bg-[#34B27B]/10 hover:text-[#34B27B]",
-							autoZoomEnabled ? "bg-[#34B27B]/15 text-[#34B27B]" : "text-slate-400",
+							"h-7 w-7 rounded-lg transition-all hover:bg-[#d4d4d8]/10 hover:text-[#d4d4d8]",
+							autoZoomEnabled ? "bg-[#d4d4d8]/15 text-[#d4d4d8]" : "text-slate-400",
 						)}
 						title={autoZoomEnabled ? t("buttons.autoZoomOn") : t("buttons.autoZoomOff")}
 					>
@@ -1505,8 +1515,8 @@ export default function TimelineEditor({
 						size="icon"
 						aria-pressed={autoFocusAll}
 						className={cn(
-							"h-7 w-7 rounded-lg transition-all hover:bg-[#34B27B]/10 hover:text-[#34B27B]",
-							autoFocusAll ? "bg-[#34B27B]/15 text-[#34B27B]" : "text-slate-400",
+							"h-7 w-7 rounded-lg transition-all hover:bg-[#d4d4d8]/10 hover:text-[#d4d4d8]",
+							autoFocusAll ? "bg-[#d4d4d8]/15 text-[#d4d4d8]" : "text-slate-400",
 						)}
 						title={autoFocusAll ? t("buttons.autoFocusAllOn") : t("buttons.autoFocusAllOff")}
 					>
@@ -1566,7 +1576,7 @@ export default function TimelineEditor({
 							disabled={isGeneratingCaptions || !videoUrl}
 							variant="ghost"
 							size="icon"
-							className="h-7 w-7 rounded-lg text-slate-400 hover:text-[#a78bfa] hover:bg-[#a78bfa]/10 transition-all"
+							className="h-7 w-7 rounded-lg text-slate-400 hover:text-white hover:bg-white/[0.08] transition-all"
 							title={captionsLabel}
 						>
 							<Captions className="w-4 h-4" />
@@ -1593,7 +1603,7 @@ export default function TimelineEditor({
 									className="text-slate-300 hover:text-white hover:bg-white/10 cursor-pointer flex items-center justify-between gap-3"
 								>
 									<span>{getAspectRatioLabel(ratio)}</span>
-									{aspectRatio === ratio && <Check className="w-3 h-3 text-[#34B27B]" />}
+									{aspectRatio === ratio && <Check className="w-3 h-3 text-[#d4d4d8]" />}
 								</DropdownMenuItem>
 							))}
 						</DropdownMenuContent>
@@ -1602,13 +1612,13 @@ export default function TimelineEditor({
 				<div className="flex-1" />
 				<div className="hidden md:flex items-center gap-3 text-[10px] text-slate-500 font-medium">
 					<span className="flex items-center gap-1.5">
-						<kbd className="px-1.5 py-0.5 bg-white/5 border border-white/10 rounded text-[#34B27B] font-sans">
+						<kbd className="px-1.5 py-0.5 bg-white/5 border border-white/10 rounded text-[#d4d4d8] font-sans">
 							{scrollLabels.pan}
 						</kbd>
 						<span>{t("labels.pan")}</span>
 					</span>
 					<span className="flex items-center gap-1.5">
-						<kbd className="px-1.5 py-0.5 bg-white/5 border border-white/10 rounded text-[#34B27B] font-sans">
+						<kbd className="px-1.5 py-0.5 bg-white/5 border border-white/10 rounded text-[#d4d4d8] font-sans">
 							{scrollLabels.zoom}
 						</kbd>
 						<span>{t("labels.zoom")}</span>

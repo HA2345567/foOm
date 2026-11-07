@@ -47,7 +47,7 @@ export async function createBrowserTestVideoUrl() {
       context.fillRect(20 + frame * 3, 44, 88, 88);
       context.fillStyle = "rgba(8, 10, 16, 0.9)";
       context.font = "600 24px sans-serif";
-      context.fillText("foOm", 116, 98);
+      context.fillText("foOom", 116, 98);
 
       const videoFrame = new VideoFrame(canvas, {
         timestamp: Math.round((frame * 1_000_000) / frameRate),

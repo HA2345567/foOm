@@ -1,3 +1,11 @@
+import type { NativeCursorType } from "@/native/contracts";
+
+const NATIVE_CURSOR_TYPES: NativeCursorType[] = [
+  "arrow", "text", "pointer", "crosshair", "open-hand", "closed-hand", "resize-ew",
+  "resize-ns", "resize-nesw", "resize-nwse", "move", "not-allowed", "wait",
+  "app-starting", "help", "up-arrow",
+];
+
 export interface ProjectMedia {
   screenVideoPath: string;
   webcamVideoPath?: string;
@@ -22,8 +30,8 @@ export interface CursorTelemetrySample {
   cx: number;
   cy: number;
   visible?: boolean;
-  cursorType?: "arrow" | "pointer" | "text";
-  interactionType?: "move" | "click" | "mouseup";
+  cursorType?: NativeCursorType;
+  interactionType?: "move" | "click" | "double-click" | "right-click" | "middle-click" | "mouseup";
 }
 
 export interface StoreRecordedSessionInput {
@@ -114,20 +122,19 @@ export function normalizeCursorTelemetrySamples(candidate: unknown): CursorTelem
       }
 
       const raw = sample as CursorTelemetrySample;
-      const interactionType =
-        raw.interactionType === "click" ||
-        raw.interactionType === "mouseup" ||
-        raw.interactionType === "move"
-          ? raw.interactionType
-          : undefined;
-
+      const interactionType = ["click", "double-click", "right-click", "middle-click", "mouseup", "move"].includes(
+        String(raw.interactionType),
+      )
+        ? raw.interactionType
+        : undefined;
       return {
         timeMs: Math.max(0, Number(raw.timeMs)),
         cx: Math.max(0, Math.min(Number(raw.cx), 1)),
         cy: Math.max(0, Math.min(Number(raw.cy), 1)),
         visible: raw.visible !== false,
-        cursorType:
-          raw.cursorType === "pointer" || raw.cursorType === "text" ? raw.cursorType : "arrow",
+        cursorType: NATIVE_CURSOR_TYPES.includes(raw.cursorType as NativeCursorType)
+          ? (raw.cursorType as NativeCursorType)
+          : "arrow",
         ...(interactionType ? { interactionType } : {}),
       };
     })

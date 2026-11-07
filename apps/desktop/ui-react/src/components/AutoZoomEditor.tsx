@@ -1,6 +1,6 @@
 /**
  * @file AutoZoomEditor.tsx
- * @description Post-Recording Editor Component for foOm Screen Recorder.
+ * @description Post-Recording Editor Component for foOom Screen Recorder.
  *
  * Fixes:
  * - FIX 1: Passes result.keyframeLog directly into generateZoomKeyframes() for pixel-perfect export.
@@ -34,12 +34,13 @@ import {
   SPRING_PRESETS,
   SpringPresetName,
   KeyframeLog,
+  ZoomState,
 } from "../lib/autozoom";
 import { SAMPLE_TRACKS, MusicTrack } from "../lib/background-music";
 
 // Clean Download Utils
 export async function triggerDownload(blob: Blob, filename: string): Promise<void> {
-  const nativeApi = (window as any).foomNative || (window as any).electronAPI;
+  const nativeApi = window.foomNative || window.electronAPI;
   if (nativeApi?.pickExportSavePath && nativeApi?.writeExportToPath) {
     try {
       const pickRes = await nativeApi.pickExportSavePath(filename);
@@ -82,7 +83,7 @@ export function mimeToExtension(mimeType: string, fallback: string = "webm"): st
 
 export function makeFilename(title: string, ext: string): string {
   const sanitized = title.trim().replace(/[^a-zA-Z0-9_-]/g, "_");
-  const base = sanitized.length > 0 ? sanitized : "foOm_Recording";
+  const base = sanitized.length > 0 ? sanitized : "foOom_Recording";
   const timestamp = new Date().toISOString().slice(0, 10);
   return `${base}_${timestamp}.${ext}`;
 }
@@ -146,7 +147,7 @@ export const AutoZoomEditor: React.FC<AutoZoomEditorProps> = ({ recordingResult,
     // Interpolate zoom state for exact timestamp
     const kf = interpolateZoom(zoomKeyframesRef.current, t);
 
-    const zoomState = {
+    const zoomState: ZoomState = {
       targetX: kf.x,
       targetY: kf.y,
       targetScale: kf.scale,
@@ -156,7 +157,7 @@ export const AutoZoomEditor: React.FC<AutoZoomEditorProps> = ({ recordingResult,
       vx: 0,
       vy: 0,
       vScale: 0,
-      mode: (kf.scale > 1.15 ? "zoomed" : "overview") as any,
+      mode: kf.scale > 1.15 ? "zoomed" : "overview",
       priority: 0,
       lastChangeTime: t,
     };
@@ -204,13 +205,13 @@ export const AutoZoomEditor: React.FC<AutoZoomEditorProps> = ({ recordingResult,
 
   const handleDownloadExport = async () => {
     const ext = mimeToExtension(recordingResult.mimeType, "webm");
-    const filename = makeFilename("foOm_Demo", ext);
+    const filename = makeFilename("foOom_Demo", ext);
     await triggerDownload(recordingResult.blob, filename);
   };
 
   const handleDownloadRaw = async () => {
     const ext = mimeToExtension(recordingResult.mimeType, "webm");
-    const filename = makeFilename("foOm_Raw_Original", ext);
+    const filename = makeFilename("foOom_Raw_Original", ext);
     await triggerDownload(recordingResult.blob, filename);
   };
 
@@ -230,7 +231,7 @@ export const AutoZoomEditor: React.FC<AutoZoomEditorProps> = ({ recordingResult,
         <div className="flex items-center justify-between z-10">
           <div className="flex items-center gap-2">
             <span className="font-extrabold text-xl bg-gradient-to-r from-orange-400 to-rose-500 bg-clip-text text-transparent">
-              foOm Editor
+              foOom Editor
             </span>
             <span className="text-xs px-2.5 py-0.5 rounded-full bg-white/10 text-neutral-300 font-mono">
               {Math.round(recordingResult.durationMs / 1000)}s

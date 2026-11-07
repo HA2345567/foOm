@@ -9,7 +9,11 @@
     "build:dev": "bun x vite build --mode development",
     "preview": "bun x vite preview",
     "lint": "eslint .",
-    "format": "prettier --write ."
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:browser": "vitest run --config vitest.browser.config.ts",
+    "format": "prettier --write .",
+    "format:check": "prettier --check ."
   },
   "dependencies": {
     "@ffmpeg/ffmpeg": "^0.12.15",
@@ -58,7 +62,6 @@
     "cmdk": "^1.1.1",
     "date-fns": "^4.1.0",
     "dnd-timeline": "^3.1.1",
-    "electron": "^42.3.0",
     "embla-carousel-react": "^8.6.0",
     "framer-motion": "^12.38.0",
     "gif.js": "^0.2.0",
@@ -86,7 +89,6 @@
     "vaul": "^1.1.2",
     "vite-tsconfig-paths": "^6.0.2",
     "vitest": "^4.1.7",
-    "web-demuxer": "^4.0.0",
     "webm-muxer": "^5.1.4",
     "zod": "^3.24.2"
   },

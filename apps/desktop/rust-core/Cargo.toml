@@ -2,8 +2,19 @@
 name = "rust-core"
 version = "0.2.0"
 edition = "2021"
+license = "MIT"
+repository = "https://github.com/HA2345567/foOm"
 
 [dependencies]
+rusqlite = { version = "0.32.0", features = ["bundled"] }
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+lazy_static = "1.4"
+base64 = "0.22"
+chrono = { version = "0.4", features = ["clock"] }
+shared-core = { path = "../shared-core" }
+
+[target.'cfg(windows)'.dependencies]
 windows = { version = "0.58.0", features = [
     "Win32_Foundation",
     "Win32_Graphics_Gdi",
@@ -20,15 +31,16 @@ windows = { version = "0.58.0", features = [
     "Win32_System_WinRT",
     "Win32_System_WinRT_Direct3D11",
     "Win32_System_WinRT_Graphics_Capture",
+    "Win32_System_Com",
+    "Win32_Media_Audio",
+    "Win32_Media_KernelStreaming",
+    "Win32_Media_Multimedia",
     "Graphics_Capture",
     "Graphics_DirectX",
     "Graphics_DirectX_Direct3D11",
     "Foundation",
     "Storage_Streams",
 ] }
-rusqlite = { version = "0.32.0", features = ["bundled"] }
-serde = { version = "1.0", features = ["derive"] }
-serde_json = "1.0"
-lazy_static = "1.4"
-base64 = "0.22"
-chrono = { version = "0.4", features = ["clock"] }
+
+[dev-dependencies]
+export-engine = { path = "../../../renderer/export-engine" }

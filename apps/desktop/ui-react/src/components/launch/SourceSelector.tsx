@@ -1,9 +1,10 @@
 import { useCallback, useEffect, useState } from "react";
-import { Check } from "lucide-react";
+import { Check, Monitor, AppWindow, Scan } from "lucide-react";
 import { useScopedT } from "@/contexts/I18nContext";
 import { Button } from "../ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "../ui/tabs";
 import styles from "./SourceSelector.module.css";
+import { RegionPicker } from "./RegionPicker";
 
 interface DesktopSource {
   id: string;
@@ -11,6 +12,7 @@ interface DesktopSource {
   thumbnail: string | null;
   display_id: string;
   appIcon: string | null;
+  bounds?: { x: number; y: number; width: number; height: number };
 }
 
 export function SourceSelector() {
@@ -20,6 +22,7 @@ export function SourceSelector() {
   const [selectedSource, setSelectedSource] = useState<DesktopSource | null>(null);
   const [loading, setLoading] = useState(true);
   const [loadFailed, setLoadFailed] = useState(false);
+  const [editingRegion, setEditingRegion] = useState(false);
 
   const fetchSources = useCallback(async () => {
     setLoading(true);
@@ -40,6 +43,7 @@ export function SourceSelector() {
           thumbnail: source.thumbnail,
           display_id: source.display_id,
           appIcon: source.appIcon,
+          bounds: source.bounds,
         })),
       );
       setSelectedSource((current) =>
@@ -62,10 +66,28 @@ export function SourceSelector() {
   const screenSources = sources.filter((s) => s.id.startsWith("screen:"));
   const windowSources = sources.filter((s) => s.id.startsWith("window:"));
   const hasNoSources = !loading && sources.length === 0;
+  const canChooseRegion = Boolean(selectedSource?.id.startsWith("screen:") && selectedSource.bounds &&
+    Object.values(selectedSource.bounds).every(Number.isFinite) && selectedSource.bounds.width > 0 && selectedSource.bounds.height > 0);
 
   const handleSourceSelect = (source: DesktopSource) => setSelectedSource(source);
   const handleShare = async () => {
     if (selectedSource) await window.electronAPI.selectSource(selectedSource);
+  };
+  const handleCancel = async () => {
+    localStorage.removeItem("foom-start-recording-after-select");
+    if ("__TAURI_INTERNALS__" in window) {
+      try {
+        const { WebviewWindow } = await import("@tauri-apps/api/webviewWindow");
+        const picker = await WebviewWindow.getByLabel("source-selector");
+        if (picker) {
+          await picker.hide();
+          return;
+        }
+      } catch {
+        // Fall back to closing the document below.
+      }
+    }
+    window.close();
   };
 
   if (loading) {
@@ -106,6 +128,17 @@ export function SourceSelector() {
     );
   }
 
+  if (editingRegion && selectedSource?.bounds) {
+    return <div className={`min-h-screen ${styles.glassContainer}`}><RegionPicker
+      bounds={selectedSource.bounds} name={selectedSource.name}
+      onCancel={() => setEditingRegion(false)}
+      onConfirm={region => window.electronAPI.selectSource({
+        ...selectedSource, id: "custom_area", type: "region", region,
+        name: `${selectedSource.name} · ${region.width} × ${region.height} region`,
+      })}
+    /></div>;
+  }
+
   const renderSourceCard = (source: DesktopSource) => {
     const isSelected = selectedSource?.id === source.id;
     const sourceKind = source.id.startsWith("screen:") ? "screen" : "window";
@@ -114,15 +147,21 @@ export function SourceSelector() {
         key={source.id}
         data-testid="source-selector-card"
         data-source-kind={sourceKind}
+        role="button"
+        tabIndex={0}
+        onKeyDown={event => { if (event.key === "Enter" || event.key === " ") { event.preventDefault(); handleSourceSelect(source); } }}
         className={`${styles.sourceCard} ${isSelected ? styles.selected : ""} p-1.5`}
         onClick={() => handleSourceSelect(source)}
       >
         <div className="relative mb-1.5 overflow-hidden rounded-lg border border-white/[0.06] bg-black/30">
-          <img
-            src={source.thumbnail || ""}
-            alt={source.name}
-            className="w-full aspect-video object-cover"
-          />
+          {source.thumbnail ? (
+            <img src={source.thumbnail} alt={`Preview of ${source.name}`} className="w-full aspect-video object-cover" />
+          ) : (
+            <div className="aspect-video flex flex-col items-center justify-center gap-2 bg-[#222222] text-[#cccccc]">
+              {sourceKind === "screen" ? <Monitor size={34} strokeWidth={1.2} /> : <AppWindow size={34} strokeWidth={1.2} />}
+              <span className="text-[10px] tracking-wide text-white/45">Preview unavailable</span>
+            </div>
+          )}
           {isSelected && (
             <div className="absolute right-1.5 top-1.5">
               <div className={styles.checkBadge}>
@@ -143,6 +182,7 @@ export function SourceSelector() {
 
   return (
     <div className={`min-h-screen flex flex-col ${styles.glassContainer}`}>
+      <header className="px-4 pt-4 pb-1 flex items-center gap-3"><span className="grid place-items-center rounded-lg w-9 h-9 bg-[#eeeeee]/10 text-[#eeeeee]"><Scan size={20}/></span><div><h1 className="text-sm font-semibold tracking-normal">Choose what to capture</h1><p className="text-[11px] text-[#a3a3a3] mt-1">Your screen. Your boundaries.</p></div></header>
       <div className="flex-1 flex flex-col w-full px-3.5 pt-3.5">
         <Tabs
           defaultValue={screenSources.length === 0 ? "windows" : "screens"}
@@ -181,10 +221,12 @@ export function SourceSelector() {
         </Tabs>
       </div>
       <div className="flex justify-center gap-2 border-t border-white/[0.06] p-3">
+        <Button variant="ghost" disabled={!canChooseRegion}
+          onClick={() => setEditingRegion(true)} className="h-8 text-[11px]">Choose region</Button>
         <Button
           data-testid="source-selector-cancel-button"
           variant="ghost"
-          onClick={() => window.close()}
+          onClick={() => { void handleCancel(); }}
           className="h-8 rounded-lg px-5 text-[11px] text-zinc-400 transition-transform duration-150 hover:bg-white/5 hover:text-white active:scale-95"
         >
           {tc("actions.cancel")}

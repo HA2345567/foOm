@@ -5,18 +5,18 @@ export function Footer() {
     <footer className="py-20 px-6 border-t border-border bg-background">
       <div className="mx-auto max-w-7xl flex flex-col md:flex-row items-center justify-between gap-8">
         <div className="flex items-center gap-2.5">
-          <div className="w-8 h-8 flex items-center justify-center relative overflow-hidden">
-            <Logo className="w-7 h-7 text-[#f5f5f7]" />
+          <div className="flex h-8 items-center justify-center relative overflow-hidden">
+            <Logo className="h-6" />
           </div>
           <span className="font-brand text-[20px] font-semibold tracking-[-0.03em] text-foreground">
-            foOm
+            foOom
           </span>
         </div>
 
 
 
         <p className="text-[13px] font-medium text-muted-foreground">
-          Copyright {new Date().getFullYear()} foOm. Built with love ❤️
+          Copyright {new Date().getFullYear()} foOom. Built with love ❤️
         </p>
       </div>
     </footer>

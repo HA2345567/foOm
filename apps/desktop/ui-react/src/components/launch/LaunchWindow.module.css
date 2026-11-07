@@ -7,6 +7,41 @@
   -webkit-app-region: no-drag;
 }
 
+/* Keep the stop state distinct from the neutral idle record control. */
+:global(.studio-recorder) button.recordControl[data-recording="true"] {
+  background: #a82b35;
+  color: #ffffff;
+  border-color: #e65a63;
+  box-shadow: 0 0 0 3px #e65a631a;
+  flex-shrink: 0;
+}
+
+:global(.studio-recorder) button.recordControl[data-recording="true"]:hover {
+  background: #bd3540;
+}
+
+:global(.studio-recorder) button.recordControl[data-recording="true"] svg {
+  color: #ffffff;
+}
+
+:global(.studio-recorder) [data-tray-layout="left"],
+:global(.studio-recorder) [data-tray-layout="right"] {
+  flex-direction: column;
+  max-height: calc(100vh - 48px);
+  overflow-y: auto;
+}
+:global(.studio-recorder) [data-tray-layout="left"] { transform: translateY(-50%); }
+:global(.studio-recorder) [data-tray-layout="right"] { transform: translateY(-50%); }
+:global(.studio-recorder) [data-tray-layout="left"],
+:global(.studio-recorder) [data-tray-layout="right"] {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+:global(.studio-recorder) [data-tray-layout="left"]::-webkit-scrollbar,
+:global(.studio-recorder) [data-tray-layout="right"]::-webkit-scrollbar {
+  display: none;
+}
+
 .languageMenuScroll {
   max-height: 16rem;
   overflow-y: auto;

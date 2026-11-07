@@ -1,11 +1,12 @@
 /**
  * @file record.tsx
- * @description Main Recording View Route for foOm Screen Recorder.
+ * @description Main Recording View Route for foOom Screen Recorder.
  * Wires RecorderCanvas, FloatingRecordingControls, useScreenRecording, and usePersistentWebcam.
  */
 
 import React, { useState } from "react";
-import { createFileRoute, useNavigate } from "@tanstack/react-router";
+import { createFileRoute } from "@tanstack/react-router";
+import { toast } from "sonner";
 import { useScreenRecording, RecordingResult } from "../hooks/useScreenRecording";
 import { usePersistentWebcam } from "../hooks/usePersistentWebcam";
 import { FloatingRecordingControls } from "../components/FloatingRecordingControls";
@@ -16,8 +17,6 @@ export const Route = createFileRoute("/record")({
 });
 
 function RecordPage() {
-  const navigate = useNavigate();
-
   // Control States
   const [autoZoomEnabled, setAutoZoomEnabled] = useState(true);
   const [micEnabled, setMicEnabled] = useState(false);
@@ -47,10 +46,36 @@ function RecordPage() {
     autoZoomEnabled,
     micEnabled,
     webcamStream,
-    onRecordingStopped: (result: RecordingResult) => {
-      // Store result in window state or navigate to editor route with payload
-      (window as any).__FOOM_LAST_RESULT = result;
-      navigate({ to: "/editor" as any });
+    onRecordingStopped: async (result: RecordingResult) => {
+      try {
+        const stored = await window.foomNative.storeRecordedSession({
+          screen: {
+            videoData: await result.blob.arrayBuffer(),
+            fileName: `recording-${Date.now()}.webm`,
+          },
+          createdAt: Date.now(),
+          durationMs: result.durationMs,
+        });
+
+        if (!stored?.success || !stored.session) {
+          throw new Error(stored?.error ?? stored?.message ?? "Could not save the recording.");
+        }
+
+        const loaded = await window.foomNative.setCurrentRecordingSession(stored.session);
+        if (loaded?.success === false) {
+          throw new Error(loaded.error ?? loaded.message ?? "Could not load the recording in the editor.");
+        }
+
+        const opened = await window.foomNative.switchToEditor();
+        if (opened?.success === false) {
+          throw new Error(opened.error ?? opened.message ?? "Could not open the video editor.");
+        }
+      } catch (error) {
+        console.error("Failed to hand off recording to the video editor:", error);
+        window.__FOOM_LAST_RESULT = result;
+        toast.error(error instanceof Error ? error.message : "Could not open the video editor.");
+        window.location.hash = "/editor";
+      }
     },
   });
 

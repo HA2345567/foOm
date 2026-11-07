@@ -1,12 +1,12 @@
-# foOm Product Flow
+# foOom Product Flow
 
 This is the core desktop product flow. Implementation decisions should preserve this path first.
 
 ```txt
 User visits website
 -> Downloads Windows app
--> Installs foOm
--> Launches foOm
+-> Installs foOom
+-> Launches foOom
 -> Floating toolbar appears instantly
 -> User selects screen/window, mic, webcam, cursor mode, auto-zoom, and system audio
 -> Clicks Record
@@ -16,7 +16,7 @@ User visits website
 -> Rust finalizes the MP4, metadata JSON, cursor events, pauses, and local project row
 -> Tauri emits `navigate-to-editor`
 -> React stores the current recording session/project context
--> foOm opens `#/video-editor` automatically
+-> foOom opens `#/video-editor` automatically
 -> The editor loads the recorded video from the local filesystem
 -> Recording metadata is already processed
 -> Auto-zoom is available from metadata/cursor events

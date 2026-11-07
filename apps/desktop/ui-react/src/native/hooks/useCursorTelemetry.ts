@@ -12,6 +12,7 @@ export function useCursorTelemetry(videoPath: string | null): UseCursorTelemetry
   const [samples, setSamples] = useState<CursorTelemetryPoint[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [loadedPath, setLoadedPath] = useState<string | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -21,20 +22,25 @@ export function useCursorTelemetry(videoPath: string | null): UseCursorTelemetry
         setSamples([]);
         setLoading(false);
         setError(null);
+        setLoadedPath(null);
         return;
       }
 
       setLoading(true);
+      setLoadedPath(null);
+      setSamples([]);
       setError(null);
 
       try {
         const nextSamples = await nativeBridgeClient.cursor.getTelemetry(videoPath);
         if (!cancelled) {
           setSamples(nextSamples);
+          setLoadedPath(videoPath);
         }
       } catch (nextError) {
         if (!cancelled) {
           setSamples([]);
+          setLoadedPath(videoPath);
           setError(
             nextError instanceof Error ? nextError.message : "Failed to load cursor telemetry",
           );
@@ -54,8 +60,8 @@ export function useCursorTelemetry(videoPath: string | null): UseCursorTelemetry
   }, [videoPath]);
 
   return {
-    samples,
-    loading,
+    samples: loadedPath === videoPath ? samples : [],
+    loading: Boolean(videoPath) && (loading || loadedPath !== videoPath),
     error,
   };
 }

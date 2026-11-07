@@ -1,23 +1,8 @@
 import { type Container, Point } from "pixi.js";
-import appStartingUrl from "@/assets/cursors/Cursor=App-Starting.svg";
-import crosshairUrl from "@/assets/cursors/Cursor=Cross.svg";
-import arrowUrl from "@/assets/cursors/Cursor=Default.svg";
-import closedHandUrl from "@/assets/cursors/Cursor=Hand-(Grabbing).svg";
-import openHandUrl from "@/assets/cursors/Cursor=Hand-(Open).svg";
-import pointerUrl from "@/assets/cursors/Cursor=Hand-(Pointing).svg";
-import helpUrl from "@/assets/cursors/Cursor=Help.svg";
-import moveUrl from "@/assets/cursors/Cursor=Move.svg";
-import notAllowedUrl from "@/assets/cursors/Cursor=Not-Allowed.svg";
-import resizeNeswUrl from "@/assets/cursors/Cursor=Resize-North-East-South-West.svg";
-import resizeNsUrl from "@/assets/cursors/Cursor=Resize-North-South.svg";
-import resizeNwseUrl from "@/assets/cursors/Cursor=Resize-North-West-South-East.svg";
-import resizeEwUrl from "@/assets/cursors/Cursor=Resize-West-East.svg";
-import textUrl from "@/assets/cursors/Cursor=Text-Cursor.svg";
-import upArrowUrl from "@/assets/cursors/Cursor=Up-Arrow.svg";
-import waitUrl from "@/assets/cursors/Cursor=Wait.svg";
+import { PRETTY_NATIVE_CURSOR_ASSETS, getFixedMacCursor, type PrettyNativeCursorAsset } from "./macCursors";
 import type { CropRegion } from "@/components/video-editor/types";
 import { getAssetPath } from "@/lib/assetPath";
-import { DEFAULT_CURSOR_THEME_ID, getCursorTheme } from "@/lib/cursor/cursorThemes";
+import { DEFAULT_CURSOR_THEME_ID, getArrowCursorVariant, getCursorTheme } from "@/lib/cursor/cursorThemes";
 import type {
 	CursorRecordingData,
 	CursorRecordingSample,
@@ -92,133 +77,10 @@ function getNativeCursorAsset(recordingData: CursorRecordingData, assetId: strin
 	return getNativeCursorAssetMap(recordingData).get(assetId) ?? null;
 }
 
-interface PrettyNativeCursorAsset {
-	imageDataUrl: string;
-	width: number;
-	height: number;
-	hotspotX: number;
-	hotspotY: number;
-}
-
-const PRETTY_NATIVE_CURSOR_ASSETS: Partial<Record<NativeCursorType, PrettyNativeCursorAsset>> = {
-	arrow: {
-		imageDataUrl: arrowUrl,
-		width: 32,
-		height: 32,
-		hotspotX: 16.25,
-		hotspotY: 15.03,
-	},
-	text: {
-		imageDataUrl: textUrl,
-		width: 32,
-		height: 32,
-		hotspotX: 16,
-		hotspotY: 16,
-	},
-	pointer: {
-		imageDataUrl: pointerUrl,
-		width: 32,
-		height: 33,
-		hotspotX: 16.65,
-		hotspotY: 14.24,
-	},
-	crosshair: {
-		imageDataUrl: crosshairUrl,
-		width: 32,
-		height: 32,
-		hotspotX: 16,
-		hotspotY: 16,
-	},
-	"open-hand": {
-		imageDataUrl: openHandUrl,
-		width: 32,
-		height: 32,
-		hotspotX: 16,
-		hotspotY: 9,
-	},
-	"closed-hand": {
-		imageDataUrl: closedHandUrl,
-		width: 32,
-		height: 32,
-		hotspotX: 16,
-		hotspotY: 9,
-	},
-	"resize-ew": {
-		imageDataUrl: resizeEwUrl,
-		width: 32,
-		height: 32,
-		hotspotX: 16,
-		hotspotY: 16,
-	},
-	"resize-ns": {
-		imageDataUrl: resizeNsUrl,
-		width: 32,
-		height: 32,
-		hotspotX: 16,
-		hotspotY: 16,
-	},
-	"resize-nesw": {
-		imageDataUrl: resizeNeswUrl,
-		width: 32,
-		height: 32,
-		hotspotX: 16,
-		hotspotY: 16,
-	},
-	"resize-nwse": {
-		imageDataUrl: resizeNwseUrl,
-		width: 32,
-		height: 32,
-		hotspotX: 16,
-		hotspotY: 16,
-	},
-	move: {
-		imageDataUrl: moveUrl,
-		width: 32,
-		height: 32,
-		hotspotX: 16,
-		hotspotY: 16,
-	},
-	"not-allowed": {
-		imageDataUrl: notAllowedUrl,
-		width: 32,
-		height: 32,
-		hotspotX: 16,
-		hotspotY: 16,
-	},
-	wait: {
-		imageDataUrl: waitUrl,
-		width: 32,
-		height: 32,
-		hotspotX: 16,
-		hotspotY: 16,
-	},
-	"app-starting": {
-		imageDataUrl: appStartingUrl,
-		width: 32,
-		height: 32,
-		hotspotX: 7.25,
-		hotspotY: 4.03,
-	},
-	help: {
-		imageDataUrl: helpUrl,
-		width: 32,
-		height: 32,
-		hotspotX: 7.25,
-		hotspotY: 4.03,
-	},
-	"up-arrow": {
-		imageDataUrl: upArrowUrl,
-		width: 32,
-		height: 32,
-		hotspotX: 16,
-		hotspotY: 3,
-	},
-};
-
 const TELEMETRY_CURSOR_ASSET: NativeCursorAsset = {
 	id: "telemetry-arrow",
 	platform: "darwin",
-	imageDataUrl: arrowUrl,
+	imageDataUrl: PRETTY_NATIVE_CURSOR_ASSETS.arrow?.imageDataUrl ?? "",
 	width: PRETTY_NATIVE_CURSOR_ASSETS.arrow?.width ?? 32,
 	height: PRETTY_NATIVE_CURSOR_ASSETS.arrow?.height ?? 32,
 	hotspotX: PRETTY_NATIVE_CURSOR_ASSETS.arrow?.hotspotX ?? 16,
@@ -306,7 +168,12 @@ export function getNativeCursorClickBounceProgress(
 			return 0;
 		}
 
-		if (sample.interactionType === "click") {
+		if (
+			sample.interactionType === "click" ||
+			sample.interactionType === "double-click" ||
+			sample.interactionType === "right-click" ||
+			sample.interactionType === "middle-click"
+		) {
 			return 1 - ageMs / NATIVE_CURSOR_CLICK_ANIMATION_MS;
 		}
 	}
@@ -442,10 +309,17 @@ export function resolveInterpolatedNativeCursorFrame(
 	if (activeSample.visible === false) {
 		return null;
 	}
+	// Telemetry often records the operating-system arrow at mouse-down even when
+	// the user is clicking a control. Use the Mac-style hand for the same short
+	// press/rebound window as the click animation, then restore the actual hover
+	// cursor (including I-beam) from subsequent samples.
+	const displaySample = getNativeCursorClickBounceProgress(recordingData, timeMs) > 0
+		? { ...activeSample, cursorType: "pointer" as const }
+		: activeSample;
 
-	const asset = activeSample.assetId
-		? getNativeCursorAsset(recordingData, activeSample.assetId)
-		: getTelemetryCursorAsset(activeSample);
+	const asset = displaySample.assetId
+		? getNativeCursorAsset(recordingData, displaySample.assetId)
+		: getTelemetryCursorAsset(displaySample);
 	if (!asset) {
 		return null;
 	}
@@ -453,16 +327,16 @@ export function resolveInterpolatedNativeCursorFrame(
 	const nextSample = samples[activeIndex + 1];
 	if (
 		!nextSample ||
-		nextSample.timeMs <= activeSample.timeMs ||
+		nextSample.timeMs <= displaySample.timeMs ||
 		nextSample.visible === false ||
-		(nextSample.assetId ?? null) !== (activeSample.assetId ?? null) ||
-		timeMs <= activeSample.timeMs
+		(nextSample.assetId ?? null) !== (displaySample.assetId ?? null) ||
+		timeMs <= displaySample.timeMs
 	) {
-		return { asset, sample: activeSample };
+		return { asset, sample: displaySample };
 	}
 
 	const interpolation = clamp(
-		(timeMs - activeSample.timeMs) / (nextSample.timeMs - activeSample.timeMs),
+		(timeMs - displaySample.timeMs) / (nextSample.timeMs - displaySample.timeMs),
 		0,
 		1,
 	);
@@ -470,9 +344,9 @@ export function resolveInterpolatedNativeCursorFrame(
 	return {
 		asset,
 		sample: {
-			...activeSample,
-			cx: activeSample.cx + (nextSample.cx - activeSample.cx) * interpolation,
-			cy: activeSample.cy + (nextSample.cy - activeSample.cy) * interpolation,
+			...displaySample,
+			cx: displaySample.cx + (nextSample.cx - displaySample.cx) * interpolation,
+			cy: displaySample.cy + (nextSample.cy - displaySample.cy) * interpolation,
 		},
 	};
 }
@@ -584,7 +458,15 @@ export function resolveNativeCursorRenderAsset(
 	sample?: CursorRecordingSample,
 	themeId?: string | null,
 ) {
-	const cursorType = sample?.cursorType ?? asset.cursorType ?? null;
+	const cursorType = sample?.cursorType ?? asset.cursorType ?? classifyCapturedCursorType(asset) ?? "arrow";
+	// Arrow presets only replace the arrow. Text, hand, and other system cursors
+	// retain their own shape so cursor semantics survive a recording.
+	const fixedCursor = cursorType === "arrow"
+		? getFixedMacCursor(themeId) ?? getArrowCursorVariant(themeId)
+		: null;
+	if (fixedCursor && themeId) {
+		return { id: themeId, ...fixedCursor };
+	}
 	if (themeId && themeId !== DEFAULT_CURSOR_THEME_ID) {
 		// A known type uses its override when the theme provides one. Untyped samples
 		// (common on macOS, where the type isn't tagged) are classified from the captured
@@ -605,13 +487,14 @@ export function resolveNativeCursorRenderAsset(
 
 	const prettyAsset = resolvePrettyNativeCursorAsset(asset, sample);
 	if (prettyAsset) {
+		const pointerScale = cursorType === "pointer" ? 1.3 : 1;
 		return {
 			id: `pretty:${sample?.cursorType ?? asset.cursorType}`,
 			imageDataUrl: prettyAsset.imageDataUrl,
-			width: prettyAsset.width,
-			height: prettyAsset.height,
-			hotspotX: prettyAsset.hotspotX,
-			hotspotY: prettyAsset.hotspotY,
+			width: prettyAsset.width * pointerScale,
+			height: prettyAsset.height * pointerScale,
+			hotspotX: prettyAsset.hotspotX * pointerScale,
+			hotspotY: prettyAsset.hotspotY * pointerScale,
 		};
 	}
 

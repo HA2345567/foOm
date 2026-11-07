@@ -110,6 +110,16 @@ describe("isSourceCopyFastPathEligible", () => {
 });
 
 describe("getSourceCopyFastPathBlockers", () => {
+	it("requires resampling when the requested frame rate differs from the source", () => {
+		expect(
+			getSourceCopyFastPathBlockers(createConfig({ frameRate: 30 }), {
+				width: 1920,
+				height: 1080,
+				frameRate: 60,
+			}),
+		).toContain("output frame rate differs from source");
+	});
+
 	it("reports the source-size mismatch that blocks copy-only export", () => {
 		expect(
 			getSourceCopyFastPathBlockers(createConfig({ height: 1080 }), {

@@ -106,16 +106,16 @@ export function EditorEmptyState({ onVideoImported, onProjectOpened }: EditorEmp
 
 	return (
 		<div
-			className="flex h-full w-full flex-col items-center justify-center bg-[#09090b]"
+			className="relative flex h-full w-full flex-col items-center justify-center overflow-hidden bg-[#09090b]"
 			onDragOver={handleDragOver}
 			onDragLeave={handleDragLeave}
 			onDrop={handleDrop}
 		>
 			{/* Drop overlay */}
 			{isDraggingOver && (
-				<div className="pointer-events-none absolute inset-0 z-50 flex flex-col items-center justify-center rounded-xl border-2 border-dashed border-[#34B27B] bg-[#34B27B]/10">
-					<Upload className="mb-3 h-10 w-10 text-[#34B27B]" />
-					<p className="text-base font-semibold text-[#34B27B]">{te("emptyState.dropOverlay")}</p>
+				<div className="pointer-events-none absolute inset-4 z-50 flex flex-col items-center justify-center rounded-2xl border-2 border-dashed border-white/40 bg-[#09090b]/90 backdrop-blur-sm">
+					<Upload className="mb-3 h-10 w-10 text-white/80" />
+					<p className="text-base font-semibold text-white/80">{te("emptyState.dropOverlay")}</p>
 				</div>
 			)}
 
@@ -125,7 +125,7 @@ export function EditorEmptyState({ onVideoImported, onProjectOpened }: EditorEmp
 					<DialogHeader className="mb-4">
 						<div className="flex items-center gap-3">
 							<img
-								src="./openscreen.png"
+								src="/app-icon.png"
 								alt=""
 								aria-hidden="true"
 								className="w-9 h-9 rounded-xl flex-shrink-0"
@@ -161,17 +161,23 @@ export function EditorEmptyState({ onVideoImported, onProjectOpened }: EditorEmp
 			</Dialog>
 
 			<div className="relative flex flex-col items-center gap-8 px-6 text-center">
-				{/* Logo */}
-				<img
-					src="./openscreen.png"
-					alt=""
-					aria-hidden="true"
-					className="h-16 w-16 rounded-2xl opacity-90"
-				/>
+				<div className="flex flex-col items-center gap-4">
+					<img
+						src="/logo.png"
+						alt=""
+						aria-hidden="true"
+						className="h-12 w-auto opacity-90"
+					/>
+					<p className="text-[10px] font-semibold uppercase tracking-[0.28em] text-white/35">
+						foOom Studio
+					</p>
+				</div>
 
-				<div className="flex flex-col gap-2">
-					<h2 className="text-xl font-semibold text-slate-200">{te("emptyState.title")}</h2>
-					<p className="max-w-sm text-sm leading-relaxed text-slate-500">
+				<div className="flex flex-col gap-2.5">
+					<h2 className="font-brand text-[26px] font-semibold tracking-[-0.02em] text-white">
+						{te("emptyState.title")}
+					</h2>
+					<p className="max-w-md text-[13px] leading-relaxed text-slate-400">
 						{te("emptyState.description")}
 					</p>
 				</div>
@@ -181,7 +187,7 @@ export function EditorEmptyState({ onVideoImported, onProjectOpened }: EditorEmp
 					<button
 						type="button"
 						onClick={handleImportVideo}
-						className="flex items-center justify-center gap-2.5 w-full px-4 py-3 rounded-xl bg-[#34B27B] hover:bg-[#2d9e6c] active:bg-[#27885c] text-white font-medium text-sm transition-colors outline-none focus-visible:ring-2 focus-visible:ring-[#34B27B] focus-visible:ring-offset-2 focus-visible:ring-offset-[#09090b]"
+						className="flex items-center justify-center gap-2.5 w-full px-4 py-3 rounded-xl bg-[#ededed] hover:bg-white active:bg-[#d4d4d4] text-[#0a0a0b] font-medium text-sm transition-colors outline-none focus-visible:ring-2 focus-visible:ring-white/70 focus-visible:ring-offset-2 focus-visible:ring-offset-[#09090b]"
 					>
 						<Film className="h-4 w-4" />
 						{te("emptyState.importVideoButton")}
@@ -196,9 +202,11 @@ export function EditorEmptyState({ onVideoImported, onProjectOpened }: EditorEmp
 					</button>
 				</div>
 
-				<div className="flex flex-col items-center gap-2">
-					<p className="text-xs text-slate-600">{te("emptyState.supportedFormats")}</p>
-					<div className="flex items-center gap-1.5 text-xs text-slate-700 mt-4">
+				<div className="flex flex-col items-center gap-3">
+					<p className="text-[11px] tracking-wide text-slate-500">
+						{te("emptyState.supportedFormats")}
+					</p>
+					<div className="flex items-center gap-1.5 text-[11px] text-slate-600">
 						<Upload className="h-3 w-3" />
 						<span>{te("emptyState.dragDropHint")}</span>
 					</div>

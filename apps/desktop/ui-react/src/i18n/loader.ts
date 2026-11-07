@@ -1,9 +1,15 @@
 import { DEFAULT_LOCALE, LOCALES, type I18nNamespace, type Locale } from "./config";
+import { en } from "./locales/en";
 
 type TranslateVars = Record<string, string | number>;
+type Catalog = Record<I18nNamespace, Record<string, string>>;
+
+const CATALOGS: Record<Locale, Catalog> = {
+  en,
+};
 
 const LOCALE_NAMES: Record<Locale, string> = {
-  "zh-CN": "Chinese",
+  en: "English",
 };
 
 function humanizeKey(key: string): string {
@@ -24,15 +30,16 @@ export function getLocaleName(locale: Locale): string {
 
 export function translate(
   locale: Locale = DEFAULT_LOCALE,
-  _namespace: I18nNamespace,
+  namespace: I18nNamespace,
   key: string,
   vars?: TranslateVars,
 ): string {
-  let value = humanizeKey(key);
+  const defaultValue = typeof vars?.defaultValue === "string" ? vars.defaultValue : undefined;
+  let value = CATALOGS[locale]?.[namespace]?.[key] ?? defaultValue ?? humanizeKey(key);
 
   for (const [name, replacement] of Object.entries(vars ?? {})) {
     value = value.replaceAll(`{${name}}`, String(replacement));
   }
 
-  return locale === DEFAULT_LOCALE ? value : value;
+  return value;
 }

@@ -1,7 +1,9 @@
+import { readPaddingEdges, type PaddingEdges } from "@/lib/canvasPadding";
 import { normalizeBlurColor, normalizeBlurType } from "@/lib/blurEffects";
 import type { ExportFormat, ExportQuality, GifFrameRate, GifSizePreset } from "@/lib/exporter";
 import type { ProjectMedia } from "@/lib/recordingSession";
 import { normalizeProjectMedia } from "@/lib/recordingSession";
+import { normalizeCursorThemeId } from "@/lib/cursor/cursorThemes";
 import { DEFAULT_WALLPAPER, WALLPAPER_PATHS } from "@/lib/wallpaper";
 import { ASPECT_RATIOS, type AspectRatio, isPortraitAspectRatio } from "@/utils/aspectRatioUtils";
 import {
@@ -11,7 +13,6 @@ import {
   DEFAULT_GIF_SETTINGS,
   DEFAULT_WEBCAM_SETTINGS,
   DEFAULT_CURSOR_SETTINGS,
-  LEGACY_OVERSIZED_EDITOR_PADDING,
   MAX_EDITOR_PADDING,
 } from "./editorDefaults";
 import {
@@ -76,13 +77,17 @@ function normalizeWallpaperValue(value: string): string {
 
 export const PROJECT_VERSION = 2;
 
+import { normalizeSoundtrack, type Soundtrack } from "@/lib/soundtrack";
+
 export interface ProjectEditorState {
+  soundtrack?: Soundtrack | null;
   wallpaper: string;
   shadowIntensity: number;
   showBlur: boolean;
   motionBlurAmount: number;
   borderRadius: number;
   padding: number;
+  paddingEdges?: PaddingEdges;
   cropRegion: CropRegion;
   zoomRegions: ZoomRegion[];
   trimRegions: TrimRegion[];
@@ -106,6 +111,12 @@ export interface ProjectEditorState {
   webcamMirrored: boolean;
   webcamReactiveZoom: boolean;
   cursorTheme: string;
+  showCursor: boolean;
+  cursorSize: number;
+  cursorSmoothing: number;
+  cursorMotionBlur: number;
+  cursorClickBounce: number;
+  cursorClipToBounds: boolean;
 }
 
 export interface EditorProjectData {
@@ -161,7 +172,7 @@ function clamp(value: number, min: number, max: number) {
 }
 
 function normalizeEditorPadding(value: unknown): number {
-  if (!isFiniteNumber(value) || value === LEGACY_OVERSIZED_EDITOR_PADDING) {
+  if (!isFiniteNumber(value)) {
     return DEFAULT_EDITOR_LAYOUT_SETTINGS.padding;
   }
   return clamp(value, 0, MAX_EDITOR_PADDING);
@@ -543,6 +554,7 @@ export function normalizeProjectEditor(editor: Partial<ProjectEditorState>): Pro
         ? editor.borderRadius
         : DEFAULT_EDITOR_APPEARANCE_SETTINGS.borderRadius,
     padding: normalizeEditorPadding(editor.padding),
+    paddingEdges: readPaddingEdges(editor.paddingEdges),
     cropRegion: {
       x: cropX,
       y: cropY,
@@ -576,6 +588,7 @@ export function normalizeProjectEditor(editor: Partial<ProjectEditorState>): Pro
             ? "source"
             : DEFAULT_EXPORT_SETTINGS.quality,
     exportFormat: editor.exportFormat === "gif" ? "gif" : DEFAULT_EXPORT_SETTINGS.format,
+    soundtrack: normalizeSoundtrack(editor.soundtrack),
     noiseReductionEnabled:
       typeof editor.noiseReductionEnabled === "boolean"
         ? editor.noiseReductionEnabled
@@ -601,19 +614,28 @@ export function normalizeProjectEditor(editor: Partial<ProjectEditorState>): Pro
     autoFocusAll: typeof editor.autoFocusAll === "boolean" ? editor.autoFocusAll : false,
     showTrimWaveform: typeof editor.showTrimWaveform === "boolean" ? editor.showTrimWaveform : true,
     webcamMirrored: typeof editor.webcamMirrored === "boolean" ? editor.webcamMirrored : false,
-    webcamReactiveZoom: typeof editor.webcamReactiveZoom === "boolean" ? editor.webcamReactiveZoom : false,
-    cursorTheme: typeof editor.cursorTheme === "string" ? editor.cursorTheme : DEFAULT_CURSOR_SETTINGS.theme,
+    webcamReactiveZoom:
+      typeof editor.webcamReactiveZoom === "boolean"
+        ? editor.webcamReactiveZoom
+        : DEFAULT_WEBCAM_SETTINGS.reactiveZoom,
+    cursorTheme: normalizeCursorThemeId(editor.cursorTheme ?? DEFAULT_CURSOR_SETTINGS.theme),
+    showCursor: typeof editor.showCursor === "boolean" ? editor.showCursor : DEFAULT_CURSOR_SETTINGS.show,
+    cursorSize: isFiniteNumber(editor.cursorSize) ? clamp(editor.cursorSize, 0.5, 10) : DEFAULT_CURSOR_SETTINGS.size,
+    cursorSmoothing: isFiniteNumber(editor.cursorSmoothing) ? clamp(editor.cursorSmoothing, 0, 1) : DEFAULT_CURSOR_SETTINGS.smoothing,
+    cursorMotionBlur: isFiniteNumber(editor.cursorMotionBlur) ? clamp(editor.cursorMotionBlur, 0, 1) : DEFAULT_CURSOR_SETTINGS.motionBlur,
+    cursorClickBounce: isFiniteNumber(editor.cursorClickBounce) ? clamp(editor.cursorClickBounce, 0, 5) : DEFAULT_CURSOR_SETTINGS.clickBounce,
+    cursorClipToBounds: typeof editor.cursorClipToBounds === "boolean" ? editor.cursorClipToBounds : DEFAULT_CURSOR_SETTINGS.clipToBounds,
   };
 }
 
 export function createProjectData(
   media: ProjectMedia,
-  editor: ProjectEditorState,
+  editor: Partial<ProjectEditorState>,
 ): EditorProjectData {
   return {
     version: PROJECT_VERSION,
     media,
-    editor,
+    editor: normalizeProjectEditor(editor),
   };
 }
 

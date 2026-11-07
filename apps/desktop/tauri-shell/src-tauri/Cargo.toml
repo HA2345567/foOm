@@ -1,10 +1,10 @@
 [package]
 name = "foOm"
 version = "0.2.0"
-description = "Cinematic screen recorder for Windows"
+description = "Cross-platform cinematic screen recorder, Windows first"
 authors = ["Harsh Bhardwaj"]
-license = "Proprietary"
-repository = ""
+license = "MIT"
+repository = "https://github.com/HA2345567/foOm"
 edition = "2021"
 rust-version = "1.77.2"
 
@@ -28,11 +28,14 @@ rfd = "0.15"
 rust-core = { path = "../../rust-core" }
 export-engine = { path = "../../../../renderer/export-engine" }
 motion-engine = { path = "../../../../renderer/motion-engine" }
+shared-core = { path = "../../shared-core" }
 
 [target.'cfg(windows)'.dependencies]
 windows-sys = { version = "0.61.2", features = [
     "Win32_Foundation",
+    "Win32_Graphics_Dwm",
     "Win32_Security",
     "Win32_System_Threading",
+    "Win32_UI_Input_KeyboardAndMouse",
     "Win32_UI_WindowsAndMessaging",
 ] }

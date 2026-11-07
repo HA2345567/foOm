@@ -10,6 +10,7 @@ interface ExportDialogProps {
   onClose: () => void;
   progress: ExportProgress | null;
   isExporting: boolean;
+  isPreparingExport?: boolean;
   error: string | null;
   onCancel?: () => void;
   exportFormat?: ExportFormat;
@@ -26,9 +27,9 @@ const EXPORT_QUALITY_OPTIONS: Array<{
   label: string;
   summary: string;
 }> = [
-  { value: "medium", label: "Low", summary: "SD 480p • 30 FPS • Fast Export" },
+  { value: "medium", label: "720p", summary: "720p short side • 60 FPS" },
   { value: "good", label: "Medium", summary: "Full HD 1080p • 60 FPS • High Quality" },
-  { value: "source", label: "High", summary: "Ultra HD 4K • 60 FPS • Maximum Quality" },
+  { value: "source", label: "Source", summary: "Source-based dimensions • 60 FPS" },
 ];
 
 export function ExportDialog({
@@ -36,6 +37,7 @@ export function ExportDialog({
   onClose,
   progress,
   isExporting,
+  isPreparingExport = false,
   error,
   onCancel,
   exportFormat = "mp4",
@@ -64,15 +66,8 @@ export function ExportDialog({
   }, [isOpen, isExporting, progress]);
 
   useEffect(() => {
-    if (!isExporting && progress && progress.percentage >= 100 && !error) {
-      setShowSuccess(true);
-      const timer = setTimeout(() => {
-        setShowSuccess(false);
-        onClose();
-      }, 2000);
-      return () => clearTimeout(timer);
-    }
-  }, [isExporting, progress, error, onClose]);
+    setShowSuccess(Boolean(exportedFilePath) && !isExporting && !isPreparingExport && !error);
+  }, [exportedFilePath, isExporting, isPreparingExport, error]);
 
   if (!isOpen) return null;
 
@@ -90,6 +85,7 @@ export function ExportDialog({
   // Get status message based on phase
   const getStatusMessage = () => {
     if (error) return t("export.tryAgain");
+    if (isPreparingExport) return "Choose where to save your video.";
     if (isCompiling || isFinalizing) {
       if (exportFormat === "mp4") {
         return t("export.finalizingVideo");
@@ -105,6 +101,7 @@ export function ExportDialog({
   // Get title based on phase
   const getTitle = () => {
     if (error) return t("export.failed");
+    if (isPreparingExport) return "Choose save location";
     if (isFinalizing && exportFormat === "mp4") return t("export.finalizingVideoTitle");
     if (isCompiling || isFinalizing) return t("export.compilingGif");
     return t("export.exportingFormat", { format: formatLabel });
@@ -114,12 +111,12 @@ export function ExportDialog({
     <>
       <div
         className="fixed inset-0 bg-black/80 backdrop-blur-md z-50 animate-in fade-in duration-200"
-        onClick={isExporting ? undefined : onClose}
+        onClick={isExporting || isPreparingExport ? undefined : onClose}
       />
       <div className="fixed top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 z-[60] bg-[#09090b] rounded-lg shadow-2xl border border-white/10 p-4 w-[min(340px,calc(100vw-24px))] animate-in zoom-in-95 duration-200">
         <div className="flex items-center justify-between mb-6">
           <div className="flex items-center gap-4">
-            {!isExporting && !progress && !error && !showSuccess ? (
+            {!isExporting && !isPreparingExport && !progress && !error && !showSuccess ? (
               <div>
                 <span className="text-sm font-semibold text-white block">Export</span>
                 <span className="text-xs text-slate-400">
@@ -128,8 +125,8 @@ export function ExportDialog({
               </div>
             ) : showSuccess ? (
               <>
-                <div className="w-12 h-12 rounded-full bg-[#34B27B]/20 flex items-center justify-center ring-1 ring-[#34B27B]/50">
-                  <Download className="w-6 h-6 text-[#34B27B]" />
+                <div className="w-12 h-12 rounded-full bg-white/10 flex items-center justify-center ring-1 ring-white/50">
+                  <Download className="w-6 h-6 text-white/80" />
                 </div>
                 <div className="flex flex-col gap-2">
                   <span className="text-xl font-bold text-slate-200 block">
@@ -156,9 +153,9 @@ export function ExportDialog({
               </>
             ) : (
               <>
-                {isExporting ? (
-                  <div className="w-12 h-12 rounded-full bg-[#34B27B]/10 flex items-center justify-center">
-                    <Loader2 className="w-6 h-6 text-[#34B27B] animate-spin" />
+                {isExporting || isPreparingExport ? (
+                  <div className="w-12 h-12 rounded-full bg-white/10 flex items-center justify-center">
+                    <Loader2 className="w-6 h-6 text-white/80 animate-spin" />
                   </div>
                 ) : (
                   <div className="w-12 h-12 rounded-full bg-white/5 flex items-center justify-center border border-white/10">
@@ -172,7 +169,7 @@ export function ExportDialog({
               </>
             )}
           </div>
-          {!isExporting && !showSuccess && (
+          {!isExporting && !isPreparingExport && (
             <Button
               variant="ghost"
               size="icon"
@@ -184,7 +181,7 @@ export function ExportDialog({
           )}
         </div>
 
-        {!isExporting && !progress && !error && !showSuccess && (
+        {!isExporting && !isPreparingExport && !progress && !error && !showSuccess && (
           <div className="space-y-4">
             <div className="grid grid-cols-2 rounded-md bg-[#2A2727] p-1">
               <button
@@ -265,6 +262,9 @@ export function ExportDialog({
                 {error}
               </p>
             </div>
+            <Button type="button" onClick={onStartExport} className="mt-3 w-full">
+              Try export again
+            </Button>
           </div>
         )}
 
@@ -297,13 +297,13 @@ export function ExportDialog({
                   // Show render progress if available, otherwise animated indeterminate bar
                   renderProgress !== undefined && renderProgress > 0 ? (
                     <div
-                      className="h-full bg-[#34B27B] shadow-[0_0_10px_rgba(52, 178, 123,0.3)] transition-all duration-300 ease-out"
+                      className="h-full bg-white/80 shadow-[0_0_10px_rgba(255,255,255,0.25)] transition-all duration-300 ease-out"
                       style={{ width: `${renderProgress}%` }}
                     />
                   ) : (
                     <div className="h-full w-full relative overflow-hidden">
                       <div
-                        className="absolute h-full w-1/3 bg-[#34B27B] shadow-[0_0_10px_rgba(52, 178, 123,0.3)]"
+                        className="absolute h-full w-1/3 bg-white/80 shadow-[0_0_10px_rgba(255,255,255,0.25)]"
                         style={{
                           animation: "indeterminate 1.5s ease-in-out infinite",
                         }}
@@ -318,7 +318,7 @@ export function ExportDialog({
                   )
                 ) : (
                   <div
-                    className="h-full bg-[#34B27B] shadow-[0_0_10px_rgba(52, 178, 123,0.3)] transition-all duration-300 ease-out"
+                    className="h-full bg-white/80 shadow-[0_0_10px_rgba(255,255,255,0.25)] transition-all duration-300 ease-out"
                     style={{ width: `${Math.min(progress.percentage, 100)}%` }}
                   />
                 )}

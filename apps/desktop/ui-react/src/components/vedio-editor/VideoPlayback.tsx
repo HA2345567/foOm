@@ -1,3 +1,4 @@
+import type { PaddingEdges } from "@/lib/canvasPadding";
 import {
 	Application,
 	BlurFilter,
@@ -119,6 +120,7 @@ interface VideoPlaybackProps {
 	motionBlurAmount?: number;
 	borderRadius?: number;
 	padding?: number;
+	paddingEdges?: PaddingEdges;
 	cropRegion?: import("./types").CropRegion;
 	trimRegions?: TrimRegion[];
 	speedRegions?: SpeedRegion[];
@@ -223,7 +225,7 @@ const VideoPlayback = forwardRef<VideoPlaybackRef, VideoPlaybackProps>(
 			webcamLayoutPreset,
 			webcamMaskShape,
 			webcamMirrored = false,
-			webcamReactiveZoom = false,
+			webcamReactiveZoom = true,
 			webcamSizePreset,
 			webcamPosition,
 			onWebcamPositionChange,
@@ -246,6 +248,7 @@ const VideoPlayback = forwardRef<VideoPlaybackRef, VideoPlaybackProps>(
 			motionBlurAmount = 0,
 			borderRadius = 0,
 			padding = DEFAULT_EDITOR_LAYOUT_SETTINGS.padding,
+			paddingEdges,
 			cropRegion,
 			trimRegions = [],
 			speedRegions = [],
@@ -608,6 +611,7 @@ const VideoPlayback = forwardRef<VideoPlaybackRef, VideoPlaybackProps>(
 				lockedVideoDimensions: lockedVideoDimensionsRef.current,
 				borderRadius,
 				padding,
+				paddingEdges,
 				webcamDimensions,
 				webcamLayoutPreset,
 				webcamSizePreset,
@@ -641,6 +645,7 @@ const VideoPlayback = forwardRef<VideoPlaybackRef, VideoPlaybackProps>(
 			cropRegion,
 			borderRadius,
 			padding,
+			paddingEdges,
 			webcamDimensions,
 			webcamLayoutPreset,
 			webcamSizePreset,
@@ -898,7 +903,7 @@ const VideoPlayback = forwardRef<VideoPlaybackRef, VideoPlaybackProps>(
 			cursorThemeRef.current = cursorTheme;
 			void preloadCursorAssets(cursorTheme).then(() => {
 				cursorOverlayRef.current?.updateThemeAssets();
-			});
+			}).catch((error) => console.warn("[VideoPlayback] Optional cursor assets unavailable:", error));
 		}, [cursorTheme]);
 
 		useEffect(() => {
@@ -1048,13 +1053,6 @@ const VideoPlayback = forwardRef<VideoPlaybackRef, VideoPlaybackProps>(
 			let app: Application | null = null;
 
 			(async () => {
-				let cursorOverlayEnabled = true;
-				try {
-					await preloadCursorAssets(cursorThemeRef.current);
-				} catch {
-					cursorOverlayEnabled = false;
-				}
-
 				app = new Application();
 
 				await app.init({
@@ -1091,7 +1089,9 @@ const VideoPlayback = forwardRef<VideoPlaybackRef, VideoPlaybackProps>(
 				cameraContainer.addChild(videoContainer);
 
 				// Cursor overlay - rendered above the masked video
-				if (cursorOverlayEnabled) {
+				// Optional cursor images must not block the canvas or first video frame.
+				void preloadCursorAssets(cursorThemeRef.current).then(() => {
+					if (!mounted || !videoContainerRef.current) return;
 					const cursorOverlay = new PixiCursorOverlay({
 						dotRadius: DEFAULT_CURSOR_CONFIG.dotRadius * cursorSizeRef.current,
 						smoothingFactor: cursorSmoothingRef.current,
@@ -1099,10 +1099,14 @@ const VideoPlayback = forwardRef<VideoPlaybackRef, VideoPlaybackProps>(
 						clickBounce: cursorClickBounceRef.current,
 					});
 					cursorOverlayRef.current = cursorOverlay;
-				}
+					videoContainerRef.current.addChild(cursorOverlay.container);
+				}).catch((error) => console.warn("[VideoPlayback] Optional cursor overlay unavailable:", error));
 
 				setPixiReady(true);
-			})();
+			})().catch((error) => {
+				console.error("[VideoPlayback] Preview initialization failed:", error);
+				if (mounted) onError("Could not initialize video preview. Try reopening the clip.");
+			});
 
 			return () => {
 				mounted = false;
@@ -1221,10 +1225,8 @@ const VideoPlayback = forwardRef<VideoPlaybackRef, VideoPlaybackProps>(
 			if (!video || !app || !videoContainer) return;
 			if (video.videoWidth === 0 || video.videoHeight === 0) return;
 
-			const source = VideoSource.from(video);
-			if ("autoPlay" in source) {
-				(source as { autoPlay?: boolean }).autoPlay = false;
-			}
+			// Configure this before construction; from() may attempt autoplay immediately.
+			const source = new VideoSource({ resource: video, autoPlay: false, autoLoad: true });
 			if ("autoUpdate" in source) {
 				(source as { autoUpdate?: boolean }).autoUpdate = true;
 			}
@@ -2016,6 +2018,7 @@ const VideoPlayback = forwardRef<VideoPlaybackRef, VideoPlaybackProps>(
 									<video
 										ref={webcamVideoRef}
 										src={resolvedWebcamSrc}
+						crossOrigin="anonymous"
 										className={`w-full h-full object-cover ${webcamLayoutPreset === "picture-in-picture" ? "cursor-grab active:cursor-grabbing" : "pointer-events-none"}`}
 										style={{
 											borderRadius: useClipPath ? 0 : (webcamLayout?.borderRadius ?? 0),
@@ -2048,7 +2051,7 @@ const VideoPlayback = forwardRef<VideoPlaybackRef, VideoPlaybackProps>(
 						>
 							<div
 								ref={focusIndicatorRef}
-								className="absolute rounded-md border border-[#34B27B]/80 bg-[#34B27B]/20 shadow-[0_0_0_1px_rgba(52,178,123,0.35)]"
+								className="absolute rounded-md border border-white/60 bg-white/10 shadow-[0_0_0_1px_rgba(255,255,255,0.25)]"
 								style={{ display: "none", pointerEvents: "none" }}
 							/>
 							{(() => {
@@ -2195,6 +2198,7 @@ const VideoPlayback = forwardRef<VideoPlaybackRef, VideoPlaybackProps>(
 				<video
 					ref={videoRef}
 					src={resolvedVideoSrc}
+					crossOrigin="anonymous"
 					className="hidden"
 					preload="auto"
 					playsInline

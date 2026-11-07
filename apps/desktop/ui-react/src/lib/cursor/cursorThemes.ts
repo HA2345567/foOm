@@ -1,3 +1,5 @@
+import { MAC_CURSOR_OPTIONS } from "./macCursors";
+import { getAssetPath } from "@/lib/assetPath";
 import type { NativeCursorType } from "@/native/contracts";
 
 /**
@@ -421,7 +423,7 @@ export const CURSOR_THEMES: readonly CursorTheme[] = [
 /** All selectable theme ids, including the built-in default. */
 export const CURSOR_THEME_IDS: ReadonlySet<string> = new Set([
 	DEFAULT_CURSOR_THEME_ID,
-	...CURSOR_THEMES.map((theme) => theme.id),
+	...MAC_CURSOR_OPTIONS.map(({ id }) => id),
 ]);
 
 /** Returns the theme for `id`, or null for the default / unknown ids. */
@@ -430,6 +432,23 @@ export function getCursorTheme(id: string | null | undefined): CursorTheme | nul
 		return null;
 	}
 	return CURSOR_THEMES.find((theme) => theme.id === id) ?? null;
+}
+
+export function getArrowCursorVariant(id: string | null | undefined) {
+	const prefix = "arrow-style:";
+	if (!id?.startsWith(prefix)) return null;
+	const theme = getCursorTheme(id.slice(prefix.length));
+	const arrow = theme?.assets.arrow;
+	if (!arrow) return null;
+	return {
+		id,
+		imageDataUrl: getAssetPath(arrow.assetPath),
+		width: arrow.width,
+		height: arrow.height,
+		hotspotX: arrow.hotspotX,
+		hotspotY: arrow.hotspotY,
+		cursorType: "arrow" as const,
+	};
 }
 
 /**

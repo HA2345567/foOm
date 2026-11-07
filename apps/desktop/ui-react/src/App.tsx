@@ -1,11 +1,11 @@
 import { lazy, Suspense, useEffect, useState } from "react";
-import { CountdownOverlay } from "./components/launch/CountdownOverlay.tsx";
 import { LaunchWindow } from "./components/launch/LaunchWindow";
 import { SourceSelector } from "./components/launch/SourceSelector";
 import { Toaster } from "./components/ui/sonner";
 import { TooltipProvider } from "./components/ui/tooltip";
 import { ShortcutsProvider } from "./contexts/ShortcutsContext";
 import { loadAllCustomFonts } from "./lib/customFonts";
+import { StudioHome } from "./components/StudioHome";
 
 const VideoEditor = lazy(() => import("./components/vedio-editor/VideoEditor"));
 const ShortcutsConfigDialog = lazy(() =>
@@ -25,7 +25,7 @@ export default function App() {
       setWindowType(type);
     }
 
-    if (type === "hud-overlay" || type === "source-selector" || type === "countdown-overlay") {
+    if (type === "hud-overlay" || type === "source-selector") {
       document.body.style.background = "transparent";
       document.documentElement.style.background = "transparent";
       document.getElementById("root")?.style.setProperty("background", "transparent");
@@ -59,8 +59,6 @@ export default function App() {
         return <LaunchWindow />;
       case "source-selector":
         return <SourceSelector />;
-      case "countdown-overlay":
-        return <CountdownOverlay />;
       case "editor":
         return (
           <ShortcutsProvider>
@@ -71,18 +69,7 @@ export default function App() {
           </ShortcutsProvider>
         );
       default:
-        return (
-          <div className="flex w-full h-full min-h-screen items-center justify-center bg-[#09090b] text-white">
-            <div className="text-center space-y-3">
-              <h1 className="text-5xl font-black tracking-widest bg-gradient-to-r from-emerald-400 to-teal-500 bg-clip-text text-transparent animate-pulse">
-                foOm
-              </h1>
-              <p className="text-xs text-white/40 tracking-wider uppercase font-medium">
-                Cinematic Recording Studio
-              </p>
-            </div>
-          </div>
-        );
+        return <StudioHome />;
     }
   })();
 
